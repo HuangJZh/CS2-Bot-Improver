@@ -10,7 +10,7 @@ namespace BotSupport;
 public sealed class BotSupport : BasePlugin
 {
     public override string ModuleName => "BotSupport";
-    public override string ModuleVersion => "1.0.1";
+    public override string ModuleVersion => "1.0.2";
     public override string ModuleAuthor => "HuangJZh fork";
     public override string ModuleDescription => "Wheel weapon requests and probabilistic post-shot stops";
     private readonly Dictionary<int, float> _requests = new();
@@ -54,7 +54,9 @@ public sealed class BotSupport : BasePlugin
             || p.PlayerPawn.Value is not { IsValid:true } pawn || pawn.Bot == null
             || (pawn.Flags & 1) == 0 || !Firearms.Contains(e.Weapon.Replace("weapon_",""))
             || !SupportPolicy.StopSucceeds(_difficulty,Random.Shared.Next(100))) return HookResult.Continue;
-        pawn.Teleport((Vector?)null, null, new Vector(0,0,pawn.AbsVelocity.Z));
+        // Change horizontal velocity directly; teleporting can disturb ground contact.
+        pawn.AbsVelocity.X = 0;
+        pawn.AbsVelocity.Y = 0;
         return HookResult.Continue;
     }
     private HookResult Wheel(CCSPlayerController? p, CommandInfo c)
