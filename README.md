@@ -2,6 +2,8 @@
 
 # CS2-Bot-Improver
 
+**HuangJZh custom branch:** [Humanized combat, utility budgets and radio assistance / 自定义说明](docs/HUMANIZED.zh-CN.md).
+
 [![Latest release](https://img.shields.io/github/v/release/ed0ard/CS2-Bot-Improver?display_name=tag&sort=semver)](https://github.com/ed0ard/CS2-Bot-Improver/releases/latest)
 [![Release downloads](https://img.shields.io/github/downloads/ed0ard/CS2-Bot-Improver/total)](https://github.com/ed0ard/CS2-Bot-Improver/releases)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)

@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>NadeSystem</RootNamespace>
+    <AssemblyName>NadeSystem</AssemblyName>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.378" Condition="'$(CounterStrikeSharpApiPath)' == ''" />
+    <Reference Include="$(CounterStrikeSharpApiPath)/*.dll" Condition="'$(CounterStrikeSharpApiPath)' != ''"><Private>false</Private></Reference>
+    <Compile Remove="tests/**/*.cs" />
+  </ItemGroup>
+
+</Project>

@@ -16,25 +16,25 @@
 // All profiles begin with this data and overwrite their own
 //
 Default
-        Skill = 100
+        Skill = 55
         Aggression = 100
-        ReactionTime = 0
-        AttackDelay = 0
+        ReactionTime = 0.28
+        AttackDelay = 0.07
         Teamwork = 100
-        AimFocusInitial = 0                    // initial focus spread in degrees (from desired center)
-        AimFocusDecay = 0                             // how much focus shrinks per second (.25 = 25% of size after 1 sec)
-        AimFocusOffsetScale = 0              // controls accuracy when tracking to target (0 == perfect, should always be < 1)
-        AimfocusInterval = 0                  // how often focus is adjusted (smaller intervals means better movement tracking)
+        AimFocusInitial = 2.0                    // initial focus spread in degrees (from desired center)
+        AimFocusDecay = 0.8                             // how much focus shrinks per second (.25 = 25% of size after 1 sec)
+        AimFocusOffsetScale = 0.3              // controls accuracy when tracking to target (0 == perfect, should always be < 1)
+        AimfocusInterval = 0.18                  // how often focus is adjusted (smaller intervals means better movement tracking)
         WeaponPreference = none
         Cost = 4
         Difficulty = NORMAL
         VoicePitch = 100
         Skin = 0
-		LookAngleMaxAccelNormal = 2000.0
-    	LookAngleStiffnessNormal = 100.0
+		LookAngleMaxAccelNormal = 1400
+		LookAngleStiffnessNormal = 240
     	LookAngleDampingNormal = 25.0
-    	LookAngleMaxAccelAttacking = 3000.0
-    	LookAngleStiffnessAttacking = 150.0
+		LookAngleMaxAccelAttacking = 1400
+		LookAngleStiffnessAttacking = 240
     	LookAngleDampingAttacking = 30.0
 End
 
@@ -224,91 +224,91 @@ End
 // skill templates
 
 Template ProTop
-    Skill = 100
-	ReactionTime = 0
-	AttackDelay = 0
-	AimFocusInitial = 0
-	AimFocusDecay = 0.0000001
-	AimFocusOffsetScale = 0
-	AimfocusInterval = 0
+    Skill = 55
+	ReactionTime = 0.28
+	AttackDelay = 0.07
+	AimFocusInitial = 2.0
+	AimFocusDecay = 0.8
+	AimFocusOffsetScale = 0.3
+	AimfocusInterval = 0.18
 	Difficulty = EXPERT+HARD+NORMAL+EASY
 End
 
 Template ProFast   // sniper rifler rusher
-	Skill = 100
-	ReactionTime = 0
-	AttackDelay = 0
-	AimFocusInitial = 0
-	AimFocusDecay = 0.001
-	AimFocusOffsetScale = 0
-	AimfocusInterval = 0
+	Skill = 55
+	ReactionTime = 0.28
+	AttackDelay = 0.07
+	AimFocusInitial = 2.0
+	AimFocusDecay = 0.8
+	AimFocusOffsetScale = 0.3
+	AimfocusInterval = 0.18
 	Difficulty = EXPERT+HARD+NORMAL+EASY
 End
 
 Template ProPrecise   // sniper scoper fastshot camper
-	Skill = 100
-	ReactionTime = 0.01
-	AttackDelay = 0
-	AimFocusInitial = 0
-	AimFocusDecay = 0.0000001
-	AimFocusOffsetScale = 0
-	AimfocusInterval = 0
+	Skill = 55
+	ReactionTime = 0.28
+	AttackDelay = 0.07
+	AimFocusInitial = 2.0
+	AimFocusDecay = 0.8
+	AimFocusOffsetScale = 0.3
+	AimfocusInterval = 0.18
 	Difficulty = EXPERT+HARD+NORMAL+EASY
 End
 
 Template ProSlow    // duelist sniper
-	Skill = 100
-    ReactionTime = 0.01
-    AttackDelay = 0
-    AimFocusInitial = 0.00000001
-	AimFocusDecay = 0.00000001
-	AimFocusOffsetScale = 0
-	AimfocusInterval = 0.00000001
+	Skill = 55
+    ReactionTime = 0.28
+    AttackDelay = 0.07
+    AimFocusInitial = 2.0
+	AimFocusDecay = 0.8
+	AimFocusOffsetScale = 0.3
+	AimfocusInterval = 0.18
 	Difficulty = EXPERT+HARD+NORMAL+EASY
 End
 
 Template ProSteady    // rifler
-    Skill = 100
-    ReactionTime = 0.0001
-    AttackDelay = 0
-    AimFocusInitial = 0.0001
-	AimFocusDecay = 0.0001
-	AimFocusOffsetScale = 0
-	AimfocusInterval = 0.0001
+    Skill = 55
+    ReactionTime = 0.28
+    AttackDelay = 0.07
+    AimFocusInitial = 2.0
+	AimFocusDecay = 0.8
+	AimFocusOffsetScale = 0.3
+	AimfocusInterval = 0.18
     Difficulty = EXPERT+HARD+NORMAL+EASY
 End
 
 Template RankRifler    // rifler
-	Skill = 49
-	ReactionTime = 0.1
-	AttackDelay = 0.01
+	Skill = 55
+	ReactionTime = 0.28
+	AttackDelay = 0.07
 	VoicePitch = 85
-	AimFocusInitial = 0.01
-	AimFocusDecay = 1
-	AimFocusOffsetScale = 0
-	AimfocusInterval = 0.01
+	AimFocusInitial = 2.0
+	AimFocusDecay = 0.8
+	AimFocusOffsetScale = 0.3
+	AimfocusInterval = 0.18
 	Difficulty = EXPERT+HARD+NORMAL+EASY
 End
 
 Template RankDuelist    // duelist rusher
-	Skill = 49
-	ReactionTime = 0.1
-	AttackDelay = 0
-	AimFocusInitial = 0.25
-	AimFocusDecay = 0.05
-	AimFocusOffsetScale = 0
-	AimfocusInterval = 0.05
+	Skill = 55
+	ReactionTime = 0.28
+	AttackDelay = 0.07
+	AimFocusInitial = 2.0
+	AimFocusDecay = 0.8
+	AimFocusOffsetScale = 0.3
+	AimfocusInterval = 0.18
 	Difficulty = EXPERT+HARD+NORMAL+EASY
 End
 
 Template RankOthers    // sniper scoper rifler
-    Skill = 49
-    ReactionTime = 0.1
-    AttackDelay = 0
-    AimFocusInitial = 0.00001
-	AimFocusDecay = 0.0000001
-	AimFocusOffsetScale = 0.0000000000000000000000001
-	AimfocusInterval = 0.0000000000001
+    Skill = 55
+    ReactionTime = 0.28
+    AttackDelay = 0.07
+    AimFocusInitial = 2.0
+	AimFocusDecay = 0.8
+	AimFocusOffsetScale = 0.3
+	AimfocusInterval = 0.18
     Difficulty = EXPERT+HARD+NORMAL+EASY
 End
 
@@ -4134,11 +4134,11 @@ ProSteady+SniperPro+SniperPersonality "MartinezSa"
 End
 ProTop+RiflePro+RiflePersonality "forsaken"
 	VoicePitch = 115
-    LookAngleMaxAccelNormal = 99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999.9.9.9.9
-    LookAngleStiffnessNormal = 3000.0
+    LookAngleMaxAccelNormal = 1400
+    LookAngleStiffnessNormal = 240
     LookAngleDampingNormal = 45.0
-    LookAngleMaxAccelAttacking = 99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999.9.9.9.9
-    LookAngleStiffnessAttacking = 3000.0
+    LookAngleMaxAccelAttacking = 1400
+    LookAngleStiffnessAttacking = 240
     LookAngleDampingAttacking = 39.95
 End
 //----------------------------------------------------------------------------

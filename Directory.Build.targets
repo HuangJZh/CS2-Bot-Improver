@@ -1,0 +1,16 @@
+<Project>
+  <!-- Optional offline build against the API already installed with the game. -->
+  <ItemGroup Condition="'$(CounterStrikeSharpApiPath)' != ''">
+    <PackageReference Remove="CounterStrikeSharp.API" />
+    <Reference Include="$(CounterStrikeSharpApiPath)/*.dll">
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup Condition="'$(BotControllerApiPath)' != ''">
+    <Reference Remove="BotControllerApi" />
+    <Reference Include="BotControllerApi">
+      <HintPath>$(BotControllerApiPath)/BotControllerApi.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

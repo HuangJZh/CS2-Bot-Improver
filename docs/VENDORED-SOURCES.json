@@ -1,0 +1,22 @@
+[
+  {
+    "path": "addons/counterstrikesharp/plugins/BotAI",
+    "upstream": "https://github.com/ed0ard/CS2-BotAI.git",
+    "commit": "7d6997e11b952abb899d71abefa959c6e49cdfef"
+  },
+  {
+    "path": "addons/counterstrikesharp/plugins/BotAimImprover",
+    "upstream": "https://github.com/ed0ard/CS2-Bullseye-Bot.git",
+    "commit": "c5a2e0f402f151336c820b7efc1b895aa087a953"
+  },
+  {
+    "path": "addons/counterstrikesharp/plugins/BotState",
+    "upstream": "https://github.com/ed0ard/CS2-Smarter-Bot.git",
+    "commit": "6b5781f85391816c08154a9c1d5b5dd6e898a2f5"
+  },
+  {
+    "path": "addons/counterstrikesharp/plugins/NadeSystem",
+    "upstream": "https://github.com/ed0ard/CS2-Bot-NadeSystem.git",
+    "commit": "7605f272d0500a7bad5b6294555485c7721a40da"
+  }
+]
