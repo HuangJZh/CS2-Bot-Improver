@@ -10,7 +10,7 @@ namespace BotSupport;
 public sealed class BotSupport : BasePlugin
 {
     public override string ModuleName => "BotSupport";
-    public override string ModuleVersion => "1.0.0";
+    public override string ModuleVersion => "1.0.1";
     public override string ModuleAuthor => "HuangJZh fork";
     public override string ModuleDescription => "Wheel weapon requests and probabilistic post-shot stops";
     private readonly Dictionary<int, float> _requests = new();
@@ -77,7 +77,7 @@ public sealed class BotSupport : BasePlugin
             && bp.Bot != null && !bp.Bot.IsAttacking && !bp.Bot.IsEnemyVisible && HasPrimary(b)
             && b.InGameMoneyServices != null).ToArray();
         var choice=SupportPolicy.Select(bots.Select(b => new Donor(b.Slot,b.InGameMoneyServices!.Account,Distance(b,caller))),caller.TeamNum,request);
-        if(choice == null) { Reply(caller,"没有符合条件的队友：需要在附近购买区、有主武器，购买后留有 800 元。可选 auto/awp/ak/m4a1/m4a4。"); return HookResult.Handled; }
+        if(choice == null) { Reply(caller,"没有符合条件的队友：需要在附近购买区、有主武器，余额足够支付武器价格。可选 auto/awp/ak/m4a1/m4a4。"); return HookResult.Handled; }
         var (donor,gun)=choice.Value;
         var bot=bots.Single(b => b.Slot==donor.Slot);
         var money=bot.InGameMoneyServices!;
