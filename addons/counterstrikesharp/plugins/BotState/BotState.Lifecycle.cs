@@ -14,6 +14,7 @@ public partial class BotState
     public override void Load(bool hotReload)
     {
         RegisterFakeConVars(typeof(HumanCombatSettings));
+        RegisterFakeConVars(typeof(BrakeSettings));
         InstallDefuseBombHook();
         InstallBotBlindHook();
         InitializeFovPatches();
@@ -61,6 +62,7 @@ public partial class BotState
     public override void Unload(bool hotReload)
     {
         ReleaseHumanReactionControls();
+        ClearBrakeControls();
         _customFov?.Dispose(); _customFov = null;
         ClearFovObservers();
         ClearFlashEntities();
@@ -109,6 +111,7 @@ public partial class BotState
         ClearFovObservers();
         ReleaseKnifeLocks();
         ReleaseHumanReactionControls();
+        ClearBrakeControls();
         ClearReveals();
         _eliminationHandled = false;
 

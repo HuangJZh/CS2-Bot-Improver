@@ -49,3 +49,12 @@ foreach (var name in new[] { "AttackState_SkipSniperSpreadCheck", "IsNoticable_A
 }
 Check(CombatPatchPolicy.IsAllowed("UnrelatedNavigationFix"), "navigation fixes are retained");
 Console.WriteLine($"{count} behavior policy checks passed.");
+
+Check(BrakePolicy.Chance("low") < BrakePolicy.Chance("medium") && BrakePolicy.Chance("medium") < BrakePolicy.Chance("high"), "brake assistance chance increases by difficulty");
+Check(BrakePolicy.NeedsStop("weapon_ak47",100), "rifle prepares a stop even at close range");
+Check(BrakePolicy.NeedsStop("weapon_awp",100), "sniper prepares a stop");
+Check(BrakePolicy.NeedsStop("weapon_deagle",100), "precision pistol prepares a stop");
+Check(!BrakePolicy.NeedsStop("weapon_tec9",300), "close Tec9 retains running fire");
+Check(!BrakePolicy.NeedsStop("weapon_mp9",300), "close SMG retains running fire");
+Check(BrakePolicy.NeedsStop("weapon_mp9",1000), "distant SMG may prefer a stop");
+Console.WriteLine($"Final total: {count} behavior checks passed.");

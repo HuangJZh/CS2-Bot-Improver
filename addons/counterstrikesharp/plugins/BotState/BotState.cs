@@ -6,9 +6,10 @@ namespace BotState;
 public partial class BotState : BasePlugin
 {
     public override string ModuleName => "Smarter-Bot";
-    public override string ModuleVersion => "1.10.5-human.1";
+    public override string ModuleVersion => "1.10.5-human.2";
     public override string ModuleAuthor => "ed0ard & XBribo & unicbm";
     public override string ModuleDescription => "Make bots smarter";
 
     private readonly Random _random = new Random();
 }
+

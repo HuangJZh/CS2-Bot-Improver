@@ -11,6 +11,7 @@ public partial class BotState
     {
         ProcessFlashbangAvoidance();
         ExpireRearResponses(Server.CurrentTime);
+        ExpireBrakeControls(Server.CurrentTime);
 
         // Server.MaxPlayers can cache the main menu's one-player limit.
         int maxPlayers = NativeAPI.GetMaxClients();
@@ -38,6 +39,7 @@ public partial class BotState
             bool inDoorCooldown = _doorEventCooldown.TryGetValue(idx, out float doorCooldownEnd) && now < doorCooldownEnd;
 
             UpdateBotBehavior(bot, now);
+            UpdateBrake(player, pawn, bot, now);
             bool curIsAttacking = UpdateBotCombat(player, pawn, bot, idx);
             if (!UpdateBotMovement(pawn, bot, idx, curIsAttacking, inDoorCooldown))
                 continue;
