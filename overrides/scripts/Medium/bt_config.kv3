@@ -29,7 +29,7 @@
 		look_around_lerp_time_deviation = 0.05
 		look_around_lerp_bias = 0.5
 
-		reaction_time = 0.22
+		reaction_time = 0.10
 
 		combat_crouch_chance = 0.4
 		combat_dodge_command_duration = 1.2
