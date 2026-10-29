@@ -14,10 +14,6 @@
 	path = addons/counterstrikesharp/plugins/BotState
 	url = https://github.com/ed0ard/CS2-Smarter-Bot.git
 	branch = main
-[submodule "addons/counterstrikesharp/plugins/BotAimImprover"]
-	path = addons/counterstrikesharp/plugins/BotAimImprover
-	url = https://github.com/ed0ard/CS2-Bullseye-Bot.git
-	branch = main
 [submodule "addons/counterstrikesharp/plugins/BotAI"]
 	path = addons/counterstrikesharp/plugins/BotAI
 	url = https://github.com/ed0ard/CS2-BotAI.git
