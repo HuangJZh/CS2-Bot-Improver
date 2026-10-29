@@ -57,7 +57,7 @@ less 队伍最多一颗闪，HE 与火合计最多两颗，仍受总数三颗限
 
 ## 构建与安装
 
-需要 .NET 10 SDK、Python 3，以及已经安装好的 CS2 Bot Improver / CounterStrikeSharp / BotController。在仓库根目录运行：
+需要 PowerShell 7、.NET 10 SDK、Python 3，以及已经安装好的 CS2 Bot Improver / CounterStrikeSharp / BotController。在仓库根目录运行：
 
 ```powershell
 .\tools\Build-CustomBots.ps1 -GameDirectory '你的游戏安装根目录' -DotnetPath 'dotnet' -Difficulty Medium
@@ -69,7 +69,7 @@ less 队伍最多一颗闪，HE 与火合计最多两颗，仍受总数三颗限
 .\Install-CustomBots.ps1 -GameDirectory '你的游戏安装根目录' -Difficulty Medium
 ```
 
-安装脚本先保存被覆盖文件及完整恢复清单，再复制文件，输出备份路径。带 `-Restore -BackupDirectory '备份路径'` 可恢复。本包不替换真人 InventorySimulator，不修改你的 Steam 库存，也不修改 `=` 的绑定。
+安装脚本先保存被覆盖文件及完整恢复清单，再复制文件，输出备份路径。带 `-Restore -BackupDirectory '备份路径'` 可恢复。安装后使用现有面板的 **Bot Mode（机器人模式）** 启动游戏，联机模式不会挂载这些插件。本包不替换真人 InventorySimulator，不修改你的 Steam 库存，也不修改 `=` 的绑定。
 
 ## 验证
 

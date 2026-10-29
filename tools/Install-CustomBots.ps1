@@ -1,3 +1,4 @@
+#requires -Version 7.0
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$GameDirectory,
@@ -58,4 +59,5 @@ foreach ($entry in $entries) {
 }
 Copy-Item -LiteralPath (Join-Path $gameRoot "game/csgo/overrides/$Difficulty/botprofile.vpk") -Destination (Join-Path $gameRoot 'game/csgo/overrides/botprofile.vpk') -Force
 Write-Output "Installed $Difficulty. Backup: $backup"
+Write-Output 'Start CS2 with Bot Mode in the existing panel to load the custom plugins.'
 Write-Output "Restore: .\Install-CustomBots.ps1 -GameDirectory '$gameRoot' -Restore -BackupDirectory '$backup'"
