@@ -12,10 +12,10 @@ using Microsoft.Extensions.Logging;
 namespace BotAimImprover;
 
 [MinimumApiVersion(305)]
-public class BotAimImprover : BasePlugin
+public partial class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8";
+    public override string ModuleVersion => "2.1.8-smoke.1";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 
@@ -168,6 +168,7 @@ public class BotAimImprover : BasePlugin
         RegisterEventHandler<EventRoundStart>((_, _) =>
         {
             _botToControllerUserId.Clear();
+            ClearSmokeError();
             return HookResult.Continue;
         });
 
@@ -188,6 +189,7 @@ public class BotAimImprover : BasePlugin
             return HookResult.Continue;
         });
 
+        RegisterListener<Listeners.OnMapStart>(_ => ClearSmokeError());
         AddCommand("bot_aim", "Set bot aim mode: head, body, mixed", (caller, info) =>
         {
             string arg = info.ArgCount > 1 ? info.GetArg(1).Trim().ToLowerInvariant() : "";
@@ -239,8 +241,7 @@ public class BotAimImprover : BasePlugin
 
             // 1) Gate: enemy must be generally visible before we
             //    spend any raytraces. Otherwise the native used last-known position.
-            if (!bot.IsEnemyVisible)
-                return HookResult.Continue;
+
 
             // 2) Resolve enemy pawn from m_enemy CHandle.
             var enemy = bot.Enemy;
@@ -259,6 +260,10 @@ public class BotAimImprover : BasePlugin
             var botController = ResolveBotController(pCCSBot);
             if (botController == null || !TryGetBotEyePosition(botController, out var botEye))
                 return HookResult.Continue;
+
+            if (!botController.HasBeenControlledByPlayerThisRound && ApplySmokeError(bot, enemyPawn, botEye))
+                return HookResult.Continue;
+            if (!bot.IsEnemyVisible) return HookResult.Continue;
 
             string? wpn = botController.PlayerPawn?.Value?.WeaponServices?.ActiveWeapon?.Value?.DesignerName;
 
