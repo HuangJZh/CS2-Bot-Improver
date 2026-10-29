@@ -15,7 +15,7 @@ namespace BotAimImprover;
 public class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8";
+    public override string ModuleVersion => "2.1.8-human.1";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 
@@ -113,6 +113,11 @@ public class BotAimImprover : BasePlugin
     // Cache: CCSBot* -> bot's UserId .
     // Cleared on round_start and per-bot on disconnect.
     private readonly ConcurrentDictionary<IntPtr, int> _botToControllerUserId = new();
+    private sealed record RememberedAim(uint Enemy, System.Numerics.Vector3 Position, float Time);
+    private readonly Dictionary<IntPtr, RememberedAim> _lastVisibleAim = new();
+    private readonly Dictionary<IntPtr, RememberedAim> _blindAim = new();
+    private readonly List<(System.Numerics.Vector3 Center, float Radius)> _smokeVolumes = new();
+    private float _nextSmokeRefresh;
 
     // Aim mode controlled by the `bot_aim` console command:
     //   Mixed = priority logic; snipers + spread weapons aim body-first, others head-first
@@ -168,6 +173,10 @@ public class BotAimImprover : BasePlugin
         RegisterEventHandler<EventRoundStart>((_, _) =>
         {
             _botToControllerUserId.Clear();
+            _lastVisibleAim.Clear();
+            _blindAim.Clear();
+            _smokeVolumes.Clear();
+            _nextSmokeRefresh = 0;
             return HookResult.Continue;
         });
 
@@ -237,11 +246,6 @@ public class BotAimImprover : BasePlugin
 
             var bot = new CCSBot(pCCSBot);
 
-            // 1) Gate: enemy must be generally visible before we
-            //    spend any raytraces. Otherwise the native used last-known position.
-            if (!bot.IsEnemyVisible)
-                return HookResult.Continue;
-
             // 2) Resolve enemy pawn from m_enemy CHandle.
             var enemy = bot.Enemy;
             if (!enemy.IsValid)
@@ -259,6 +263,16 @@ public class BotAimImprover : BasePlugin
             var botController = ResolveBotController(pCCSBot);
             if (botController == null || !TryGetBotEyePosition(botController, out var botEye))
                 return HookResult.Continue;
+
+            // Solid-brush raycasts do not include smoke. Never upgrade a sound or
+            // damage cue into live head tracking through a smoke volume.
+            if (TryComputePartPos(enemyPawn, 3, out float chestX, out float chestY, out float chestZ)
+                && IsSmokeObscured(botEye, chestX, chestY, chestZ))
+            {
+                ApplyUncertainAim(pCCSBot, bot, enemyPawn.EntityHandle.Raw, botEye);
+                return HookResult.Continue;
+            }
+            if (!bot.IsEnemyVisible) return HookResult.Continue;
 
             string? wpn = botController.PlayerPawn?.Value?.WeaponServices?.ActiveWeapon?.Value?.DesignerName;
 
@@ -293,6 +307,9 @@ public class BotAimImprover : BasePlugin
             // 6) Overwrite only m_targetSpot.xyz.
             var targetSpot = bot.TargetSpot;
             targetSpot.X = rx; targetSpot.Y = ry; targetSpot.Z = rz;
+            _lastVisibleAim[pCCSBot] = new(enemyPawn.EntityHandle.Raw,
+                new System.Numerics.Vector3(chestX, chestY, chestZ), Server.CurrentTime);
+            _blindAim.Remove(pCCSBot);
 
             // One-time confirmation that the override path actually runs end-to-end.
             if (!_firstOverrideLogged)
@@ -401,7 +418,60 @@ public class BotAimImprover : BasePlugin
             var res = Trace.TraceEndShape(eye, end, options: opts);
             return res.Fraction >= 0.999f;
         }
-        catch { return true; }
+        catch { return false; }
+    }
+
+    private bool IsSmokeObscured(Vector eye, float x, float y, float z)
+    {
+        float now = Server.CurrentTime;
+        if (now >= _nextSmokeRefresh)
+        {
+            _nextSmokeRefresh = now + 0.1f;
+            _smokeVolumes.Clear();
+            foreach (var smoke in Utilities.FindAllEntitiesByDesignerName<CSmokeGrenadeProjectile>("smokegrenade_projectile"))
+            {
+                if (!smoke.IsValid || !smoke.DidSmokeEffect || smoke.SmokeEffectTickBegin <= 0) continue;
+                float age = (Server.TickCount - smoke.SmokeEffectTickBegin) * Server.TickInterval;
+                float radius = AimVisibilityPolicy.SmokeRadius(age);
+                if (radius <= 0) continue;
+                var center = smoke.SmokeDetonationPos;
+                _smokeVolumes.Add((new(center.X, center.Y, center.Z), radius));
+            }
+        }
+        var start = new System.Numerics.Vector3(eye.X, eye.Y, eye.Z);
+        var end = new System.Numerics.Vector3(x, y, z);
+        return _smokeVolumes.Any(s => AimVisibilityPolicy.SegmentIntersectsSmoke(start, end, s.Center, s.Radius));
+    }
+
+    private void ApplyUncertainAim(IntPtr key, CCSBot bot, uint enemy, Vector eye)
+    {
+        float now = Server.CurrentTime;
+        if (!_blindAim.TryGetValue(key, out var sample) || sample.Enemy != enemy || now - sample.Time >= 0.5f)
+        {
+            System.Numerics.Vector3 guess;
+            if (_lastVisibleAim.TryGetValue(key, out var seen) && seen.Enemy == enemy && now - seen.Time <= 1.2f)
+                guess = seen.Position;
+            else if (now - bot.NoiseTimestamp is >= 0 and <= 0.8f)
+            {
+                var noise = bot.NoisePosition;
+                guess = new(noise.X, noise.Y, noise.Z + 45);
+            }
+            else
+            {
+                float yaw = bot.LookYaw * MathF.PI / 180;
+                guess = new(eye.X + MathF.Cos(yaw) * 400, eye.Y + MathF.Sin(yaw) * 400, eye.Z - 12);
+            }
+            guess += new System.Numerics.Vector3(Random.Shared.NextSingle() * 180 - 90,
+                Random.Shared.NextSingle() * 180 - 90, Random.Shared.NextSingle() * 30 - 15);
+            sample = new(enemy, guess, now);
+            _blindAim[key] = sample;
+        }
+        var target = bot.TargetSpot;
+        target.X = sample.Position.X; target.Y = sample.Position.Y; target.Z = sample.Position.Z;
+        var predicted = bot.TargetSpotPredicted;
+        predicted.X = target.X; predicted.Y = target.Y; predicted.Z = target.Z;
+        var velocity = bot.TargetSpotVelocity;
+        velocity.X = 0; velocity.Y = 0; velocity.Z = 0;
     }
 
 }

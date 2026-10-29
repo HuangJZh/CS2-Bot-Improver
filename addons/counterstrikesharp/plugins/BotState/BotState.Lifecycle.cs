@@ -9,16 +9,17 @@ namespace BotState;
 
 public partial class BotState
 {
-    private bool _isFreezeTime = false;
     //---------------------------------------------------------------------------------------
     // Registers game events and the per-tick bot behavior listener
     public override void Load(bool hotReload)
     {
+        RegisterFakeConVars(typeof(HumanCombatSettings));
         InstallDefuseBombHook();
         InstallBotBlindHook();
         InitializeFovPatches();
         LoadCustomFov();
         RegisterListener<Listeners.OnMapEnd>(ClearFovObservers);
+        RegisterListener<Listeners.OnMapEnd>(ReleaseHumanReactionControls);
         RegisterEventHandler<EventRoundStart>(OnRoundStart);
         RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
         RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
@@ -59,6 +60,7 @@ public partial class BotState
     // Restores plugin-owned state before the plugin unloads
     public override void Unload(bool hotReload)
     {
+        ReleaseHumanReactionControls();
         _customFov?.Dispose(); _customFov = null;
         ClearFovObservers();
         ClearFlashEntities();
@@ -68,7 +70,6 @@ public partial class BotState
         RestoreAllFovPatches();
         ReleaseKnifeLocks();
         ClearReveals();
-        _defuseRevealTimer?.Kill();
         _gunReequipTimer?.Kill();
         StopRushAntennaPublisher();
     }
@@ -94,7 +95,6 @@ public partial class BotState
     [GameEventHandler]
     public HookResult OnRoundFreezeEnd(EventRoundFreezeEnd @event, GameEventInfo info)
     {
-        _isFreezeTime = false;
         foreach (var player in Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller"))
         {
             if (!player.IsValid || !player.IsBot) continue;
@@ -108,10 +108,9 @@ public partial class BotState
     {
         ClearFovObservers();
         ReleaseKnifeLocks();
-        StopDefuseReveal();
+        ReleaseHumanReactionControls();
         ClearReveals();
         _eliminationHandled = false;
-        _isFreezeTime = true;
 
         ResetMovementRoundState();
         ResetCombatRoundState();

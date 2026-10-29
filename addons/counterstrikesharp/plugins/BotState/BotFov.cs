@@ -5,8 +5,8 @@ namespace BotState;
 public sealed record BotFovOptions
 {
     public bool Enabled { get; init; } = true;
-    public float HorizontalDegrees { get; init; } = 180;
-    public float VerticalDegrees { get; init; } = 180;
+    public float HorizontalDegrees { get; init; } = 106.26f;
+    public float VerticalDegrees { get; init; } = 73.74f;
 
     // Resolve the command's one-angle shorthand once; runtime state always
     // contains two independent angles and has no aspect-ratio setting.

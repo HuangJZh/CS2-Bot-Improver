@@ -25,7 +25,7 @@ namespace NadeSystem;
 public partial class NadeSystemPlugin : BasePlugin
 {
     public override string ModuleName    => "NadeSystem";
-    public override string ModuleVersion => "1.2.3";
+    public override string ModuleVersion => "1.2.3-fair-utility.1";
     public override string ModuleAuthor  => "ed0ard & XBribo & unicbm";
 
     // grenades folder lives inside the plugin directory
@@ -51,7 +51,7 @@ public partial class NadeSystemPlugin : BasePlugin
     // Information System
     private Dictionary<string, float> _probFailCooldown = new();
     // flash immunity
-    private Dictionary<uint, float> _botFlashImmunityUntil = new();
+
     // Special Nades
     private bool _defuseSmokeUsed    = false;
     private bool _defuseFlashUsed    = false;
@@ -67,23 +67,16 @@ public partial class NadeSystemPlugin : BasePlugin
     // Normal and More modes
     private Dictionary<int, float> _retaliationCooldown      = new();
     // Normal Mode
-    private Dictionary<int,  int>    _earlySmokeCountByTeam   = new();
-    private Dictionary<uint, HashSet<string>> _botInFlashZone = new();
+
+
     // Normal Mode: post-throw probability window for flash
     // key = botIndex, value = (windowExpiresAt, blindRatio)
-    private Dictionary<uint, (float ExpiresAt, float Ratio)> _botFlashRatioWindow = new();
+
     // ── Information system (sound events + vision) ─────────────
     // key = controller index, value = latest Valve player_sound state
-    private Dictionary<uint, PlayerSoundState> _playerSounds = new();
+
     // key = controller index, value = last weapon_fire time (global, all players)
     private Dictionary<uint, float> _botLastFireTime = new();
-    // Value-only state avoids retaining native Vector wrappers between callbacks
-    private readonly record struct PlayerSoundState(
-        float X,
-        float Y,
-        float Z,
-        float RadiusSquared,
-        float ExpiresAt);
     // Shared result prevents duplicate flash target ray traces in one decision
     private readonly record struct FlashTargetEvaluation(
         List<CCSPlayerController> BlindableEnemies,

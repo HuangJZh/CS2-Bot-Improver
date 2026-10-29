@@ -34,54 +34,7 @@ public partial class NadeSystemPlugin : BasePlugin
 
         var gtype = g.GrenadeType; // lowercase since LoadDb
 
-        // ── Round limit checks ─────────────────────────────────
-        // Less mode: per-bot limits (1 smoke, 1 molotov, 1 HE,
-        // ammo_grenade_limit_flashbang flashes, total <= 4 per round).
-        if (_botNadesMode == "less")
-        {
-            if (!LessModeAllows(gtype, (uint)bot.Index)) return;
-        }
-        else if (_botNadesMode == "normal")
-        {
-            int teamNum = bot.TeamNum;
-            int teamSize = allControllers
-                .Count(p => p.IsValid && p.IsBot && (int)p.TeamNum == teamNum);
-            if (teamSize < 1) teamSize = 1;
-
-            if (!_roundCountByTeam.TryGetValue(teamNum, out var teamCount))
-                teamCount = new RoundCounter();
-
-            // Purchase limit: flash + he + molotov <= 3 * bot count on this side.
-            // Smoke is compulsory for each bot to buy.
-            if (gtype is "flash" or "he" or "molotov")
-            {
-                int OptionalTotal = teamCount.Flash + teamCount.HE + teamCount.Molotov;
-                if (OptionalTotal >= 3 * teamSize) return;
-            }
-
-            if (gtype == "flash")
-            {
-                var cv  = ConVar.Find("ammo_grenade_limit_flashbang");
-                int max = (cv?.GetPrimitiveValue<int>() ?? 2) * teamSize;
-                if (teamCount.Flash >= max) return;
-            }
-            else
-            {
-                int used = gtype switch
-                {
-                    "smoke"   => teamCount.Smoke,
-                    "he"      => teamCount.HE,
-                    "molotov" => teamCount.Molotov,
-                    _         => 99,
-                };
-                if (used >= teamSize) return;
-            }
-        }
-        // The only two differences between more and normal modes are the round limit and the early smoke limit
-        else if (_botNadesMode == "max" || _botNadesMode == "more")
-        {
-            // no limits
-        }
+        if (!UtilityBudgetAllows(bot, gtype)) return;
 
         // ── Account check ──────────────────────────────────────────────
         var money = bot.InGameMoneyServices;
@@ -100,10 +53,9 @@ public partial class NadeSystemPlugin : BasePlugin
         if (!_roundSpendPerBot.TryGetValue(botIdx, out int alreadySpent))
             alreadySpent = 0;
         // Expensure Limit
-        bool deductMoney = alreadySpent < spendCap;
+        if (alreadySpent + cost > spendCap) return;
 
         // ── All checks passed — commit ─────────────────────────────────
-        if (deductMoney)
         {
             money.Account -= cost;
             Utilities.SetStateChanged(bot, "CCSPlayerController", "m_pInGameMoneyServices");
@@ -113,17 +65,7 @@ public partial class NadeSystemPlugin : BasePlugin
 
         _replayBots.Add((uint)bot.Index);
         RegisterCooldown(g.Id, gtype);
-        IncrementCount(gtype, bot.TeamNum);
-        // Less mode: per-bot round count
-        if (_botNadesMode == "less")
-            IncrementBotCount(gtype, (uint)bot.Index);
-        // Normal/Less Mode early smoke limit
-        if ((_botNadesMode == "normal" || _botNadesMode == "less") && gtype == "smoke"
-            && _freezeEndTime > 0f && Server.CurrentTime - _freezeEndTime < 5f)
-        {
-            _earlySmokeCountByTeam.TryGetValue(bot.TeamNum, out int cnt);
-            _earlySmokeCountByTeam[bot.TeamNum] = cnt + 1;
-        }
+        CommitUtilityBudget(bot, gtype);
         SpawnProjectile(bot, g);
 
         // Allow bot to throw another grenade after this window
@@ -160,8 +102,10 @@ public partial class NadeSystemPlugin : BasePlugin
         var teamNum  = bot.TeamNum;
         var itemDef  = (int)GetItemIndex(gtype);
 
+        uint roundSerial = _utilityRoundSerial;
         Server.NextFrame(() =>
         {
+            if (_roundOver || _botNadesMode == "off" || roundSerial != _utilityRoundSerial) return;
             try
             {
                 var botPawn = bot.PlayerPawn?.Value;
@@ -197,15 +141,6 @@ public partial class NadeSystemPlugin : BasePlugin
                     flash.DispatchSpawn();
                     flash.Teleport(origin, angles, velocity);
                     AnnounceGrenadeThrow(bot, gtype);
-                    // Flash Immunity
-                    float immuneUntil = Server.CurrentTime + 2f;
-                    foreach (var teammate in Utilities
-                        .FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller"))
-                    {
-                        if (!teammate.IsValid || !teammate.IsBot) continue;
-                        if ((int)teammate.TeamNum != (int)bot.TeamNum) continue;
-                        _botFlashImmunityUntil[(uint)teammate.Index] = immuneUntil;
-                    }
                     Server.PrintToConsole(
                         $"[NadeSystem] Replayed [flash] id={g.Id[..8]}... " +
                         $"bot=[{bot.PlayerName}] " +

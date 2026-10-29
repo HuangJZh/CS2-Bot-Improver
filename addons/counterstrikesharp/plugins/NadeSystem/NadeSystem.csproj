@@ -10,7 +10,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.378" />
+    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.378" Condition="'$(CounterStrikeSharpApiPath)' == ''" />
+    <Reference Include="$(CounterStrikeSharpApiPath)/*.dll" Condition="'$(CounterStrikeSharpApiPath)' != ''"><Private>false</Private></Reference>
+    <Compile Remove="tests/**/*.cs" />
   </ItemGroup>
 
 </Project>

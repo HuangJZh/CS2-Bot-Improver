@@ -50,72 +50,8 @@ public partial class BotState
         ref bool allowActive = ref bot.AllowActive;
         allowActive = true;
 
-        ref bool isRapidFiring = ref bot.IsRapidFiring;
-        isRapidFiring = true;
-
-        ref float peripheralTimestamp = ref bot.PeripheralTimestamp;
-        peripheralTimestamp = 0.0f;
-
-        ref float fireWeaponTimestamp = ref bot.FireWeaponTimestamp;
-        fireWeaponTimestamp = 0.0f;
-        // Alert
-        CountdownTimer alertTimer = bot.AlertTimer;
-        ref float alertduration = ref alertTimer.Duration;
-        alertduration = 600.0f;
-
-        ref float alerttimestamp = ref alertTimer.Timestamp;
-        alerttimestamp = now + alertduration;
-
-        ref float alerttimescale = ref alertTimer.Timescale;
-        alerttimescale = 1.0f;
-        // Never ignore enemies
-        CountdownTimer ignoreEnemiesTimer = bot.IgnoreEnemiesTimer;
-
-        ref float ignoreEnemiesduration = ref ignoreEnemiesTimer.Duration;
-        ignoreEnemiesduration = 0.0f;
-
-        ref float ignoreEnemiestimestamp = ref ignoreEnemiesTimer.Timestamp;
-        ignoreEnemiestimestamp = 0.0f;
-
-        ref float ignoreEnemiestimescale = ref ignoreEnemiesTimer.Timescale;
-        ignoreEnemiestimescale = 1.0f;
-
-        // Never lookat (panic)
-        CountdownTimer panicTimer = bot.PanicTimer;
-
-        ref float panicduration = ref panicTimer.Duration;
-        panicduration = 0.0f;
-
-        ref float panictimestamp = ref panicTimer.Timestamp;
-        panictimestamp = 0.0f;
-
-        ref float panictimescale = ref panicTimer.Timescale;
-        panictimescale = 1.0f;
-        // Never be surprised
-        CountdownTimer surpriseTimer = bot.SurpriseTimer;
-
-        ref float surpriseDuration = ref surpriseTimer.Duration;
-        surpriseDuration = 0.0f;
-
-        ref float surpriseTimestamp = ref surpriseTimer.Timestamp;
-        surpriseTimestamp = 0.0f;
-
-        ref float surpriseTimescale = ref surpriseTimer.Timescale;
-        surpriseTimescale = 1.0f;
-        // Always dodge
-        ref bool isEnemySniperVisible = ref bot.IsEnemySniperVisible;
-        isEnemySniperVisible = true;
-
-        CountdownTimer sawEnemySniperTimer = bot.SawEnemySniperTimer;
-
-        ref float sawEnemySniperduration = ref sawEnemySniperTimer.Duration;
-        sawEnemySniperduration = 600.0f;
-
-        ref float sawEnemySniperTimestamp = ref sawEnemySniperTimer.Timestamp;
-        sawEnemySniperTimestamp = now + sawEnemySniperduration;
-
-        ref float sawEnemySniperTimescale = ref sawEnemySniperTimer.Timescale;
-        sawEnemySniperTimescale = 1.0f;
+        // Native fire cadence, peripheral attention, panic, surprise and awareness
+        // timers belong to the engine and the selected difficulty profile.
         // Teammate Stuck Fix
         ref bool IsWaitingBehindFriend = ref bot.IsWaitingBehindFriend;
         IsWaitingBehindFriend = false;

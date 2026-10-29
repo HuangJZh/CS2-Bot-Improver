@@ -75,14 +75,9 @@ public partial class BotState
     // Enables FOV patching on supported platforms
     private void InitializeFovPatches()
     {
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) &&
-            !RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-        {
-            _fovPatchesAvailable = false;
-            return;
-        }
-
-        _fovPatchesAvailable = true;
+        // These legacy patches give every bot process-wide 360-degree vision.
+        // Human combat keeps the frustum active even during fake-defuse search.
+        _fovPatchesAvailable = false;
     }
 
     // Applies the platform-specific FOV branch patches

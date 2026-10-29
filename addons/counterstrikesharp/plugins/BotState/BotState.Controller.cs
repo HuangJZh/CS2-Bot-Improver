@@ -11,6 +11,14 @@ public partial class BotState
     private static class BotControllerBridge
     {
         [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool LockAim(object api, int slot)
+            => ((BotControllerApi.IBotControllerApi)api).Lock(slot, BotControllerApi.LockKind.Aim);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool UnlockAim(object api, int slot)
+            => ((BotControllerApi.IBotControllerApi)api).Unlock(slot, BotControllerApi.LockKind.Aim);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static bool IsViewControlled(object api, int slot)
         {
             var controller = (BotControllerApi.IBotControllerApi)api;

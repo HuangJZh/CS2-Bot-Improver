@@ -97,27 +97,4 @@ public partial class NadeSystemPlugin : BasePlugin
         _roundCountByBot[botIdx] = counter;
     }
 
-    // Less mode gate: true if this bot may still throw one more of gtype
-    // this round. Per bot: <= 1 smoke, <= 1 molotov, <= 1 HE,
-    // <= ammo_grenade_limit_flashbang flashes, and <= 4 nades total.
-    // * Enforces the per-bot grenade limits used by less mode
-    private bool LessModeAllows(string gtype, uint botIdx)
-    {
-        if (gtype == "incgrenade") gtype = "molotov";
-        if (!_roundCountByBot.TryGetValue(botIdx, out var c))
-            c = new RoundCounter();
-        // Total per-round cap
-        if (c.Flash + c.Smoke + c.HE + c.Molotov >= 4) return false;
-        switch (gtype)
-        {
-            case "flash":
-                var cv  = ConVar.Find("ammo_grenade_limit_flashbang");
-                int max = cv?.GetPrimitiveValue<int>() ?? 2;
-                return c.Flash < max;
-            case "smoke":   return c.Smoke   < 1;
-            case "he":      return c.HE      < 1;
-            case "molotov": return c.Molotov < 1;
-            default:        return false;
-        }
-    }
 }

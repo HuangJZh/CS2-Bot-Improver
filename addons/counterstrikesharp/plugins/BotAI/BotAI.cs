@@ -28,7 +28,7 @@ public static class BotOffsets
 public class BotAI : BasePlugin
 {
     public override string ModuleName => "Bot AI - Patches";
-    public override string ModuleVersion => "1.8.14";
+    public override string ModuleVersion => "1.8.14-human.1";
     public override string ModuleAuthor => "K4ryuu & Austin (updated by ed0ard & XBribo & unicbm & Misaka17032 & AmagiReina)";
     public override string ModuleDescription =>
         "Improve and fix bots' behavior comprehensively";
@@ -41,7 +41,10 @@ public class BotAI : BasePlugin
     public override void Load(bool hotReload)
     {
         Logger.LogInformation("Bot AI Patches loading...");
-        var patchDefinitions = _isLinux ? LinuxPatchDefinitions.All : WindowsPatchDefinitions.All;
+        var patchDefinitions = (_isLinux ? LinuxPatchDefinitions.All : WindowsPatchDefinitions.All)
+            .Where(pair => CombatPatchPolicy.IsAllowed(pair.Key))
+            .ToDictionary(pair => pair.Key, pair => pair.Value);
+        Logger.LogInformation("Human combat: native reaction, hearing, aim drift, firing cadence and spread checks are preserved.");
 
         // "<name>_Cave" entries build a code cave that their "<name>" partner then
         // jumps into. The pair must be applied atomically: if the cave is missing

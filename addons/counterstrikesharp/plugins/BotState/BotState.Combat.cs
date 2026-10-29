@@ -11,7 +11,7 @@ public partial class BotState
     private readonly HashSet<int> _hasFiredThisAttack = new();
     private readonly Dictionary<int, bool> _prevIsAttacking = new();
 
-    // Records sniper shots, applies counter-strafe, and rolls combat crouching.
+    // Records shots and rolls combat crouching without changing shot velocity.
     private HookResult OnWeaponFire(EventWeaponFire @event, GameEventInfo info)
     {
         var shooter = @event.Userid;
@@ -26,46 +26,7 @@ public partial class BotState
         // Sniper Peek
         _hasFiredThisAttack.Add(idx);
 
-        // Counter-strafe on fire
-        bool cachedInAir = _cachedInAir.GetValueOrDefault(idx, false);
-        bool cachedNearLadder = _cachedNearLadder.GetValueOrDefault(idx, false);
-        if (!cachedInAir && !cachedNearLadder)
-        {
-            string? wpnFire = pawn.WeaponServices?.ActiveWeapon?.Value?.DesignerName;
-            if (wpnFire != null)
-            {
-                float vx = pawn.AbsVelocity.X;
-                float vy = pawn.AbsVelocity.Y;
-                float speed2D = MathF.Sqrt(vx * vx + vy * vy);
-
-                if (wpnFire is "weapon_glock" or "weapon_hkp2000" or "weapon_p250"
-                            or "weapon_fiveseven" or "weapon_cz75a" or "weapon_tec9"
-                            or "weapon_mac10" or "weapon_mp9")
-                {
-                    if (speed2D > 70f)
-                    {
-                        float scale = 70f / speed2D;
-                        pawn.AbsVelocity.X = vx * scale;
-                        pawn.AbsVelocity.Y = vy * scale;
-                    }
-                }
-                else if (wpnFire is "weapon_usp_silencer" or "weapon_deagle"
-                                or "weapon_ssg08" or "weapon_awp"
-                                or "weapon_scar20" or "weapon_g3sg1"
-                                or "weapon_galilar" or "weapon_ak47" or "weapon_sg556"
-                                or "weapon_famas" or "weapon_m4a1" or "weapon_m4a1_silencer"
-                                or "weapon_aug" or "weapon_m249" or "weapon_negev")
-                {
-                    if (speed2D > 0f)
-                    {
-                        pawn.AbsVelocity.X = 0f;
-                        pawn.AbsVelocity.Y = 0f;
-                    }
-                }
-                // Other weapons: no speed change
-            }
-        }
-
+        // Movement inaccuracy is resolved by the engine at the actual shot velocity.
         if (pawn.IsDefusing || !bot.IsAttacking) return HookResult.Continue;
         // Random combat crouch
         double crouchChance = 0.0;
@@ -122,25 +83,7 @@ public partial class BotState
         // Sniper Peek
         bool curIsAttacking = bot.IsAttacking;
 
-        if (curIsAttacking && _hasFiredThisAttack.Remove(idx))
-        {
-            string? wpn = pawn.WeaponServices?.ActiveWeapon?.Value?.DesignerName;
-            if (wpn == "weapon_awp" || wpn == "weapon_ssg08")
-            {
-                _lastLateralDir.TryGetValue(idx, out float lastDir);
-                if (lastDir != 0f)
-                {
-                    float yawS = pawn.EyeAngles.Y * MathF.PI / 180f;
-                    float rx = -MathF.Sin(yawS), ry = MathF.Cos(yawS);
-                    float injX = rx * (-lastDir) * 250f;
-                    float injY = ry * (-lastDir) * 250f;
-                    pawn.AbsVelocity.X += injX;
-                    pawn.AbsVelocity.Y += injY;
-
-                    ResetLookAroundForBot(player);
-                }
-            }
-        }
+        _hasFiredThisAttack.Remove(idx);
         // Avoid Confusion
         if (curIsAttacking)
         {
@@ -149,12 +92,6 @@ public partial class BotState
 
             ref float inhibitLookAroundTimestamp = ref bot.InhibitLookAroundTimestamp;
             inhibitLookAroundTimestamp = 0f;
-        }
-        //Test Alert! Can cause crash when bot_debug 1 !
-        ref bool isAimingAtEnemy = ref bot.IsAimingAtEnemy;
-        if (isAimingAtEnemy && !curIsAttacking)
-        {
-            bot.IsAttacking = true;
         }
         // Cancel Crouch After Attack
         if (_prevIsAttacking.TryGetValue(idx, out bool prevAttack))

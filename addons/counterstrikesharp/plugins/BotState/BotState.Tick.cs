@@ -10,7 +10,7 @@ public partial class BotState
     private void OnTick()
     {
         ProcessFlashbangAvoidance();
-        ExpireReveals(Server.CurrentTime);
+        ExpireRearResponses(Server.CurrentTime);
 
         // Server.MaxPlayers can cache the main menu's one-player limit.
         int maxPlayers = NativeAPI.GetMaxClients();

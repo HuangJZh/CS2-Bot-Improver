@@ -36,12 +36,21 @@ public partial class NadeSystemPlugin : BasePlugin
         if (origin == null) return HookResult.Continue;
 
         float radius = @event.Radius;
-        _playerSounds[(uint)player.Index] = new PlayerSoundState(
-            origin.X,
-            origin.Y,
-            origin.Z,
-            radius * radius,
-            Server.CurrentTime + @event.Duration);
+        // Only listeners actually inside the audible radius get this event's
+        // approximate location. Never follow the sound source after the event.
+        foreach (var listener in Utilities.GetPlayers())
+        {
+            if (!listener.IsValid || !listener.IsBot || listener.TeamNum == player.TeamNum || !listener.PawnIsAlive) continue;
+            var lp = GetActiveLivePawn(listener)?.AbsOrigin;
+            if (lp == null || Dist3D(lp.X, lp.Y, lp.Z, origin.X, origin.Y, origin.Z) > radius) continue;
+            var key = KnowledgeKey(listener, player);
+            if (_enemyKnowledge.TryGetValue(key, out var visual) && !visual.HeardOnly && visual.ExpiresAt > Server.CurrentTime) continue;
+            _enemyKnowledge[key] = new EnemyKnowledge(
+                UtilityPolicy.ApproximateSoundCoordinate(origin.X),
+                UtilityPolicy.ApproximateSoundCoordinate(origin.Y),
+                UtilityPolicy.ApproximateSoundCoordinate(origin.Z),
+                Server.CurrentTime + Math.Min(1.5f, @event.Duration), true);
+        }
         return HookResult.Continue;
     }
 
@@ -54,62 +63,6 @@ public partial class NadeSystemPlugin : BasePlugin
         if (p != null && p.IsValid)
             _botLastFireTime[(uint)p.Index] = Server.CurrentTime;
         return HookResult.Continue;
-    }
-
-    // * Checks whether a listener is inside a player's active sound radius
-    private bool PlayerMadeAudibleSound(
-        CCSPlayerController player,
-        CCSPlayerController listener)
-    {
-        if (!player.IsValid || !listener.IsValid) return false;
-
-        uint index = (uint)player.Index;
-        if (!_playerSounds.TryGetValue(index, out var sound)) return false;
-        if (Server.CurrentTime > sound.ExpiresAt)
-        {
-            _playerSounds.Remove(index);
-            return false;
-        }
-
-        var listenerOrigin = GetActiveLivePawn(listener)?.AbsOrigin;
-        if (listenerOrigin == null) return false;
-
-        float dx = listenerOrigin.X - sound.X;
-        float dy = listenerOrigin.Y - sound.Y;
-        float dz = listenerOrigin.Z - sound.Z;
-        return dx * dx + dy * dy + dz * dz <= sound.RadiusSquared;
-    }
-
-    // True if the given enemy currently sees the target via the official spotting system.
-    // Reads the TARGET's SpottedByMask and checks the enemy's slot bit.
-    // Falls back to FOV + RayTrace if the schema read is unavailable.
-    // * Checks official spotting state before using geometric vision
-    private bool EnemySeesTarget(CCSPlayerController enemy, CCSPlayerController target)
-    {
-        if (!enemy.IsValid || !target.IsValid) return false;
-        var targetPawn = GetActiveLivePawn(target);
-        if (targetPawn == null || !targetPawn.IsValid) return false;
-
-        try
-        {
-            var spotted = targetPawn.EntitySpottedState;
-            if (spotted != null)
-            {
-                int slot = enemy.Slot; // entity index - 1
-                if (slot >= 0)
-                {
-                    var mask = spotted.SpottedByMask; // uint[2]
-                    int word = slot / 32;
-                    int bit  = slot % 32;
-                    if (word >= 0 && word < mask.Length)
-                        return (mask[word] & (1u << bit)) != 0;
-                }
-            }
-        }
-        catch { /* fall through to geometric check */ }
-
-        // Fallback: FOV + RayTrace from enemy eyes to target eyes.
-        return EnemySeesTargetGeometric(enemy, target);
     }
 
     // Geometric vision fallback.
@@ -126,7 +79,8 @@ public partial class NadeSystemPlugin : BasePlugin
 
         float dx = tx - eyeX, dy = ty - eyeY, dz = tz - eyeZ;
         float dist2 = dx * dx + dy * dy + dz * dz;
-        if (dist2 > 1300f * 1300f) return false;
+        if (dist2 > 1300f * 1300f || ep.BlindUntilTime > Server.CurrentTime) return false;
+        if (SmokeBlocksSight(eyeX, eyeY, eyeZ, tx, ty, tz)) return false;
 
         float eYawRad   =  ep.EyeAngles.Y * MathF.PI / 180f;
         float ePitchRad = -ep.EyeAngles.X * MathF.PI / 180f;
@@ -146,15 +100,6 @@ public partial class NadeSystemPlugin : BasePlugin
             var tEye = new Vec3 { X = tx, Y = ty, Z = tz };
             return FlashHasLoS(tEye, eyeX, eyeY, eyeZ);
         }
-        return false;
-    }
-
-    // General-purpose: does `enemy` have information (vision or sound) on `target`?
-    // * Combines sound and vision into an enemy information check
-    private bool HasInformationOn(CCSPlayerController enemy, CCSPlayerController target)
-    {
-        if (PlayerMadeAudibleSound(target, enemy)) return true;
-        if (EnemySeesTarget(enemy, target)) return true;
         return false;
     }
 

@@ -30,21 +30,21 @@ public partial class BotState
     // Ends the defuser reveal cycle when defusing is interrupted.
     private HookResult OnBombAbortDefuse(EventBombAbortdefuse @event, GameEventInfo info)
     {
-        StopDefuseReveal();
+
         return HookResult.Continue;
     }
 
     // Ends the defuser reveal cycle after a successful defuse.
     private HookResult OnBombDefused(EventBombDefused @event, GameEventInfo info)
     {
-        StopDefuseReveal();
+
         return HookResult.Continue;
     }
 
     // Ends the defuser reveal cycle when the bomb explodes.
     private HookResult OnBombExploded(EventBombExploded @event, GameEventInfo info)
     {
-        StopDefuseReveal();
+
         return HookResult.Continue;
     }
 
@@ -90,10 +90,8 @@ public partial class BotState
         ResetLookAroundForBot(@event.Userid);
 
         var player = @event.Userid;
-        // The bomb-defuser is revealed
-        _defuserSlot = player != null && player.IsValid ? player.Slot : -1;
-        _isBombBeingDefused = true;
-        StartDefuseRevealCycle();
+        // Defuse audio may prompt investigation; it never reveals a live player
+        // through smoke to every bot.
 
         if (player == null || !player.IsValid || !player.IsBot) return HookResult.Continue;
 
@@ -189,9 +187,8 @@ public partial class BotState
 
         ResetLookAroundForBot(player);
 
-        // Enable 360 FOV for this bot during search phase
+        // Search by physically turning within the normal visual cone.
         _fakeDefuseSearchingBots.Add(slot);
-        ApplyFovPatches();
 
         // Schedule FOV restoration after search completes
         AddTimer(

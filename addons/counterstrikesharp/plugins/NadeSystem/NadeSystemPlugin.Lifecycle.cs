@@ -38,9 +38,14 @@ public partial class NadeSystemPlugin : BasePlugin
         RegisterEventHandler<EventBombBegindefuse>(OnBombBeginDefuse);
         RegisterEventHandler<EventBombBeginplant>(OnBombBeginPlant);
         RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
-        RegisterEventHandler<EventPlayerBlind>(OnPlayerBlind);
+        // Friendly flashes use the same physical blindness as player flashes.
         RegisterEventHandler<EventWeaponFire>(OnWeaponFire);
         RegisterEventHandler<EventPlayerSound>(OnPlayerSound);
+        RegisterEventHandler<EventSmokegrenadeDetonate>((e, _) =>
+        {
+            _activeSmoke.Add((e.X, e.Y, e.Z, Server.CurrentTime + 20f));
+            return HookResult.Continue;
+        });
         RegisterListener<Listeners.OnMapStart>(_ =>
         {
             _db.Clear();
@@ -49,6 +54,7 @@ public partial class NadeSystemPlugin : BasePlugin
             _roundCountByTeam.Clear();
             _replayBots.Clear();
             _roundNadeMoneyPerBot.Clear();
+            ResetFairUtility();
         });
         
         AddCommand("bot_nades", "Control bots' nade throw mode (off/less/normal/more/max)", CmdBotNades);
@@ -64,6 +70,7 @@ public partial class NadeSystemPlugin : BasePlugin
         _freezeEndTime = 0f;
         _roundCountByTeam.Clear();
         _roundCountByBot.Clear();
+        ResetFairUtility();
         _cooldowns.Clear();
         _replayBots.Clear();
         _smokeCooldownBots.Clear();
@@ -73,14 +80,14 @@ public partial class NadeSystemPlugin : BasePlugin
         _defuseFlashUsed  = false;
         _plantSmokeUsed   = false;
         _botMolotovDmgStart.Clear();
-        _earlySmokeCountByTeam.Clear();
-        _botInFlashZone.Clear();
-        _botFlashRatioWindow.Clear();
-        _botFlashImmunityUntil.Clear();
+
+
+
+
         _molotovEscapeSmokeCooldown.Clear();
         _retaliationCooldown.Clear();
         // Information System
-        _playerSounds.Clear();
+
         _botLastFireTime.Clear();
         foreach (var key in _probFailCooldown.Where(kv => kv.Value <= Server.CurrentTime).Select(kv => kv.Key).ToList())
             _probFailCooldown.Remove(key);
@@ -139,7 +146,12 @@ public partial class NadeSystemPlugin : BasePlugin
     {
         var player = @event.Userid;
         if (player != null && player.IsValid)
-            _playerSounds.Remove((uint)player.Index);
+        {
+
+            uint handle = player.EntityHandle.Raw;
+            foreach (var key in _enemyKnowledge.Keys.Where(k => k.Observer == handle || k.Target == handle).ToList())
+                _enemyKnowledge.Remove(key);
+        }
         return HookResult.Continue;
     }
 
@@ -178,42 +190,6 @@ public partial class NadeSystemPlugin : BasePlugin
                 + costTable["he"]
                 + costTable["molotov"];
         return cap;
-    }
-    // Don't blind ourselves and our teammates
-    // * Cancels friendly flashes covered by temporary bot immunity
-    private HookResult OnPlayerBlind(EventPlayerBlind @event, GameEventInfo info)
-    {
-        var victim   = @event.Userid;
-
-        if (victim is null || !victim.IsValid || !victim.IsBot)
-            return HookResult.Continue;
-        // In case the bot has been taken over
-        bool isTakenOver = victim.HasBeenControlledByPlayerThisRound;
-        if (isTakenOver)
-            return HookResult.Continue;
-
-        var pawn = victim.PlayerPawn?.Value;
-        if (_botFlashImmunityUntil.TryGetValue((uint)victim.Index, out float immuneUntil)
-            && Server.CurrentTime <= immuneUntil)
-        {
-            if (pawn != null && pawn.IsValid)
-            {
-                @event.BlindDuration = 0f;
-
-                ref float blindStartTime = ref pawn.BlindStartTime;
-                blindStartTime = 0f;
-
-                ref float blindUntilTime = ref pawn.BlindUntilTime;
-                blindUntilTime = 0f;
-
-                ref float flashDuration = ref pawn.FlashDuration;
-                flashDuration = 0f;
-
-                ref float flashMaxAlpha = ref pawn.FlashMaxAlpha;
-                flashMaxAlpha = 0f;
-            }
-        }
-        return HookResult.Continue;
     }
     // ═══════════════════════════════════════════════════════════
     //  Tick

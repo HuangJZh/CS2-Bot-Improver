@@ -1,2 +1,6 @@
 **/bin/
 **/obj/
+.scratch/
+dist/
+artifacts/
+__pycache__/

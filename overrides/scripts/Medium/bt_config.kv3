@@ -3,33 +3,33 @@
 {
 	default =
 	{
-		aim_target_acquisition_lerp_time = 0.05
-		aim_target_acquisition_lerp_time_deviation = 0.05
-		aim_target_acquisition_angle_penalty = 0.0
-		aim_target_acquisition_angle_penalty_deviation = 0.0
-		aim_target_acquisition_angle_penalty_reduction_ratio = 0.0
-		aim_target_acquisition_angle_tolerance = 0.0
-		aim_target_acquisition_angle_lerp_bias = 0.0
-		aim_target_tracking_lerp_time = 0.01
-		aim_target_tracking_lerp_time_deviation = 0.05
-		aim_target_tracking_focus_interval = 0.05
-		aim_target_tracking_focus_interval_deviation = 0.02
+		aim_target_acquisition_lerp_time = 0.15
+		aim_target_acquisition_lerp_time_deviation = 0.04
+		aim_target_acquisition_angle_penalty = 1.0
+		aim_target_acquisition_angle_penalty_deviation = 0.25
+		aim_target_acquisition_angle_penalty_reduction_ratio = 0.15
+		aim_target_acquisition_angle_tolerance = 1.0
+		aim_target_acquisition_angle_lerp_bias = 0.5
+		aim_target_tracking_lerp_time = 0.12
+		aim_target_tracking_lerp_time_deviation = 0.03
+		aim_target_tracking_focus_interval = 0.12
+		aim_target_tracking_focus_interval_deviation = 0.03
 		aim_target_tracking_angle_lerp_bias = 0.05
-		aim_ready_angle_tolerance = 0.1
-		aim_new_target_angle_tolerance = 30.0
-		aim_max_duration = 0.05
-		aim_max_duration_deviation = 0.0
+		aim_ready_angle_tolerance = 1.7
+		aim_new_target_angle_tolerance = 90.0
+		aim_max_duration = 0.6
+		aim_max_duration_deviation = 0.08
 		aim_punch_angle_reaction_chance = 1.0
 
 		look_around_awareness_yaw_range = 50
 		look_around_awareness_pitch_range = 10
 		look_around_focus_interval = 0.2
 		look_around_focus_interval_deviation = 0.2
-		look_around_lerp_time = 0.3
-		look_around_lerp_time_deviation = 0.05
+		look_around_lerp_time = 0.15
+		look_around_lerp_time_deviation = 0.04
 		look_around_lerp_bias = 0.5
 
-		reaction_time = 0.05
+		reaction_time = 0.22
 
 		combat_crouch_chance = 0.4
 		combat_dodge_command_duration = 1.2

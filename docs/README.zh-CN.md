@@ -2,6 +2,8 @@
 
 # CS2-Bot-Improver
 
+**本 fork 的自定义版本：** [拟人战斗、投掷预算与轮盘协作说明](HUMANIZED.zh-CN.md)。
+
 [![最新版本](https://img.shields.io/github/v/release/ed0ard/CS2-Bot-Improver?display_name=tag&sort=semver)](https://github.com/ed0ard/CS2-Bot-Improver/releases/latest)
 [![累计下载](https://img.shields.io/github/downloads/ed0ard/CS2-Bot-Improver/total)](https://github.com/ed0ard/CS2-Bot-Improver/releases)
 [![许可证：AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](../LICENSE)

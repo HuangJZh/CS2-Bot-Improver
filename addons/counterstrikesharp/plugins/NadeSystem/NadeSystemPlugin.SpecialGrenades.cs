@@ -28,6 +28,8 @@ public partial class NadeSystemPlugin : BasePlugin
     private void TrySpawnInstantGrenade(CCSPlayerController bot, Vector spawnPos, string gtype, Vector? velocity = null)
     {
         if (_botNadesMode == "off") return;
+        if (_roundOver || !UtilityBudgetAllows(bot, gtype)) return;
+        if (gtype == "flash" && !FriendlyFlashSafe(bot, new Vec3 { X = spawnPos.X, Y = spawnPos.Y, Z = spawnPos.Z }, Utilities.GetPlayers())) return;
         // In case the bot has been taken over
         bool isTakenOver = bot.HasBeenControlledByPlayerThisRound;
         if (isTakenOver) return;
@@ -52,7 +54,8 @@ public partial class NadeSystemPlugin : BasePlugin
         int  spendCap = GetRoundSpendCap(isCT, isPoor);
         if (!_roundSpendPerBot.TryGetValue(botIdx, out int alreadySpent))
             alreadySpent = 0;
-        bool deduct = alreadySpent < spendCap;
+        if (alreadySpent + cost > spendCap) return;
+        bool deduct = true;
 
         if (deduct)
         {
@@ -61,10 +64,13 @@ public partial class NadeSystemPlugin : BasePlugin
             _roundSpendPerBot[botIdx] = alreadySpent + cost;
         }
         SpendLockedNadeMoney(botIdx, cost);
+        CommitUtilityBudget(bot, gtype);
 
         var vel = velocity ?? new Vector(0f, 0f, 0f);
+        uint roundSerial = _utilityRoundSerial;
         Server.NextFrame(() =>
         {
+            if (_roundOver || _botNadesMode == "off" || roundSerial != _utilityRoundSerial) return;
             try
             {
                 var botPawn = bot.PlayerPawn?.Value;
@@ -154,7 +160,7 @@ public partial class NadeSystemPlugin : BasePlugin
             {
                 _defuseFlashUsed = true;
                 // Don't flash yourself
-                _botFlashImmunityUntil[(uint)bot.Index] = Server.CurrentTime + 2f;
+                // No artificial self-flash immunity.
                 var flashVel = new Vector(0f, 0f, -800f);
                 TrySpawnInstantGrenade(bot, spawnPos, "flash", flashVel);
             }
@@ -243,125 +249,40 @@ public partial class NadeSystemPlugin : BasePlugin
     // * Selects and throws a retaliatory explosive grenade
     private void HandleRetaliationHE(EventPlayerHurt @event)
     {
-        if (_botNadesMode == "off") return;
+        if (_botNadesMode == "off" || _roundOver) return;
         var victim = @event.Userid;
-        if (victim == null || !victim.IsValid || !victim.IsBot) return;
-        if (victim.HasBeenControlledByPlayerThisRound) return;
-
-        var victimPawn = victim.PlayerPawn?.Value;
-        if (victimPawn == null || !victimPawn.IsValid || !victim.PawnIsAlive) return;
-
         var attacker = @event.Attacker;
-        if (attacker == null || !attacker.IsValid || attacker.IsBot || !attacker.PawnIsAlive) return;
-
-        if (attacker.TeamNum == victim.TeamNum) return;   // only retaliate against the enemies
-        if (_roundOver) return;
-
-        // No retaliation HE/molotov within 1s of victim firing
-        if (FiredRecently(victim, 1f)) return;
-
+        if (victim == null || attacker == null || !victim.IsValid || !victim.IsBot
+            || victim.HasBeenControlledByPlayerThisRound || !victim.PawnIsAlive
+            || attacker.TeamNum == victim.TeamNum) return;
         string weapon = @event.Weapon ?? "";
-        bool isHE      = weapon.Contains("hegrenade",  StringComparison.OrdinalIgnoreCase);
-        bool isMolotov = weapon.Contains("molotov",    StringComparison.OrdinalIgnoreCase)
-                    || weapon.Contains("incgrenade",  StringComparison.OrdinalIgnoreCase)
-                    || weapon.Contains("inferno",     StringComparison.OrdinalIgnoreCase);
-        if (!isHE && !isMolotov) return;
-
-        var atkPos = GetActiveLivePawn(attacker)?.AbsOrigin;
-        if (atkPos == null) return;
-
-        string map = Server.MapName;
-        int teamNum = victim.TeamNum;
-        // less / normal / more mode: retaliation cooldown per team (7s)
-        if (_botNadesMode == "normal" || _botNadesMode == "more" || _botNadesMode == "less")
+        if (!weapon.Contains("hegrenade", StringComparison.OrdinalIgnoreCase)
+            && !weapon.Contains("inferno", StringComparison.OrdinalIgnoreCase)
+            && !weapon.Contains("molotov", StringComparison.OrdinalIgnoreCase)
+            && !weapon.Contains("incgrenade", StringComparison.OrdinalIgnoreCase)) return;
+        if (_retaliationCooldown.TryGetValue(victim.TeamNum, out float until) && Server.CurrentTime < until) return;
+        // Being hit does not reveal a thrower's current location through walls.
+        if (!TryGetKnownEnemy(victim, attacker, out _)) return;
+        _retaliationCooldown[victim.TeamNum] = Server.CurrentTime + 8f;
+        uint roundSerial = _utilityRoundSerial;
+        AddTimer(0.7f + (float)Random.Shared.NextDouble() * 0.6f, () =>
         {
-            if (_retaliationCooldown.TryGetValue(teamNum, out float cdExpiry)
-                && Server.CurrentTime < cdExpiry) return;
-        }
-        // less / normal / more mode: limit total he+molotov spawned per hurt event
-        int retaliationLimit = int.MaxValue;
-        if (_botNadesMode == "normal" || _botNadesMode == "more" || _botNadesMode == "less")
-        {
-            var vPos = victimPawn.AbsOrigin;
-            int aliveTeamSize = Utilities
-                .FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller")
-                .Count(p =>
-                {
-                    if (!p.IsValid || (int)p.TeamNum != victim.TeamNum) return false;
-                    if (vPos == null) return false;
-                    var pp = GetActiveLivePawn(p)?.AbsOrigin;
-                    if (pp == null) return false;
-                    return Dist3D(vPos.X, vPos.Y, vPos.Z, pp.X, pp.Y, pp.Z) <= 800f;
-                });
-            retaliationLimit = aliveTeamSize < 1 ? 1 : aliveTeamSize;
-        }
-        int retaliationSpawned = 0;
-
-        // Build candidate list (single pass: filter then sort)
-        // primary  : satisfies both direction and distance check  -> first
-        // secondary: nearest projectilePosition to victim         -> ascending
-        var vPosForSort = victimPawn.AbsOrigin;
-        var candidates = _mapNades
-            .Where(g =>
+            if (!victim.IsValid || !victim.PawnIsAlive || _roundOver || roundSerial != _utilityRoundSerial) return;
+            var pawn = GetActiveLivePawn(victim);
+            var pos = pawn?.AbsOrigin;
+            if (pawn == null || pos == null) return;
+            var players = Utilities.GetPlayers();
+            UpdateEnemyKnowledge(players);
+            // Retaliation uses a real nearby release point and a remembered
+            // position, never an arbitrary lineup beside a hidden attacker.
+            foreach (var g in _mapNades.Where(g => g.GrenadeType is "he" or "molotov" or "incgrenade"))
             {
-                string gt = g.GrenadeType; // lowercase since LoadDb
-                if (gt != "he" && gt != "molotov" && gt != "incgrenade") return false;
-                float d = Dist3D(atkPos.X, atkPos.Y, atkPos.Z,
-                                 g.LandingPosition.X, g.LandingPosition.Y, g.LandingPosition.Z);
-                if (d > 200f) return false;
-                if (IsOnCooldown(g.Id)) return false;
-                return true;
-            })
-            .OrderByDescending(g => FacesThrowDirection(victimPawn, g) ? 1 : 0)
-            .ThenBy(g => vPosForSort == null ? 0f :
-                Dist3D(vPosForSort.X, vPosForSort.Y, vPosForSort.Z,
-                       g.ProjectilePosition.X, g.ProjectilePosition.Y, g.ProjectilePosition.Z))
-            .ToList();
-
-        // Loop-invariant purchase context; GetRoundSpendCap walks the entity
-        // table for gamerules, so resolve it once instead of per candidate.
-        var money = victim.InGameMoneyServices;
-        if (money == null) return;
-        bool isCT     = victim.TeamNum == (int)CsTeam.CounterTerrorist;
-        var costTable = isCT ? CostCT : CostT;
-        uint botIdx   = (uint)victim.Index;
-        bool isPoor   = _poorBots.Contains(botIdx);
-        int  spendCap = GetRoundSpendCap(isCT, isPoor);
-
-        foreach (var g in candidates)
-        {
-            if (retaliationSpawned >= retaliationLimit) break;
-
-            string gt = g.GrenadeType; // lowercase since LoadDb
-
-            if (!costTable.TryGetValue(gt, out int cost)) continue;
-            if (money.Account < cost) continue;
-            if (!HasLockedNadeMoney(botIdx, cost)) continue;
-            // Less mode: enforce per-bot round limits (counts retaliation nades).
-            if (_botNadesMode == "less" && !LessModeAllows(gt, botIdx)) continue;
-
-            if (!_roundSpendPerBot.TryGetValue(botIdx, out int alreadySpent)) alreadySpent = 0;
-            bool deduct = alreadySpent < spendCap;
-            if (deduct)
-            {
-                money.Account -= cost;
-                Utilities.SetStateChanged(victim, "CCSPlayerController", "m_pInGameMoneyServices");
-                _roundSpendPerBot[botIdx] = alreadySpent + cost;
+                if (IsOnCooldown(g.Id) || !KnownEnemyNear(victim, attacker, g.LandingPosition, 240f)
+                    || !FacesThrowDirection(pawn, g)
+                    || Dist3D(pos.X, pos.Y, pos.Z + 64f, g.ProjectilePosition.X, g.ProjectilePosition.Y, g.ProjectilePosition.Z) > 110f) continue;
+                TryConditionalReplay(victim, g, players);
+                break;
             }
-            SpendLockedNadeMoney(botIdx, cost);
-
-            RegisterCooldown(g.Id, gt);
-            SpawnProjectile(victim, g);
-            // Normal mode: counts retaliation nades toward per-team round limit.
-            if (_botNadesMode == "normal")
-                IncrementCount(gt, victim.TeamNum);
-            // Less mode: counts retaliation nades toward per-bot round limit.
-            else if (_botNadesMode == "less")
-                IncrementBotCount(gt, botIdx);
-            retaliationSpawned++;
-        }
-        // Write cooldown after retaliation completes (less / normal / more)
-        if ((_botNadesMode == "normal" || _botNadesMode == "more" || _botNadesMode == "less") && retaliationSpawned > 0)
-            _retaliationCooldown[teamNum] = Server.CurrentTime + 7f;
+        }, TimerFlags.STOP_ON_MAPCHANGE);
     }
 }
