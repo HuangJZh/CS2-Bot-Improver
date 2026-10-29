@@ -51,10 +51,18 @@ Check(CombatPatchPolicy.IsAllowed("UnrelatedNavigationFix"), "navigation fixes a
 Console.WriteLine($"{count} behavior policy checks passed.");
 
 Check(BrakePolicy.Chance("low") < BrakePolicy.Chance("medium") && BrakePolicy.Chance("medium") < BrakePolicy.Chance("high"), "brake assistance chance increases by difficulty");
-Check(BrakePolicy.NeedsStop("weapon_ak47",100), "rifle prepares a stop even at close range");
+Check(BrakePolicy.NeedsStop("weapon_ak47",700), "distant rifle prepares a stop");
 Check(BrakePolicy.NeedsStop("weapon_awp",100), "sniper prepares a stop");
-Check(BrakePolicy.NeedsStop("weapon_deagle",100), "precision pistol prepares a stop");
+Check(BrakePolicy.NeedsStop("weapon_deagle",500), "precision pistol prepares a stop");
 Check(!BrakePolicy.NeedsStop("weapon_tec9",300), "close Tec9 retains running fire");
 Check(!BrakePolicy.NeedsStop("weapon_mp9",300), "close SMG retains running fire");
 Check(BrakePolicy.NeedsStop("weapon_mp9",1000), "distant SMG may prefer a stop");
 Console.WriteLine($"Final total: {count} behavior checks passed.");
+
+Check(BrakePolicy.StopPreference("weapon_ak47",100)==0,"point-blank rifle retains running fire");
+Check(BrakePolicy.StopPreference("weapon_awp",40)==0,"point-blank sniper does not force braking");
+Check(BrakePolicy.StopPreference("weapon_ak47",300)<BrakePolicy.StopPreference("weapon_ak47",600),"rifle stop preference grows with range");
+Check(BrakePolicy.StopPreference("weapon_mp9",800)<BrakePolicy.StopPreference("weapon_ak47",800),"SMG retains more running-fire intent at same range");
+Check(BrakePolicy.StopPreference("weapon_ak47",2000)==1,"distant rifle always wants to stop, execution still depends on skill");
+Check(BrakePolicy.StopPreference("weapon_ak47",float.NaN)==0,"invalid range cannot trigger assistance");
+Console.WriteLine($"Distance-aware total: {count} checks passed.");

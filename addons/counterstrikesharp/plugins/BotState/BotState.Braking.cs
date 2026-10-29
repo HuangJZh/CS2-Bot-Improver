@@ -14,7 +14,8 @@ public partial class BotState
         public uint Pawn, Enemy;
         public float LastSeen, StopAt, ReleaseAt;
         public long Token;
-        public bool Successful;
+        public bool Successful, Attempted;
+        public double IntentRoll;
     }
     private readonly Dictionary<int, BrakeAttempt> _brakes = new();
     private void ReleaseBrake(int slot, bool remove)
@@ -49,20 +50,32 @@ public partial class BotState
         if (!bot.IsEnemyVisible || enemy?.IsValid != true || enemy.AbsOrigin == null || pawn.AbsOrigin == null) return;
         var weapon = pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName;
         if (weapon == null) return;
-        var dx=enemy.AbsOrigin.X-pawn.AbsOrigin.X; var dy=enemy.AbsOrigin.Y-pawn.AbsOrigin.Y;
-        if (!BrakePolicy.NeedsStop(weapon,MathF.Sqrt(dx*dx+dy*dy))) return;
+        var dx=enemy.AbsOrigin.X-pawn.AbsOrigin.X; var dy=enemy.AbsOrigin.Y-pawn.AbsOrigin.Y; var dz=enemy.AbsOrigin.Z-pawn.AbsOrigin.Z;
+        double preference=BrakePolicy.StopPreference(weapon,MathF.Sqrt(dx*dx+dy*dy+dz*dz));
+        if (preference <= 0) { ReleaseBrake(player.Slot,false); return; }
         int slot=player.Slot;
         if (!_brakes.TryGetValue(slot,out var state) || state.Enemy != enemy.EntityHandle.Raw || state.Pawn != player.PlayerPawn.Raw)
         {
             state = new() { Pawn=player.PlayerPawn.Raw, Enemy=enemy.EntityHandle.Raw, LastSeen=now,
-                Successful=_random.NextDouble() < BrakePolicy.Chance(HumanCombatSettings.Difficulty.Value),
-                StopAt=now + .025f + (float)_random.NextDouble()*.035f, ReleaseAt=now+.12f };
+                IntentRoll=_random.NextDouble(),
+                Successful=_random.NextDouble() < BrakePolicy.Chance(HumanCombatSettings.Difficulty.Value) };
             _brakes[slot]=state;
-            if (state.Successful && pawn.AbsVelocity.Length2D() > 20)
-                state.Token=BotControllerBridge.StartUsercmdSuppression(_botController,slot,(ulong)PlayerButtons.Attack);
-            else state.Successful=false;
         }
         state.LastSeen=now;
+        // Reevaluate distance with the same random threshold, never reroll every tick.
+        // A retreating target can make a previously running bot decide to stop.
+        if (!state.Attempted && state.IntentRoll < preference)
+        {
+            state.Attempted=true;
+            if (state.Successful && pawn.AbsVelocity.Length2D()>20)
+            {
+                state.StopAt=now+.025f+(float)_random.NextDouble()*.035f;
+                state.ReleaseAt=now+.12f;
+                state.Token=BotControllerBridge.StartUsercmdSuppression(_botController,slot,(ulong)PlayerButtons.Attack);
+            }
+            else state.Successful=false;
+        }
+        if (!state.Attempted) return;
         if (!state.Successful || now >= state.ReleaseAt) return;
         // Tick preparation, not weapon_fire: do not retrospectively change a fired bullet.
         // Preserve any longer native reaction/weapon cadence gate.
