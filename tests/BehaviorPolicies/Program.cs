@@ -54,15 +54,22 @@ Check(BrakePolicy.Chance("low") < BrakePolicy.Chance("medium") && BrakePolicy.Ch
 Check(BrakePolicy.NeedsStop("weapon_ak47",700), "distant rifle prepares a stop");
 Check(BrakePolicy.NeedsStop("weapon_awp",100), "sniper prepares a stop");
 Check(BrakePolicy.NeedsStop("weapon_deagle",500), "precision pistol prepares a stop");
-Check(!BrakePolicy.NeedsStop("weapon_tec9",300), "close Tec9 retains running fire");
-Check(!BrakePolicy.NeedsStop("weapon_mp9",300), "close SMG retains running fire");
+Check(!BrakePolicy.NeedsStop("weapon_tec9",80), "close Tec9 retains running fire");
+Check(!BrakePolicy.NeedsStop("weapon_mp9",80), "close SMG retains running fire");
 Check(BrakePolicy.NeedsStop("weapon_mp9",1000), "distant SMG may prefer a stop");
 Console.WriteLine($"Final total: {count} behavior checks passed.");
 
-Check(BrakePolicy.StopPreference("weapon_ak47",100)==0,"point-blank rifle retains running fire");
-Check(BrakePolicy.StopPreference("weapon_awp",40)==0,"point-blank sniper does not force braking");
-Check(BrakePolicy.StopPreference("weapon_ak47",300)<BrakePolicy.StopPreference("weapon_ak47",600),"rifle stop preference grows with range");
-Check(BrakePolicy.StopPreference("weapon_mp9",800)<BrakePolicy.StopPreference("weapon_ak47",800),"SMG retains more running-fire intent at same range");
+Check(BrakePolicy.StopPreference("weapon_ak47",80)==0,"point-blank rifle retains running fire");
+Check(BrakePolicy.StopPreference("weapon_awp",40)==1,"point-blank sniper retains stop intent");
+Check(BrakePolicy.StopPreference("weapon_ak47",90)<BrakePolicy.StopPreference("weapon_ak47",110),"rifle stop preference grows with range");
+Check(BrakePolicy.StopPreference("weapon_mp9",80)<BrakePolicy.StopPreference("weapon_deagle",80),"contact SMG may run while Deagle wants to stop");
 Check(BrakePolicy.StopPreference("weapon_ak47",2000)==1,"distant rifle always wants to stop, execution still depends on skill");
 Check(BrakePolicy.StopPreference("weapon_ak47",float.NaN)==0,"invalid range cannot trigger assistance");
 Console.WriteLine($"Distance-aware total: {count} checks passed.");
+
+Check(BrakePolicy.StopPreference("weapon_ak47",120)==1,"rifle wants to stop beyond three-metre band");
+Check(BrakePolicy.StopPreference("weapon_glock",100)==.5,"ordinary pistol blends intent within two-to-three-metre band");
+Check(BrakePolicy.StopPreference("weapon_nova",40)==1,"shotgun retains stop intent even at contact");
+Check(BrakePolicy.StopPreference("weapon_negev",40)==1,"machinegun retains stop intent even at contact");
+Check(BrakePolicy.StopPreference("weapon_knife",40)==0,"knife is never treated as a gun brake request");
+Console.WriteLine($"Final distance policy total: {count} checks passed.");
