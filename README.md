@@ -18,7 +18,7 @@ CS2-Bot-Improver enhances Counter-Strike 2 bots for offline matches and private 
 <details>
 <summary>Signature status</summary>
 
-[![Signature status](https://raw.githubusercontent.com/XBribo/cs2-bot-signatures/main/.github/docs/all-signatures.svg)](https://github.com/XBribo/cs2-bot-signatures)
+[![Signature status](https://raw.githubusercontent.com/XBribo/cs2-bot-signatures/main/.github/docs/BotImprover.svg)](https://github.com/XBribo/cs2-bot-signatures)
 
 </details>
 
