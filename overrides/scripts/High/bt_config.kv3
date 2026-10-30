@@ -19,7 +19,7 @@
 		aim_new_target_angle_tolerance = 360.0
 		aim_max_duration = 0.01
 		aim_max_duration_deviation = 0.0
-		aim_punch_angle_reaction_chance = 1.0
+		aim_punch_angle_reaction_chance = 0.95
 
 		look_around_awareness_yaw_range = 60
 		look_around_awareness_pitch_range = 0
