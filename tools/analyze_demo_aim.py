@@ -43,9 +43,17 @@ def analyze(path,out,steam):
    angles=window[["pitch","yaw"]].to_numpy();d=wrap(np.diff(angles,axis=0));dt=np.diff(window.tick)*time_per_tick
    steps=np.linalg.norm(d,axis=1);travel=float(steps.sum());net=float(np.linalg.norm(wrap(angles[-1]-angles[0])))
    peak=float(np.max(steps/dt));recent=float(steps[-1]/dt[-1])
-  else:travel=net=peak=recent=None
+   speeds=np.linalg.norm(np.diff(window[["X","Y"]].to_numpy(),axis=0),axis=1)/dt
+   move_peak=float(speeds.max());move_last=float(speeds[-1]);move_mean=float(speeds.mean())
+   if move_peak>400:move_peak=move_last=move_mean=None
+  else:travel=net=peak=recent=move_peak=move_last=move_mean=None
+  long=frames[(frames.tick<shot.tick)&(frames.tick>=shot.tick-round(.500/time_per_tick))]
+  long_travel=None
+  if len(long)>=20 and np.diff(long.tick).max()<=2 and long.is_alive.all() and (long.total_rounds_played==current.total_rounds_played).all():
+   long_travel=float(np.linalg.norm(wrap(np.diff(long[["pitch","yaw"]].to_numpy(),axis=0)),axis=1).sum())
   rows.append(dict(map=header["map_name"],tick=int(shot.tick),round=int(current.total_rounds_played)+1,weapon=shot.weapon,category=shot.category,
    scoped=bool(current.is_scoped),burst_start=bool(first),burst=burst,interval_ms=gap*1000 if gap is not None else None,
+   preshot500_travel_deg=long_travel,move_peak_units_s=move_peak,move_last_units_s=move_last,move_mean_units_s=move_mean,
    preshot160_travel_deg=travel,preshot160_net_deg=net,preshot160_peak_deg_s=peak,preshot_last_step_deg_s=recent))
   last=shot.tick;last_weapon=shot.weapon;last_round=current.total_rounds_played
  result=pd.DataFrame(rows);result.to_csv(out/(path.stem+"-shots.csv"),index=False)
