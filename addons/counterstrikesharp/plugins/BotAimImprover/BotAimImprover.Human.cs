@@ -43,6 +43,7 @@ public partial class BotAimImprover
     private void InitializeHumanAim()
     {
         ReadHumanSettings();
+        InitializeAimTelemetry();
         // Use the installed BotController gamedata, not an invented/current-upstream signature.
         var path=Path.GetFullPath(Path.Combine(ModuleDirectory,"../../../../addons/BotController/gamedata.json"));
         try
