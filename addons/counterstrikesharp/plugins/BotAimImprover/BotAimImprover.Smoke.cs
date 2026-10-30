@@ -14,17 +14,7 @@ public partial class BotAimImprover
     {
         if (enemy.AbsOrigin is not { } origin) return false;
         float now=Server.CurrentTime;
-        if (now>=_smokeRefresh)
-        {
-            _smokeRefresh=now+.1f; _smokes.Clear();
-            foreach (var smoke in Utilities.FindAllEntitiesByDesignerName<CSmokeGrenadeProjectile>("smokegrenade_projectile"))
-            {
-                if (!smoke.IsValid || !smoke.DidSmokeEffect || smoke.SmokeEffectTickBegin<=0) continue;
-                float radius=SmokeAimPolicy.Radius((Server.TickCount-smoke.SmokeEffectTickBegin)*Server.TickInterval);
-                var c=smoke.SmokeDetonationPos;
-                if (radius>0) _smokes.Add((new(c.X,c.Y,c.Z),radius));
-            }
-        }
+        RefreshSmokeVolumes(now);
         var start=new Vec(eye.X,eye.Y,eye.Z);
         var body=new Vec(origin.X,origin.Y,origin.Z+(enemy.ViewOffset?.Z ?? 64)*.67f);
         if (!_smokes.Any(s=>SmokeAimPolicy.Blocks(start,body,s.Center,s.Radius)))
@@ -42,5 +32,19 @@ public partial class BotAimImprover
         var predicted=bot.TargetSpotPredicted;predicted.X=spot.X;predicted.Y=spot.Y;predicted.Z=spot.Z;
         var velocity=bot.TargetSpotVelocity;velocity.X=0;velocity.Y=0;velocity.Z=0;
         return true;
+    }
+    private void RefreshSmokeVolumes(float now)
+    {
+        if (now>=_smokeRefresh)
+        {
+            _smokeRefresh=now+.1f; _smokes.Clear();
+            foreach (var smoke in Utilities.FindAllEntitiesByDesignerName<CSmokeGrenadeProjectile>("smokegrenade_projectile"))
+            {
+                if (!smoke.IsValid || !smoke.DidSmokeEffect || smoke.SmokeEffectTickBegin<=0) continue;
+                float radius=SmokeAimPolicy.Radius((Server.TickCount-smoke.SmokeEffectTickBegin)*Server.TickInterval);
+                var c=smoke.SmokeDetonationPos;
+                if (radius>0) _smokes.Add((new(c.X,c.Y,c.Z),radius));
+            }
+        }
     }
 }

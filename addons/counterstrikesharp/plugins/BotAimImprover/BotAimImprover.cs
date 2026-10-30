@@ -15,7 +15,7 @@ namespace BotAimImprover;
 public partial class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8-smoke.1";
+    public override string ModuleVersion => "2.1.8-human.1";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 
@@ -169,6 +169,7 @@ public partial class BotAimImprover : BasePlugin
         {
             _botToControllerUserId.Clear();
             ClearSmokeError();
+            ResetHuman();
             return HookResult.Continue;
         });
 
@@ -189,7 +190,8 @@ public partial class BotAimImprover : BasePlugin
             return HookResult.Continue;
         });
 
-        RegisterListener<Listeners.OnMapStart>(_ => ClearSmokeError());
+        RegisterListener<Listeners.OnMapStart>(_ => { ClearSmokeError();ResetHuman(); });
+        InitializeHumanAim();
         AddCommand("bot_aim", "Set bot aim mode: head, body, mixed", (caller, info) =>
         {
             string arg = info.ArgCount > 1 ? info.GetArg(1).Trim().ToLowerInvariant() : "";
@@ -218,6 +220,8 @@ public partial class BotAimImprover : BasePlugin
 
     public override void Unload(bool hotReload)
     {
+        ResetHuman();
+        try { _updateLook?.Unhook(OnHumanLook,HookMode.Pre); } catch { }
         try { _pickNewAimSpot?.Unhook(OnPickNewAimSpotPost, HookMode.Post); }
         catch { /* ignore */ }
     }
@@ -261,6 +265,7 @@ public partial class BotAimImprover : BasePlugin
             if (botController == null || !TryGetBotEyePosition(botController, out var botEye))
                 return HookResult.Continue;
 
+            if (WriteCachedHumanSpot(bot,botController,botEye)) return HookResult.Continue;
             if (!botController.HasBeenControlledByPlayerThisRound && ApplySmokeError(bot, enemyPawn, botEye))
                 return HookResult.Continue;
             if (!bot.IsEnemyVisible) return HookResult.Continue;
@@ -406,7 +411,7 @@ public partial class BotAimImprover : BasePlugin
             var res = Trace.TraceEndShape(eye, end, options: opts);
             return res.Fraction >= 0.999f;
         }
-        catch { return true; }
+        catch { return false; }
     }
 
 }
