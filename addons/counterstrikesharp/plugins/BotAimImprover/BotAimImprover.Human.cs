@@ -235,11 +235,25 @@ public partial class BotAimImprover
                 int sampleAttempts=0;
                 string samplePoint="none";
                 float sampleRayFraction=0f;
-                visible=sensorGate && TrySelectHumanPoint(bot,pawn,enemy,eye,out sample,out sampleRadius,out sampleResult,out sampleAttempts,out samplePoint,out sampleRayFraction);
+                bool smokeBlocked=false;
+                bool degradedSmoke=false;
+                visible=sensorGate && TrySelectHumanPoint(bot,pawn,enemy,eye,out sample,out sampleRadius,out sampleResult,out sampleAttempts,out samplePoint,out sampleRayFraction,out smokeBlocked);
+                if(!visible && sensorGate && smokeBlocked && TryBuildSmokeSample(eyeVec,enemy,out sample,out sampleRadius))
+                {
+                    // The target is natively visible but smoke blocks every precise
+                    // point. Do not fall back to perfect native aim: take a coarse,
+                    // deliberately imprecise body-level sample whose large uncertainty
+                    // flows through the model's perception/motor pipeline.
+                    visible=true;
+                    degradedSmoke=true;
+                    sampleResult="smoke-degraded";
+                    samplePoint="smoke:body";
+                    sampleRayFraction=0f;
+                }
                 state.LastSampleResult=sampleResult;
                 state.LastSampleAttempts=sampleAttempts;
                 state.LastSamplePoint=samplePoint;
-                state.LastSampleRayFraction=sensorGate && sampleAttempts>0 ? sampleRayFraction : null;
+                state.LastSampleRayFraction=sensorGate && sampleAttempts>0 && !degradedSmoke ? sampleRayFraction : null;
                 state.LastSight=visible;
                 if(visible)
                 {
@@ -262,7 +276,8 @@ public partial class BotAimImprover
                     else if(state.Model.HasObservation && visibleGap>.35f)
                         WriteTelemetry(new {kind="model_lifecycle",tick=Server.TickCount,time=now,slot=controller.Slot,action="reacquire-keep",gap=visibleGap});
                     // The sample, not the live entity, enters the model's delay queue.
-                    state.LastVisualEstimate=state.Model.ObserveVisual(now,eyeVec,sample,new(pawn.EyeAngles.X,pawn.EyeAngles.Y),sampleRadius);
+                    state.LastVisualEstimate=state.Model.ObserveVisual(now,eyeVec,sample,new(pawn.EyeAngles.X,pawn.EyeAngles.Y),sampleRadius,
+                        degradedSmoke ? .60f : 0f);
                     if(state.LastVisualEstimate.HasValue)state.FirstVisualAt??=now;
                 }
             }
@@ -305,9 +320,9 @@ public partial class BotAimImprover
     // Long enough to absorb a normal peek/cover flicker, short enough that a
     // genuinely new engagement still starts a fresh perception/motor plan.
     private const float ReacquireResetSeconds=1.0f;
-    private bool TrySelectHumanPoint(CCSBot bot,CCSPlayerPawn pawn,CCSPlayerPawn enemy,Vector eye,out Vec point,out float radius,out string result,out int attempts,out string pointLabel,out float rayFraction)
+    private bool TrySelectHumanPoint(CCSBot bot,CCSPlayerPawn pawn,CCSPlayerPawn enemy,Vector eye,out Vec point,out float radius,out string result,out int attempts,out string pointLabel,out float rayFraction,out bool smokeBlocked)
     {
-        point=default;radius=4;result="no-point";attempts=0;pointLabel="none";rayFraction=0f;
+        point=default;radius=4;result="no-point";attempts=0;pointLabel="none";rayFraction=0f;smokeBlocked=false;
         var weapon=pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName;
         var order=_aimMode switch
         {
@@ -355,8 +370,26 @@ public partial class BotAimImprover
             return true;
         }
         result=rayFail>0?$"ray({rayFail}/{attemptsLocal})":fovFail>0?$"fov({fovFail}/{attemptsLocal})":smokeFail>0?$"smoke({smokeFail}/{attemptsLocal})":"no-point";
+        smokeBlocked=smokeFail>0;
         pointLabel="none";
         return false;
+    }
+    // Coarse body-level sample for a natively visible target hidden by smoke.
+    // The error is deliberately large and derived from the smoke geometry, so the
+    // model plans and fires from an imprecise belief instead of perfect native aim.
+    private static bool TryBuildSmokeSample(Vec eye,CCSPlayerPawn enemy,out Vec point,out float radius)
+    {
+        point=default;radius=14;
+        var origin=enemy.AbsOrigin;
+        if(origin==null)return false;
+        float eyeZ=enemy.ViewOffset?.Z ?? 64f;
+        var body=new Vec(origin.X,origin.Y,origin.Z+eyeZ*.6f);
+        float distance=Vec.Distance(eye,body);
+        float error=SmokeAimPolicy.Error(distance);
+        float angle=Random.Shared.NextSingle()*MathF.Tau;
+        point=new Vec(body.X+MathF.Cos(angle)*error,body.Y+MathF.Sin(angle)*error,
+            body.Z+(Random.Shared.NextSingle()*2f-1f)*error*.35f);
+        return float.IsFinite(point.X+point.Y+point.Z);
     }
     private static void WriteModelSpot(CCSBot bot,Vec point)
     {

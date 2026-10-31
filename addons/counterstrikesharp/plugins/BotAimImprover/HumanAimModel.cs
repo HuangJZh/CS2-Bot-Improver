@@ -69,11 +69,11 @@ public sealed class HumanAimModel
     private float Symmetric() => (float)(_random.NextDouble()+_random.NextDouble()-1);
     private Vector2 Noise(float magnitude) => new(Symmetric()*magnitude,Symmetric()*magnitude);
     public bool NeedsObservation(float now) => now>=_nextSample;
-    public VisualEstimate? ObserveVisual(float now,Vector3 eye,Vector3 visiblePoint,Vector2 actualView,float radius)
+    public VisualEstimate? ObserveVisual(float now,Vector3 eye,Vector3 visiblePoint,Vector2 actualView,float radius,float extraUncertainty=0)
     {
         if(!NeedsObservation(now))return null;
         var estimate=_visual.Estimate(now,eye,visiblePoint,actualView,radius);
-        Observe(now,estimate.Position,radius,estimate.UncertaintyDegrees);
+        Observe(now,estimate.Position,radius,estimate.UncertaintyDegrees+MathF.Max(0,extraUncertainty));
         return estimate;
     }
     public void Observe(float now,Vector3 point,float radius=8,float uncertainty=0)
