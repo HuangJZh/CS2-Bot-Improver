@@ -70,17 +70,17 @@ public partial class BotAimImprover
         string reason;
         if (alive <= 2)
         {
-            probability = .75f; minDuration = 2.4f; maxDuration = 4.2f;
+            probability = .28f; minDuration = 0.6f; maxDuration = 3.0f;
             reason = "clutch-silent-search";
         }
         else if (nearbyTeammate)
         {
-            probability = .30f; minDuration = 2.0f; maxDuration = 3.5f;
+            probability = .06f; minDuration = 0.5f; maxDuration = 2.5f;
             reason = "group-silent-push";
         }
         else
         {
-            probability = .16f; minDuration = 1.8f; maxDuration = 3.0f;
+            probability = .06f; minDuration = 0.5f; maxDuration = 2.0f;
             reason = "control-silent-check";
         }
         if (Random.Shared.NextSingle() >= probability)
