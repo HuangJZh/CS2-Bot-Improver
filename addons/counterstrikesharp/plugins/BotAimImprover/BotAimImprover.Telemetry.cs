@@ -62,10 +62,16 @@ public partial class BotAimImprover
         CCSPlayer_AimPunchServices? punch=pawn.AimPunchServices;
         if(punch?.Handle==nint.Zero)punch=null;
         var angles=pawn.EyeAngles;var pos=pawn.AbsOrigin;var vel=pawn.AbsVelocity;var bot=pawn.Bot;
+        var gun=pawn.WeaponServices?.ActiveWeapon.Value?.As<CCSWeaponBase>();
+        var csWeaponServices=pawn.WeaponServices is {} services ? new CCSPlayer_WeaponServices(services.Handle) : null;
+        FireGateDecision? gate=bot!=null && EligibleForFireGuard(player,pawn) ? EvaluateFireGate(player,pawn,bot,false) : null;
         WriteTelemetry(new {kind,tick=Server.TickCount,time=Server.CurrentTime,slot=player.Slot,pawn=player.PlayerPawn.Raw,alive=player.PawnIsAlive,
             game_warmup=_telemetryRules?.WarmupPeriod,game_freeze=_telemetryRules?.FreezePeriod,rounds_played=_telemetryRules?.TotalRoundsPlayed,
             x=pos?.X,y=pos?.Y,z=pos?.Z,pitch=angles.X,yaw=angles.Y,vx=vel.X,vy=vel.Y,vz=vel.Z,flags=pawn.Flags,
             weapon=pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName,scoped=pawn.IsScoped,
+            weapon_clip=gun?.Clip1,weapon_next_primary_tick=gun?.NextPrimaryAttackTick,
+            weapon_next_primary_fraction=gun!=null && float.IsFinite(gun.NextPrimaryAttackTickRatio) ? (float?)gun.NextPrimaryAttackTickRatio : null,
+            player_next_attack_time=csWeaponServices!=null && float.IsFinite(csWeaponServices.NextAttack) ? (float?)csWeaponServices.NextAttack : null,
             view_offset_z=pawn.ViewOffset.Z,native_crouching=bot?.IsCrouching,native_attacking=bot?.IsAttacking,
             shots_fired=pawn.ShotsFired,
             punch_predictable_pitch=punch?.PredictableBaseAngle.X,punch_predictable_yaw=punch?.PredictableBaseAngle.Y,
@@ -79,6 +85,7 @@ public partial class BotAimImprover
             native_phase=bot!=null ? NativePhase(bot.Handle) : null,
             native_fire_weapon_timestamp=bot?.FireWeaponTimestamp,
             model_last_used_time=state?.LastUsed,
+            model_first_visual_time=state?.FirstVisualAt,native_guard_reason=gate?.Reason,native_guard_hold=gate?.Hold,
             enemy=bot?.Enemy.Raw,native_visible=bot?.IsEnemyVisible,sensor_visible=state?.LastSight,
             planned_pitch=state?.Output.Angles.X,planned_yaw=state?.Output.Angles.Y,phase=state?.Output.Phase,allow_fire=state?.Output.AllowFire,
             observation_age=state!=null && float.IsFinite(state.Output.ObservationAge) ? (float?)state.Output.ObservationAge : null,
@@ -89,8 +96,11 @@ public partial class BotAimImprover
             fire_expected_error_degrees=state?.Model.LastFireDecision.ExpectedErrorDegrees,
             fire_tolerance_degrees=state?.Model.LastFireDecision.ToleranceDegrees,
             under_fire=state!=null && Server.CurrentTime<state.UnderFireUntil,
-            test_gate_active=TestGateActive,effective_allow_fire=state!=null ? (bool?)(state.Output.AllowFire && !TestGateActive) : null,
-            model_fire_suppression_owned=state?.Suppression>0,event_weapon=eventWeapon,other_pawn=otherPawn,damage});
+            test_gate_active=TestGateActive,effective_allow_fire=gate?.Allow,
+            fire_guard_hold_since=state?.PlanHoldSince,fire_guard_hold_timed_out=state?.PlanHoldTimedOut,
+            model_fire_suppression_owned=_fireGuards.TryGetValue(player.Slot,out var guard) && guard.Pawn==player.PlayerPawn.Raw && guard.Token>0,
+            fire_guard_pending=guard!=null && guard.Pawn==player.PlayerPawn.Raw && guard.Token<=0,
+            event_weapon=eventWeapon,other_pawn=otherPawn,damage});
     }
     private void WriteTelemetry<T>(T row)
     {

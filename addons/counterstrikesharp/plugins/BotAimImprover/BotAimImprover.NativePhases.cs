@@ -40,8 +40,16 @@ public partial class BotAimImprover
         }
         return HookResult.Continue;
     }
-    private HookResult OnNativeUpdatePre(DynamicHook hook)=>EnterNativePhase(hook,"update");
-    private HookResult OnNativeUpdatePost(DynamicHook hook)=>ExitNativePhase(hook);
+    private HookResult OnNativeUpdatePre(DynamicHook hook)
+    {
+        RefreshNativeFireGuard(hook);
+        return EnterNativePhase(hook,"update");
+    }
+    private HookResult OnNativeUpdatePost(DynamicHook hook)
+    {
+        RefreshNativeFireGuard(hook);
+        return ExitNativePhase(hook);
+    }
     private HookResult OnNativeUpkeepPre(DynamicHook hook)=>EnterNativePhase(hook,"upkeep");
     private HookResult OnNativeUpkeepPost(DynamicHook hook)=>ExitNativePhase(hook);
     private string NativePhase(nint pointer)=>!_nativePhasesReady ? "diagnostics-unavailable"

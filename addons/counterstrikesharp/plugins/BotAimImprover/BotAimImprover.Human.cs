@@ -23,15 +23,18 @@ public partial class BotAimImprover
     private sealed class HumanState
     {
         public required uint Pawn,Enemy;
+        public uint PlannedWeapon;
         public required nint Pointer;
         public required HumanAimModel Model;
-        public long Suppression;
         public float LastUsed;
         public float NextSensorCheck;
         public bool LastSight;
         public AimOutput Output;
         public VisualEstimate? LastVisualEstimate;
         public float UnderFireUntil;
+        public float? FirstVisualAt;
+        public float? PlanHoldSince;
+        public bool PlanHoldTimedOut;
     }
     private HumanSettings _humanSettings=new();
     private readonly Dictionary<int,HumanState> _humanStates=new();
@@ -43,7 +46,7 @@ public partial class BotAimImprover
     private long _humanLookCalls;
     private float _testGateUntil=float.NegativeInfinity;
     private bool TestGateActive=>Server.CurrentTime<_testGateUntil;
-    private bool HumanActive => _humanSettings.Enabled && _humanController != null && _updateLook != null;
+    private bool HumanActive => _humanSettings.Enabled && _humanController != null && _updateLook != null && _nativePhasesReady;
 
     private void InitializeHumanAim()
     {
@@ -79,7 +82,7 @@ public partial class BotAimImprover
             InitializeDirectView(document.RootElement,platform);
             _updateLook.Hook(OnHumanLookPost,HookMode.Post);
             try{InitializeNativePhases(document.RootElement,platform);}
-            catch(Exception error){UninstallNativePhases();Logger.LogWarning(error,"Native phase diagnostics unavailable");}
+            catch(Exception error){UninstallNativePhases();Logger.LogWarning(error,"Native decision hooks unavailable; human aim inactive");}
         }
         catch(Exception error)
         {
@@ -94,15 +97,24 @@ public partial class BotAimImprover
                 if(p is not {IsValid:true,IsBot:true,PawnIsAlive:true} || p.HasBeenControlledByPlayerThisRound
                     || p.PlayerPawn.Raw!=state.Pawn || Server.CurrentTime-state.LastUsed>.5f)ReleaseHuman(slot);
             }
+            MaintainFireGuards();
         });
-        RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p)ReleaseHuman(p.Slot);return HookResult.Continue; });
+        RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);}return HookResult.Continue; });
         RegisterEventHandler<EventPlayerHurt>((e,i) => {
             if(e.Userid is {IsValid:true,IsBot:true} victim && e.Attacker is {IsValid:true} attacker && attacker.TeamNum!=victim.TeamNum
                 && _humanStates.TryGetValue(victim.Slot,out var state) && state.Pawn==victim.PlayerPawn.Raw)
                 state.UnderFireUntil=Server.CurrentTime+.6f;
             return HookResult.Continue;
         });
-        RegisterEventHandler<EventPlayerDisconnect>((e,i) => { if(e.Userid is {} p)ReleaseHuman(p.Slot);return HookResult.Continue; });
+        RegisterEventHandler<EventPlayerDisconnect>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);}return HookResult.Continue; });
+        RegisterEventHandler<EventItemEquip>((e,i) => {
+            if(e.Userid is {IsValid:true} player)
+            {
+                try{RefreshFireGuard(player);}
+                catch(Exception error){_humanSettings.Enabled=false;ResetHuman();Logger.LogError(error,"Human aim disabled after equip guard failure");}
+            }
+            return HookResult.Continue;
+        });
         AddCommand("bot_human_aim","Human aim: status/on/off/reload",(caller,c) =>
         {
             if(caller != null)return; // Local server console only.
@@ -110,7 +122,7 @@ public partial class BotAimImprover
             if(action is "on" or "off") { _humanSettings.Enabled=action=="on";ResetHuman(); }
             if(action=="reload") { ResetHuman();ReadHumanSettings(); }
             if(action is "on" or "off" or "reload")WriteTelemetry(new {kind="model_control",tick=Server.TickCount,time=Server.CurrentTime,action,enabled=_humanSettings.Enabled,active=HumanActive});
-            Server.PrintToConsole($"[HumanAim] active={HumanActive} difficulty={_humanDifficulty} direct_requested={_humanSettings.DirectViewControl} direct_available={_setEyeAngles!=null} calls={_humanLookCalls} bots={Utilities.GetPlayers().Count(p=>p.IsBot)} alive={Utilities.GetPlayers().Count(p=>p.PawnIsAlive)} states={_humanStates.Count} phases={JsonSerializer.Serialize(_humanPhases)}");
+            Server.PrintToConsole($"[HumanAim] active={HumanActive} difficulty={_humanDifficulty} direct_requested={_humanSettings.DirectViewControl} direct_available={_setEyeAngles!=null} native_ready={_nativePhasesReady} guards={_fireGuards.Count} pending={_fireGuards.Values.Count(g=>g.Token<=0)} calls={_humanLookCalls} bots={Utilities.GetPlayers().Count(p=>p.IsBot)} alive={Utilities.GetPlayers().Count(p=>p.PawnIsAlive)} states={_humanStates.Count} phases={JsonSerializer.Serialize(_humanPhases)}");
         });
         AddTimer(10f,() => {
             if(_humanSettings.Diagnostics && HumanActive)
@@ -152,13 +164,12 @@ public partial class BotAimImprover
     {
         if(!_humanStates.Remove(slot,out var state))return;
         _modelSpots.Remove(state.Pointer);
-        try { if(state.Suppression>0)_humanController?.CancelUsercmdSuppression(slot,state.Suppression); }
-        catch(Exception error) { Logger.LogWarning(error,"Cannot release aim suppression for slot {Slot}",slot); }
     }
     private void ResetHuman()
     {
         _testGateUntil=float.NegativeInfinity;
         foreach(var slot in _humanStates.Keys.ToArray())ReleaseHuman(slot);
+        foreach(var slot in _fireGuards.Keys.ToArray())ReleaseFireGuard(slot);
         _modelSpots.Clear();_humanPhases.Clear();ReadHumanDifficulty();
     }
     private static bool IsGun(CCSPlayerPawn pawn)
@@ -178,10 +189,10 @@ public partial class BotAimImprover
             if(controller is not {IsValid:true,IsBot:true,PawnIsAlive:true} || controller.HasBeenControlledByPlayerThisRound)return HookResult.Continue;
             var pawn=controller.PlayerPawn.Value;
             if(pawn is not {IsValid:true} || !IsGun(pawn) || OtherViewOwner(controller.Slot))
-            { ReleaseHuman(controller.Slot);_modelSpots.Remove(pointer);return HookResult.Continue; }
+            { ReleaseHuman(controller.Slot);ReleaseFireGuard(controller.Slot);_modelSpots.Remove(pointer);return HookResult.Continue; }
             var bot=new CCSBot(pointer);
             if(bot.Enemy.Value is not {IsValid:true} enemy || enemy.LifeState!=0 || enemy.TeamNum==controller.TeamNum)
-            { ReleaseHuman(controller.Slot);_modelSpots.Remove(pointer);return HookResult.Continue; }
+            { ReleaseHuman(controller.Slot);_modelSpots.Remove(pointer);RefreshFireGuard(controller);return HookResult.Continue; }
             if(!TryGetBotEyePosition(controller,out var eye))return HookResult.Continue;
             var eyeVec=new Vec(eye.X,eye.Y,eye.Z);
             float now=Server.CurrentTime;
@@ -189,6 +200,7 @@ public partial class BotAimImprover
             {
                 ReleaseHuman(controller.Slot);
                 state=new HumanState{Pointer=pointer,Pawn=controller.PlayerPawn.Raw,Enemy=enemy.EntityHandle.Raw,
+                    PlannedWeapon=pawn.WeaponServices?.ActiveWeapon.Raw ?? uint.MaxValue,
                     Model=new(HumanAimProfile.For(_humanDifficulty),new(pawn.EyeAngles.X,pawn.EyeAngles.Y),now,Random.Shared.Next())};
                 _humanStates[controller.Slot]=state;
             }
@@ -208,6 +220,7 @@ public partial class BotAimImprover
                     {
                         ReleaseHuman(controller.Slot);
                         state=new HumanState{Pointer=pointer,Pawn=controller.PlayerPawn.Raw,Enemy=enemy.EntityHandle.Raw,
+                            PlannedWeapon=pawn.WeaponServices?.ActiveWeapon.Raw ?? uint.MaxValue,
                             Model=new(HumanAimProfile.For(_humanDifficulty),new(pawn.EyeAngles.X,pawn.EyeAngles.Y),now,Random.Shared.Next()),
                             LastUsed=now,LastSight=true,NextSensorCheck=now+HumanAimProfile.For(_humanDifficulty).SampleInterval,
                             UnderFireUntil=state.UnderFireUntil};
@@ -215,6 +228,7 @@ public partial class BotAimImprover
                     }
                     // The sample, not the live entity, enters the model's delay queue.
                     state.LastVisualEstimate=state.Model.ObserveVisual(now,eyeVec,sample,new(pawn.EyeAngles.X,pawn.EyeAngles.Y),sampleRadius);
+                    if(state.LastVisualEstimate.HasValue)state.FirstVisualAt??=now;
                 }
             }
             // Preserve native search/navigation without permitting hidden-target fire.
@@ -222,16 +236,17 @@ public partial class BotAimImprover
             {
                 _modelSpots.Remove(pointer);
                 state.Output=state.Model.Step(now,eyeVec,false);
-                GateHumanFire(controller.Slot,state,false);
+                RefreshFireGuard(controller);
                 return HookResult.Continue;
             }
             var fireContext=new HumanFireContext(HumanFireContext.Classify(pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName),now<state.UnderFireUntil);
+            state.PlannedWeapon=pawn.WeaponServices?.ActiveWeapon.Raw ?? uint.MaxValue;
             state.Output=state.Model.Step(now,eyeVec,visible,fireContext);
             _humanPhases[state.Output.Phase]=_humanPhases.GetValueOrDefault(state.Output.Phase)+1;
             var spot=AimMath.Ray(eyeVec,state.Output.Angles);
             _modelSpots[pointer]=spot;
             WriteModelSpot(bot,spot);
-            GateHumanFire(controller.Slot,state,state.Output.AllowFire);
+            RefreshFireGuard(controller);
         }
         catch(Exception error)
         {
@@ -240,19 +255,6 @@ public partial class BotAimImprover
             Logger.LogError(error,"Human aim disabled after runtime error; previous aiming behavior restored");
         }
         return HookResult.Continue;
-    }
-    private void GateHumanFire(int slot,HumanState state,bool allow)
-    {
-        allow=allow && !TestGateActive;
-        if(!allow)
-        {
-            if(state.Suppression<=0)state.Suppression=_humanController!.StartUsercmdSuppression(slot,(ulong)PlayerButtons.Attack);
-            if(state.Suppression<=0)throw new InvalidOperationException("Cannot gate bot fire through usercmd API");
-        }
-        else if(state.Suppression>0)
-        {
-            _humanController!.CancelUsercmdSuppression(slot,state.Suppression);state.Suppression=0;
-        }
     }
     private bool TrySelectHumanPoint(CCSBot bot,CCSPlayerPawn pawn,CCSPlayerPawn enemy,Vector eye,out Vec point,out float radius)
     {
