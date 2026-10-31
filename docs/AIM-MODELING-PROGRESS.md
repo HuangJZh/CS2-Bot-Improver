@@ -410,3 +410,17 @@ A局未采样比例从8.5同口径的30.8%降到3.9%；扇形回退在这两局�
 4. **验证**（专用服，用户配置：`bot_allow_grenades 0`、`sv_bot_buy_*_weight 0`、`bot_nades normal`，de_dust2，约60秒/2回合）：控制台/日志记录292条购买、11次点位回放、16次因“无对应道具”跳过、0次补发；回放仍带录制id/origin/velocity并可在`grenades/`点位库中匹配。说明严格模式下点位系统仍工作，但会因某Bot已用完/未买到该道具而跳过对应点位（这是严格语义的预期代价）。
 
 边界：严格模式会比“缺道具补发”少一些投掷；如果希望在高强度对局中保持点位覆盖，可下一步把“该点位交给附近仍持有对应道具的Bot”作为优化（仍不违反严格持有可能需要）。当前安装：NadeSystem严格版哈希`BA6B84D9…`；BotAimImprover仍为8.17；gameinfo已恢复（3B18F0CA…），无CS2进程。证据：E:/csdemo/bot-captures/model-round28-20261101（服务端日志、购买/回放/跳过记录、gameinfo快照）。
+
+## 第二十四轮：基于创意工坊预瞄图的点位预瞄（human.8.18）
+
+按用户提供的创意工坊预瞄图做预瞄点位数据，而不是凭空猜角度：
+
+1. **找到本地文件**：四张图位于 `E:/steam/steam/steamapps/workshop/content/730/` 下的 `3272008480 / 3279281339 / 3270706131 / 3275080617`。每个 `_dir.vpk` 内都有 `annotations/local/<map>_routeNN/...txt`（KV3格式），包含 `main` 路径节点和 `aim_target` 预瞄目标节点（世界坐标+角度）；它们才是“预瞄/搜点”的准确数据源。用 Source2Viewer CLI 20.1（VRF release cli-windows-x64）提取并解析32个路线文件（4图×8路线），得到**412个去重后的aim_target点位**：de_ancient 91、de_nuke 111、de_vertigo 93、de_anubis 117。
+2. **数据结构**：`BotAimImprover/preaim-points.json` 按真实地图名保存点位（x/y/z、录制朝向yaw、来源路线），安装时随插件复制；插件启动/换图时加载（日志会打印“Loaded preaim points for 4 maps (412 points)”）。
+3. **8.18行为**：Bot没有有效敌人时，除声音预瞄外，会周期性选取**附近且在前方视野内**（≤3200单位、与当前yaw差≤100°）的预瞄点，以有界速度（每更新≤16°yaw/10°pitch）转向，1.1秒后换下一个点；若同帧有声音预瞄则声音优先。只改瞄准TargetSpot，不改移动/开火/道具逻辑。遥测新增`map_preaim_active`、`preaim_target_x/y/z`。
+4. **验证**：de_ancient专用服10v10、30秒采集——插件加载4图412点；`map_preaim_active`行23,681、`preaim_target_x/y/z`行27,191、`sound_preaim_active`行4,721；142次开火/35次伤害；无异常。说明预瞄点位在大量无目标Bot上持续生效。
+5. 额外验证：这些工坊图共用一个嵌套地图`maps/officialmapshub.vpk`；用VRF提取后在本机专用服成功加载并dump了307个实体（含66个prop_dynamic、102个func_button、84个point_worldtext），但路线annotation里的aim_target坐标已经足够使用，实体dump暂不需要。
+
+边界：当前只对4张图（ancient/nuke/vertigo/anubis）生效，且只是“朝预瞄点看”，没有实现“在这些位置防守/下包后躲藏”的移动逻辑；点位未按路线顺序/CT/T侧筛选，可能包含不适合当前回合的点；部分点位离Bot很近或不在可通视位置，目前用距离/FOV简单过滤。下一步：按路线顺序、CT/T和地图区域筛选点位，加入“防守/下包后隐藏位置”的移动目标（需要更谨慎地控制移动），并补mirage/inferno/dust2等订阅图（用户若下载后可直接解析同样格式）。
+
+安装：BotAimImprover `2.1.8-human.8.18-experimental`（哈希`5738A0BD…`）+ `preaim-points.json`；gameinfo已恢复（3B18F0CA…），测试用临时地图副本/probe已清理，无CS2进程。证据：E:/csdemo/preaim-extract/（workshop注解提取）、E:/csdemo/bot-captures/model-round29-20261101（de_ancient采集与日志）。

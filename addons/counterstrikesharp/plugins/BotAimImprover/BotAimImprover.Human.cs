@@ -270,6 +270,7 @@ public partial class BotAimImprover
             if(bot.Enemy.Value is not {IsValid:true} enemy || enemy.LifeState!=0 || enemy.TeamNum==controller.TeamNum)
             {
                 if(TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
+                if(TryApplyMapPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
                 // The native enemy handle can flicker between peeks. Keep the memory
                 // based plan for a short grace period instead of resetting every
                 // model (reset means a fresh sensor delay and reaction before the
@@ -286,6 +287,7 @@ public partial class BotAimImprover
                 ReleaseHuman(controller.Slot);_modelSpots.Remove(pointer);RefreshFireGuard(controller);return HookResult.Continue;
             }
             _soundPreaim.Remove(controller.Slot);
+            _preaimTargets.Remove(controller.Slot);
             if(!_humanStates.TryGetValue(controller.Slot,out var state) || state.Pawn!=controller.PlayerPawn.Raw || state.Enemy!=enemy.EntityHandle.Raw)
             {
                 ReleaseHuman(controller.Slot);

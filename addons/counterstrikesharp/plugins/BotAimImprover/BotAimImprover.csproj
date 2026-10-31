@@ -17,4 +17,7 @@
     <Compile Remove="tests/**/*.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="preaim-points.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
