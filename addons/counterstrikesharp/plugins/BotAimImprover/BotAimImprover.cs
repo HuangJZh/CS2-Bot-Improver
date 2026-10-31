@@ -15,7 +15,7 @@ namespace BotAimImprover;
 public partial class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8-human.8.6-experimental";
+    public override string ModuleVersion => "2.1.8-human.8.7-experimental";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 
@@ -430,13 +430,21 @@ public partial class BotAimImprover : BasePlugin
 
     // World-only LoS test from eye to target point, true if unobstructed (>= 0.999)
     private bool PointVisibleFromEye(Vector eye, float tx, float ty, float tz)
+        => PointVisibleFromEye(eye, tx, ty, tz, 0.999f, out _);
+
+    // Relaxed variant used only by the partial-cover fallback: a fraction a few
+    // percent short of the full eye-to-point distance still means the candidate is
+    // effectively in line of sight, not that the target is behind a wall.
+    private bool PointVisibleFromEye(Vector eye, float tx, float ty, float tz, float minFraction, out float fraction)
     {
+        fraction = 0f;
         try
         {
             var end = new Vector(tx, ty, tz);
             var opts = new TraceOptions { InteractsWith = Masks.SolidBrushOnly };
             var res = Trace.TraceEndShape(eye, end, options: opts);
-            return res.Fraction >= 0.999f;
+            fraction = res.Fraction;
+            return fraction >= minFraction;
         }
         catch { return false; }
     }

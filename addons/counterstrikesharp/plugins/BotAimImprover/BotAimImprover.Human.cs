@@ -38,6 +38,7 @@ public partial class BotAimImprover
         public string LastSampleResult="none";
         public int LastSampleAttempts;
         public string LastSamplePoint="none";
+        public float? LastSampleRayFraction;
     }
     private HumanSettings _humanSettings=new();
     private readonly Dictionary<int,HumanState> _humanStates=new();
@@ -233,16 +234,23 @@ public partial class BotAimImprover
                 string sampleResult=sensorGate ? "not-sampled" : pawn.BlindUntilTime>now ? "blind" : "native-invisible";
                 int sampleAttempts=0;
                 string samplePoint="none";
-                visible=sensorGate && TrySelectHumanPoint(bot,pawn,enemy,eye,out sample,out sampleRadius,out sampleResult,out sampleAttempts,out samplePoint);
+                float sampleRayFraction=0f;
+                visible=sensorGate && TrySelectHumanPoint(bot,pawn,enemy,eye,out sample,out sampleRadius,out sampleResult,out sampleAttempts,out samplePoint,out sampleRayFraction);
                 state.LastSampleResult=sampleResult;
                 state.LastSampleAttempts=sampleAttempts;
                 state.LastSamplePoint=samplePoint;
+                state.LastSampleRayFraction=sensorGate && sampleAttempts>0 ? sampleRayFraction : null;
                 state.LastSight=visible;
                 if(visible)
                 {
-                    // Reacquisition after lost memory is a fresh movement.
-                    if(state.Model.HasObservation && now-state.Model.LastVisible>.35f)
+                    // Reacquisition after lost memory is a fresh movement only when the
+                    // target was gone long enough that the old plan is no longer usable.
+                    // Short peeks keep the plan so reacquiring does not pay a fresh
+                    // sensor delay + reaction + flick every time.
+                    float visibleGap=state.Model.HasObservation ? now-state.Model.LastVisible : float.PositiveInfinity;
+                    if(state.Model.HasObservation && visibleGap>ReacquireResetSeconds)
                     {
+                        WriteTelemetry(new {kind="model_lifecycle",tick=Server.TickCount,time=now,slot=controller.Slot,action="reacquire-reset",gap=visibleGap});
                         ReleaseHuman(controller.Slot);
                         state=new HumanState{Pointer=pointer,Pawn=controller.PlayerPawn.Raw,Enemy=enemy.EntityHandle.Raw,
                             PlannedWeapon=pawn.WeaponServices?.ActiveWeapon.Raw ?? uint.MaxValue,
@@ -251,6 +259,8 @@ public partial class BotAimImprover
                             UnderFireUntil=state.UnderFireUntil};
                         _humanStates[controller.Slot]=state;
                     }
+                    else if(state.Model.HasObservation && visibleGap>.35f)
+                        WriteTelemetry(new {kind="model_lifecycle",tick=Server.TickCount,time=now,slot=controller.Slot,action="reacquire-keep",gap=visibleGap});
                     // The sample, not the live entity, enters the model's delay queue.
                     state.LastVisualEstimate=state.Model.ObserveVisual(now,eyeVec,sample,new(pawn.EyeAngles.X,pawn.EyeAngles.Y),sampleRadius);
                     if(state.LastVisualEstimate.HasValue)state.FirstVisualAt??=now;
@@ -287,14 +297,17 @@ public partial class BotAimImprover
     private static (float Frac,float Lateral)[] BuildFallbackPoints()
     {
         var points=new List<(float,float)>();
-        foreach(var frac in new[]{.95f,.85f,.7f,.55f,.4f})
+        foreach(var frac in new[]{.95f,.85f,.82f,.7f,.55f})
             foreach(var lateral in new[]{0f,5f,-5f,10f,-10f})
                 points.Add((frac,lateral));
         return points.ToArray();
     }
-    private bool TrySelectHumanPoint(CCSBot bot,CCSPlayerPawn pawn,CCSPlayerPawn enemy,Vector eye,out Vec point,out float radius,out string result,out int attempts,out string pointLabel)
+    // Long enough to absorb a normal peek/cover flicker, short enough that a
+    // genuinely new engagement still starts a fresh perception/motor plan.
+    private const float ReacquireResetSeconds=1.0f;
+    private bool TrySelectHumanPoint(CCSBot bot,CCSPlayerPawn pawn,CCSPlayerPawn enemy,Vector eye,out Vec point,out float radius,out string result,out int attempts,out string pointLabel,out float rayFraction)
     {
-        point=default;radius=4;result="no-point";attempts=0;pointLabel="none";
+        point=default;radius=4;result="no-point";attempts=0;pointLabel="none";rayFraction=0f;
         var weapon=pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName;
         var order=_aimMode switch
         {
@@ -305,33 +318,37 @@ public partial class BotAimImprover
         var forward=new Angles(pawn.EyeAngles.X,pawn.EyeAngles.Y);
         float fovHalf=_humanSettings.HorizontalFieldOfView*.5f;
         int attemptsLocal=0,fovFail=0,rayFail=0,smokeFail=0;
+        float bestFraction=0f;
         Vec chosen=default;float chosenRadius=4;string chosenLabel="none";bool found=false;
-        bool Consider(float x,float y,float z,float candidateRadius,string label)
+        bool Consider(float x,float y,float z,float candidateRadius,string label,float minFraction)
         {
             attemptsLocal++;
             var candidate=new Vec(x,y,z);
             var angle=AimMath.Angles(new(eye.X,eye.Y,eye.Z),candidate);
             var delta=AimMath.Delta(angle,forward);
             if(MathF.Abs(delta.Y)>fovHalf || MathF.Abs(delta.X)>50){fovFail++;return false;}
-            if(!PointVisibleFromEye(eye,x,y,z)){rayFail++;return false;}
+            // Smoke is the cheapest rejection and does not depend on an engine trace.
             if(HumanSmokeBlocks(eye,candidate)){smokeFail++;return false;}
-            chosen=candidate;chosenRadius=candidateRadius;chosenLabel=label;found=true;
+            if(!PointVisibleFromEye(eye,x,y,z,minFraction,out var fraction)){rayFail++;bestFraction=MathF.Max(bestFraction,fraction);return false;}
+            chosen=candidate;chosenRadius=candidateRadius;chosenLabel=label;bestFraction=MathF.Max(bestFraction,fraction);found=true;
             return true;
         }
         foreach(var index in order)
         {
             if(!TryComputePartPos(enemy,index,out var x,out var y,out var z))continue;
             var candidateRadius=index is >=3 and <=7 or 10 or 11 ? 8f : 4f;
-            if(Consider(x,y,z,candidateRadius,"base:"+_aimPoints[index].Name))break;
+            if(Consider(x,y,z,candidateRadius,"base:"+_aimPoints[index].Name,.999f))break;
         }
         if(!found)
             foreach(var (frac,lateral) in _fallbackPoints)
             {
                 if(!TryComputeOffsetPos(enemy,frac,lateral,out var x,out var y,out var z))continue;
                 var candidateRadius=frac>=.9f?4f:frac>=.55f?8f:6f;
-                if(Consider(x,y,z,candidateRadius,$"fan:{frac:0.00}/{lateral:0}"))break;
+                var minFraction=frac>=.9f?.999f:.985f;
+                if(Consider(x,y,z,candidateRadius,$"fan:{frac:0.00}/{lateral:0}",minFraction))break;
             }
         attempts=attemptsLocal;
+        rayFraction=bestFraction;
         if(found)
         {
             point=chosen;radius=chosenRadius;pointLabel=chosenLabel;result="ok:"+chosenLabel;
