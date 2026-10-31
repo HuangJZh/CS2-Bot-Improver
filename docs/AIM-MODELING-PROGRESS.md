@@ -396,3 +396,17 @@ A局未采样比例从8.5同口径的30.8%降到3.9%；扇形回退在这两局�
 验证（8.17，两局自然10v10各35秒）：`sound_preaim`事件427/298次、`sound_preaim_active`行5,513/3,739，说明枪声预瞄在大量无目标Bot上触发；两局枪械开火262/226次、伤害64/48；爆发长度中位1、p90 5/4；自然局多数爆发仍很短，距离摆动只在长连发时明显，near/far各距离的sway样本不足（近<600仅74/10行、远≥600为784/281行），不能作为距离分层有效性的严格证据；声音预瞄也尚未量化“转向到声源需要多久/是否更早发现敌人”。
 
 边界：声音预瞄没有遮挡/脚步/音量衰减，只是方向记忆；距离摆动是启发式；爆发分布与demo仍有差距。下一步：用受控场景量化声音预瞄的发现时间与错误方向率；把demo的准星放置（架点）统计用于无目标预瞄；继续扩大demo样本（更多队伍/地图）并考虑移动目标开火。8.17已安装（哈希CD982981…），64项模型检查通过；证据：E:/csdemo/analysis/pro-spray-stats-vitality-navi.json与summary、docs/pro-spray-combined-8maps.json、E:/csdemo/bot-captures/model-round25-20261101（两局自然采集、sound-sway-summary、8.16备份、logs、gameinfo快照）。
+
+## 第二十三轮：道具点位系统审计与修复（NadeSystem，不是启用原生AI）
+
+用户反馈“人机似乎不会丢道具了”，并强调要检查仓库原有的完整道具点位逻辑是否被破坏，而不是改成CS原生“拿着道具冲、见人丢”的行为。审计结果：
+
+1. **仓库点位系统本身没有被替换/删除**：安装的`grenades/`包含48个地图JSON、合计3,703条录制的职业/点位道具（`projectilePosition`/`projectileVelocity`/落点/描述），`NadeSystemPlugin.Decision.cs`/`ZoneDetection.cs`/`Replay.cs`仍按地图预缓存点位、在区域内选择并`SpawnProjectile`按录制坐标生成投掷物；控制台`Replayed [smoke/he/flash/molotov] id=... origin=... vel=...`就是这套点位回放，不是原生Bot AI。
+2. **问题出在后来加入的“库存门控”**：提交`edbbc29`（“Buy bot grenades at round start and consume actual inventory on throws”）在`TryReplay`、`SpawnProjectile`、`SpecialGrenades`里都加了`HasInventoryGrenade`，没有真实道具时直接`return`。用户配置里是`bot_allow_grenades 0`、`sv_bot_buy_*_weight 0`（本来就是为了压住原生Bot的道具AI），再加上经济/InventorySimulator/掉落等因素，Bot常常没有对应道具，于是**所有点位回放被静默跳过**，表现就是“不会丢道具了”。这不是原生AI被启用，而是仓库点位系统被库存条件挡死。
+3. **修复（保留点位逻辑、关掉静默跳过）**：
+   - 新增`EnsureInventoryGrenade`：回放前若Bot缺少对应道具，则临时`GiveNamedItem`补一个（并记日志）；有道具时仍走原来的消耗逻辑（`AnnounceGrenadeThrow`→`ConsumeInventoryGrenade`）。
+   - `TryReplay`/`SpawnProjectile`/`SpecialGrenades`的门控改为`EnsureInventoryGrenade`；失败才跳过并`Logger.LogWarning`写明原因（不再静默）。
+   - 未改动`bot_allow_grenades 0`/`sv_bot_buy_*`/原生Bot行为，也没有把道具系统换成原生AI；点位选择、DB、冷却、经济、区域判定等原逻辑保持。
+4. **验证**：本机专用服按用户配置（`bot_allow_grenades 0`、`sv_bot_buy_*_weight 0`、`bot_nades normal`）跑de_dust2/de_mirage多回合：控制台出现413条NadeSystem记录，包括`Purchased`、`Granted ... (inventory missing)`与`Replayed [smoke/he/molotov/flash] id=... origin/vel`；抽查回放id（如`f6fe3a08`、`399da5bc`、`b6469893`、`b76a903c`）均能在安装的`grenades/`点位库中按前缀匹配到`de_mirage`对应类型与录制位置，证明走的是仓库点位回放。无异常；补充了`Logger`日志便于用户游戏后查`logs/log-*`，不必开控制台。
+
+边界：点位回放与真实投掷物之间仍有细小差异（投射物生成、库存消耗、部分特殊道具路径）；用户配置里若还有InventorySimulator等会反复清空库存，临时补道具可保证回放可见，但“库存是否应长期保留”仍需后续设计。当前安装：NadeSystem修复版哈希`C640C4D2…`；BotAimImprover仍为8.17；gameinfo已恢复为用户正常状态（3B18F0CA…），probe已移除，无CS2进程。证据：E:/csdemo/bot-captures/model-round27-20261101（服务端日志、补道具/回放记录、gameinfo快照）、E:/csdemo/bot-captures/model-round26-20261101（修复前同配置对照）。

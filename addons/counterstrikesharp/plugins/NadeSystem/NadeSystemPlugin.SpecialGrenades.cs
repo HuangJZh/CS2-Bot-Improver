@@ -38,7 +38,7 @@ public partial class NadeSystemPlugin : BasePlugin
                 && (int)p.TeamNum != bot.TeamNum);
         if (!hasLiveEnemy) return;
 
-        if (!HasInventoryGrenade(bot, gtype)) return;
+        if (!EnsureInventoryGrenade(bot, gtype)) return;
 
         var vel = velocity ?? new Vector(0f, 0f, 0f);
         var inventoryPawn = bot.PlayerPawn.Raw;
@@ -52,7 +52,7 @@ public partial class NadeSystemPlugin : BasePlugin
                 var botPawn = bot.PlayerPawn?.Value;
                 if (botPawn == null || !botPawn.IsValid) return;
 
-                if (!HasInventoryGrenade(bot, gtype)) return;
+                if (!EnsureInventoryGrenade(bot, gtype)) return;
                 int teamNum = bot.TeamNum;
 
                 if (gtype == "smoke")
@@ -309,7 +309,7 @@ public partial class NadeSystemPlugin : BasePlugin
 
             string gt = g.GrenadeType; // lowercase since LoadDb
 
-            if (!HasInventoryGrenade(victim, gt)) continue;
+            if (!EnsureInventoryGrenade(victim, gt)) continue;
             if (_botNadesMode == "less" && !LessModeAllows(gt, botIdx)) continue;
 
             RegisterCooldown(g.Id, gt);

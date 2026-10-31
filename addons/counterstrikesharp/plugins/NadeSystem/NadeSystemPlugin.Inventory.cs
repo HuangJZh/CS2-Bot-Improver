@@ -3,6 +3,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Cvars;
 using System;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace NadeSystem;
 
@@ -25,6 +26,32 @@ public partial class NadeSystemPlugin
     }
     private static bool HasInventoryGrenade(CCSPlayerController bot, string type)
         => bot is { IsValid:true, IsBot:true, PawnIsAlive:true } && FindInventoryGrenade(bot,type) != null;
+
+    // Scripted lineups spawn a projectile from recorded coordinates, so a real item
+    // is not required to make the throw visible. Newer inventory-aware builds used
+    // to silently skip when the bot did not buy/carry the grenade (bot_allow_grenades
+    // 0, poor economy, inventory/cosmetics plugin interference). Grant the matching
+    // item just for the scripted throw; AnnounceGrenadeThrow consumes it afterwards.
+    private bool EnsureInventoryGrenade(CCSPlayerController bot, string type)
+    {
+        if (HasInventoryGrenade(bot, type)) return true;
+        if (bot is not { IsValid:true, IsBot:true, PawnIsAlive:true }) return false;
+        var item = InventoryItem(type, bot.TeamNum);
+        if (item == null) return false;
+        try
+        {
+            if (bot.GiveNamedItem(item) == nint.Zero) return false;
+            Server.PrintToConsole($"[NadeSystem] Granted {type} to {bot.PlayerName} (inventory missing)");
+            Logger.LogInformation("[NadeSystem] Granted {Type} to {Bot} (inventory missing)", type, bot.PlayerName);
+            return HasInventoryGrenade(bot, type);
+        }
+        catch (Exception error)
+        {
+            Server.PrintToConsole($"[NadeSystem] Grant {type} failed: {error.Message}");
+            Logger.LogWarning("[NadeSystem] Grant {Type} failed for {Bot}: {Error}", type, bot.PlayerName, error.Message);
+            return false;
+        }
+    }
 
     private static void ConsumeInventoryGrenade(CCSPlayerController bot, string type)
     {

@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -83,7 +84,12 @@ public partial class NadeSystemPlugin : BasePlugin
             // no limits
         }
 
-        if (!HasInventoryGrenade(bot, gtype)) return;
+        if (!EnsureInventoryGrenade(bot, gtype))
+        {
+            Server.PrintToConsole($"[NadeSystem] Replay skipped: no {gtype} inventory/grant");
+            Logger.LogWarning("[NadeSystem] Replay skipped: no {Type} inventory/grant for {Bot}", gtype, bot.PlayerName);
+            return;
+        }
 
         _replayBots.Add((uint)bot.Index);
         RegisterCooldown(g.Id, gtype);
@@ -149,7 +155,7 @@ public partial class NadeSystemPlugin : BasePlugin
                     return;
                 }
 
-                if (!HasInventoryGrenade(bot, gtype)) return;
+                if (!EnsureInventoryGrenade(bot, gtype)) return;
 
                 // ── FLASH — CreateEntityByName is sufficient ───────────
                 // No native factory needed.
