@@ -36,6 +36,8 @@ public partial class BotAimImprover
         public float? PlanHoldSince;
         public bool PlanHoldTimedOut;
         public string LastSampleResult="none";
+        public int LastSampleAttempts;
+        public string LastSamplePoint="none";
     }
     private HumanSettings _humanSettings=new();
     private readonly Dictionary<int,HumanState> _humanStates=new();
@@ -229,8 +231,12 @@ public partial class BotAimImprover
                 float sampleRadius=4;
                 bool sensorGate=bot.IsEnemyVisible && pawn.BlindUntilTime<=now;
                 string sampleResult=sensorGate ? "not-sampled" : pawn.BlindUntilTime>now ? "blind" : "native-invisible";
-                visible=sensorGate && TrySelectHumanPoint(bot,pawn,enemy,eye,out sample,out sampleRadius,out sampleResult);
+                int sampleAttempts=0;
+                string samplePoint="none";
+                visible=sensorGate && TrySelectHumanPoint(bot,pawn,enemy,eye,out sample,out sampleRadius,out sampleResult,out sampleAttempts,out samplePoint);
                 state.LastSampleResult=sampleResult;
+                state.LastSampleAttempts=sampleAttempts;
+                state.LastSamplePoint=samplePoint;
                 state.LastSight=visible;
                 if(visible)
                 {
@@ -275,9 +281,20 @@ public partial class BotAimImprover
         }
         return HookResult.Continue;
     }
-    private bool TrySelectHumanPoint(CCSBot bot,CCSPlayerPawn pawn,CCSPlayerPawn enemy,Vector eye,out Vec point,out float radius,out string result)
+    // Dense fallback candidates used only when every preferred aim point is
+    // occluded: partial cover often leaves a shoulder, arm, hip or leg exposed.
+    private static readonly (float Frac,float Lateral)[] _fallbackPoints=BuildFallbackPoints();
+    private static (float Frac,float Lateral)[] BuildFallbackPoints()
     {
-        point=default;radius=4;result="no-point";
+        var points=new List<(float,float)>();
+        foreach(var frac in new[]{.95f,.85f,.7f,.55f,.4f})
+            foreach(var lateral in new[]{0f,5f,-5f,10f,-10f})
+                points.Add((frac,lateral));
+        return points.ToArray();
+    }
+    private bool TrySelectHumanPoint(CCSBot bot,CCSPlayerPawn pawn,CCSPlayerPawn enemy,Vector eye,out Vec point,out float radius,out string result,out int attempts,out string pointLabel)
+    {
+        point=default;radius=4;result="no-point";attempts=0;pointLabel="none";
         var weapon=pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName;
         var order=_aimMode switch
         {
@@ -286,21 +303,42 @@ public partial class BotAimImprover
             _ => weapon != null && _bodyFirstWeapons.Contains(weapon) ? _priorityTrunk : _priorityJaw
         };
         var forward=new Angles(pawn.EyeAngles.X,pawn.EyeAngles.Y);
-        foreach(var index in order)
+        float fovHalf=_humanSettings.HorizontalFieldOfView*.5f;
+        int attemptsLocal=0,fovFail=0,rayFail=0,smokeFail=0;
+        Vec chosen=default;float chosenRadius=4;string chosenLabel="none";bool found=false;
+        bool Consider(float x,float y,float z,float candidateRadius,string label)
         {
-            if(!TryComputePartPos(enemy,index,out var x,out var y,out var z)){result="bad-part";continue;}
+            attemptsLocal++;
             var candidate=new Vec(x,y,z);
             var angle=AimMath.Angles(new(eye.X,eye.Y,eye.Z),candidate);
             var delta=AimMath.Delta(angle,forward);
-            if(MathF.Abs(delta.Y)>_humanSettings.HorizontalFieldOfView*.5f){result="fov-yaw";continue;}
-            if(MathF.Abs(delta.X)>50){result="fov-pitch";continue;}
-            if(!PointVisibleFromEye(eye,x,y,z)){result="ray";continue;}
-            if(HumanSmokeBlocks(eye,candidate)){result="smoke";continue;}
-            point=candidate;
-            radius=index is >=3 and <=7 or 10 or 11 ? 8 : 4;
-            result="ok";
+            if(MathF.Abs(delta.Y)>fovHalf || MathF.Abs(delta.X)>50){fovFail++;return false;}
+            if(!PointVisibleFromEye(eye,x,y,z)){rayFail++;return false;}
+            if(HumanSmokeBlocks(eye,candidate)){smokeFail++;return false;}
+            chosen=candidate;chosenRadius=candidateRadius;chosenLabel=label;found=true;
             return true;
         }
+        foreach(var index in order)
+        {
+            if(!TryComputePartPos(enemy,index,out var x,out var y,out var z))continue;
+            var candidateRadius=index is >=3 and <=7 or 10 or 11 ? 8f : 4f;
+            if(Consider(x,y,z,candidateRadius,"base:"+_aimPoints[index].Name))break;
+        }
+        if(!found)
+            foreach(var (frac,lateral) in _fallbackPoints)
+            {
+                if(!TryComputeOffsetPos(enemy,frac,lateral,out var x,out var y,out var z))continue;
+                var candidateRadius=frac>=.9f?4f:frac>=.55f?8f:6f;
+                if(Consider(x,y,z,candidateRadius,$"fan:{frac:0.00}/{lateral:0}"))break;
+            }
+        attempts=attemptsLocal;
+        if(found)
+        {
+            point=chosen;radius=chosenRadius;pointLabel=chosenLabel;result="ok:"+chosenLabel;
+            return true;
+        }
+        result=rayFail>0?$"ray({rayFail}/{attemptsLocal})":fovFail>0?$"fov({fovFail}/{attemptsLocal})":smokeFail>0?$"smoke({smokeFail}/{attemptsLocal})":"no-point";
+        pointLabel="none";
         return false;
     }
     private static void WriteModelSpot(CCSBot bot,Vec point)

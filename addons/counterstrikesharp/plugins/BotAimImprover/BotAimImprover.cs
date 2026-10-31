@@ -15,7 +15,7 @@ namespace BotAimImprover;
 public partial class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8-human.8.5-experimental";
+    public override string ModuleVersion => "2.1.8-human.8.6-experimental";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 
@@ -404,6 +404,26 @@ public partial class BotAimImprover : BasePlugin
             y = oy + rY * p.Lateral;
             z = oz + eyeZ * p.Frac;
         }
+        return !(float.IsNaN(x) || float.IsNaN(y) || float.IsNaN(z)
+                 || float.IsInfinity(x) || float.IsInfinity(y) || float.IsInfinity(z));
+    }
+
+    // Fraction/lateral variant used by the fallback sampler for body/arm points
+    // that are not part of the fixed aim-point table.
+    private static bool TryComputeOffsetPos(CCSPlayerPawn enemyPawn, float frac, float lateral,
+                                            out float x, out float y, out float z)
+    {
+        x = y = z = 0;
+        var origin = enemyPawn.AbsOrigin;
+        if (origin == null) return false;
+        float eyeZ = enemyPawn.ViewOffset?.Z ?? 64.0f;
+        float yawDeg = enemyPawn.EyeAngles?.Y ?? 0.0f;
+        double yawRad = yawDeg * Math.PI / 180.0;
+        float rX = (float)Math.Sin(yawRad);
+        float rY = (float)-Math.Cos(yawRad);
+        x = origin.X + rX * lateral;
+        y = origin.Y + rY * lateral;
+        z = origin.Z + eyeZ * frac;
         return !(float.IsNaN(x) || float.IsNaN(y) || float.IsNaN(z)
                  || float.IsInfinity(x) || float.IsInfinity(y) || float.IsInfinity(z));
     }

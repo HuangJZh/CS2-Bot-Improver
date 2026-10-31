@@ -99,6 +99,7 @@ public partial class BotAimImprover
             enemy_vx=enemyVelocity?.X,enemy_vy=enemyVelocity?.Y,enemy_vz=enemyVelocity?.Z,enemy_distance=enemyDistance,
             contact_gap_degrees=state!=null && float.IsFinite(state.Model.ContactGapDegrees) ? (float?)state.Model.ContactGapDegrees : null,
             contact_kind=state?.Model.ContactKind,sample_result=state?.LastSampleResult,
+            sample_attempts=state?.LastSampleAttempts,sample_point=state?.LastSamplePoint,
             model_plan_start_time=state is {} planState && planState.Model.ContactKind!="none" ? (float?)planState.Model.PlanStartedAt : null,
             model_plan_duration=state is {} durationState && durationState.Model.ContactKind!="none" ? (float?)durationState.Model.PlanDuration : null,
             native_phase=bot!=null ? NativePhase(bot.Handle) : null,
