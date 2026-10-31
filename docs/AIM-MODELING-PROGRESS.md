@@ -488,3 +488,10 @@ A局未采样比例从8.5同口径的30.8%降到3.9%；扇形回退在这两局�
 - 去掉了`InBuyZone`限制（上一版已做），保留购买窗口`BuyTimeEnded=false`和严格持有语义。
 
 专用服验证：`Buy pass mode=normal sinceRound=51 bots=10 eligible=33 already=20 noMoney=0 bought=13`，随后因Bot已满/已有道具`eligible=0`，购买正常。安装哈希`49A0622D…`；用户下次重启游戏后日志会直接显示购买是否被条件挡住，若仍无购买可据此定位。
+### 2026-11-01 第三次修复：本地模式Bot资格诊断与放宽
+
+用户重启后日志出现`Buy pass ... bots=0`：购买循环里没有任何玩家通过资格检查。由于本地listen服务器与专用服的`IsBot/InGameMoneyServices/WeaponServices/控制标记`可能不同，本次：
+- 在购买日志中加入完整计数：`players/notBot/dead/teamBad/pawnBad/controlled/weaponsNull/moneyNull/bots/eligible/already/noMoney/bought`，可直接定位是哪一项把Bot全部筛掉；
+- 放款资格：不再因`HasBeenControlledByPlayerThisRound`跳过Bot购买；`WeaponServices==null`时按0颗已有道具处理；`InGameMoneyServices==null`时允许按预算购买且不做金钱扣除（记录`moneyServices=false`），避免本地服务器金钱服务不可用时0购买；
+- 仍保持购买窗口限制与严格持有语义。
+安装哈希`6A002989…`；需重启游戏加载。若仍无购买，请把最新`Buy pass`整行发来。
