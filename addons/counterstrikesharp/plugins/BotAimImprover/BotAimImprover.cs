@@ -15,7 +15,7 @@ namespace BotAimImprover;
 public partial class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8-human.5-experimental";
+    public override string ModuleVersion => "2.1.8-human.7-experimental";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 
@@ -221,6 +221,7 @@ public partial class BotAimImprover : BasePlugin
     public override void Unload(bool hotReload)
     {
         StopAimTelemetry();
+        UninstallNativePhases();
         ResetHuman();
         try { _updateLook?.Unhook(OnHumanLook,HookMode.Pre); } catch { }
         try { _updateLook?.Unhook(OnHumanLookPost,HookMode.Post); } catch { }

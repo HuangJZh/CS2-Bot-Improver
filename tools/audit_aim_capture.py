@@ -16,8 +16,9 @@ def audit(path):
             'mac10','mp9','mp7','mp5sd','ump45','p90','bizon','nova','xm1014','mag7','sawedoff','negev','m249'}
     fires = [r for r in rows if r.get('kind') == 'weapon_fire_callback'
              and str(r.get('event_weapon','')).removeprefix('weapon_') in guns]
-    blocked = [r for r in fires if r.get('allow_fire') is False]
-    unknown = sum(r.get('allow_fire') is None for r in fires)
+    decision = lambda r: r.get('effective_allow_fire') if r.get('effective_allow_fire') is not None else r.get('allow_fire')
+    blocked = [r for r in fires if decision(r) is False]
+    unknown = sum(decision(r) is None for r in fires)
     gate_status = ('blocked-state-fire-callbacks' if blocked else 'no-classified-gun-fire' if not fires
                    else 'insufficient-gate-state' if unknown else 'no-blocked-state-callbacks-observed')
     seen, previous, tracked = set(), {}, {}
@@ -40,6 +41,10 @@ def audit(path):
         fire_gate=dict(status=gate_status,gun_fire_callbacks=len(fires),unknown_decision_callbacks=unknown,
                        blocked_state_callbacks=len(blocked),blocked_and_suppression_owned=sum(bool(r.get('model_fire_suppression_owned')) for r in blocked),
                        examples=[{k:r.get(k) for k in ['slot','time','event_weapon','phase','fire_reason','model_fire_suppression_owned']} for r in blocked[:10]]),
+        fire_callback_native_phases=dict(collections.Counter(r.get('native_phase','not-recorded') for r in fires)),
+        native_phase_ready=rows[0].get('native_phase_ready'),
+        native_phase_calls=next((r.get('native_phase_calls') for r in reversed(rows) if r.get('kind')=='session_end'),None),
+        model_controls=[{k:r.get(k) for k in ['time','action','active']} for r in rows if r.get('kind')=='model_control'],
         tracking_yaw_error={slot: dict(samples=len(errors), median_deg=float(np.median(errors)),
                                       p95_deg=float(np.quantile(errors, .95)), max_deg=float(max(errors)))
                             for slot, errors in tracked.items()},

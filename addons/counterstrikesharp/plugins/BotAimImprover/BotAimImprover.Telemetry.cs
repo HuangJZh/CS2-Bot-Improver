@@ -40,13 +40,14 @@ public partial class BotAimImprover
                 int seconds=c.ArgCount>2 && int.TryParse(c.GetArg(2),out var n) ? Math.Clamp(n,10,300) : 120;
                 try
                 {
+                    _nativePhaseCalls.Clear();
                     var directory=Path.Combine(ModuleDirectory,"telemetry");Directory.CreateDirectory(directory);
                     _telemetryPath=Path.Combine(directory,$"aim-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.jsonl");
                     _telemetry=new StreamWriter(new FileStream(_telemetryPath,FileMode.CreateNew,FileAccess.Write,FileShare.Read),new System.Text.UTF8Encoding(false),65536);
                     _telemetryRules=Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault(p=>p.IsValid)?.GameRules;
                     _telemetryUntil=Server.CurrentTime+seconds;_telemetryTick=-1;
                     WriteTelemetry(new {kind="session",schema="bot-aim-telemetry-v1",map=Server.MapName,difficulty=_humanDifficulty,model_active=HumanActive,module_version=ModuleVersion,direct_view_requested=_humanSettings.DirectViewControl,direct_view_available=_setEyeAngles!=null,tick_interval=Server.TickInterval,
-                        note="Tick observations and event-callback angles; not raw usercmd or exact subtick shot angles. Captures bots only. No network upload."});
+                        native_phase_ready=_nativePhasesReady,note="Tick observations and event-callback angles; not raw usercmd or exact subtick shot angles. Captures bots only. No network upload."});
                 }
                 catch(Exception error) { StopAimTelemetry();Logger.LogError(error,"Cannot start aim capture"); }
             }
@@ -75,6 +76,9 @@ public partial class BotAimImprover
             native_goal_pitch=bot?.AimGoal.X,native_goal_yaw=bot?.AimGoal.Y,
             native_look_at_x=bot?.LookAtSpot.X,native_look_at_y=bot?.LookAtSpot.Y,native_look_at_z=bot?.LookAtSpot.Z,native_look_at_attack=bot?.LookAtSpotAttack,
             native_target_x=bot?.TargetSpot.X,native_target_y=bot?.TargetSpot.Y,native_target_z=bot?.TargetSpot.Z,
+            native_phase=bot!=null ? NativePhase(bot.Handle) : null,
+            native_fire_weapon_timestamp=bot?.FireWeaponTimestamp,
+            model_last_used_time=state?.LastUsed,
             enemy=bot?.Enemy.Raw,native_visible=bot?.IsEnemyVisible,sensor_visible=state?.LastSight,
             planned_pitch=state?.Output.Angles.X,planned_yaw=state?.Output.Angles.Y,phase=state?.Output.Phase,allow_fire=state?.Output.AllowFire,
             observation_age=state!=null && float.IsFinite(state.Output.ObservationAge) ? (float?)state.Output.ObservationAge : null,
@@ -85,6 +89,7 @@ public partial class BotAimImprover
             fire_expected_error_degrees=state?.Model.LastFireDecision.ExpectedErrorDegrees,
             fire_tolerance_degrees=state?.Model.LastFireDecision.ToleranceDegrees,
             under_fire=state!=null && Server.CurrentTime<state.UnderFireUntil,
+            test_gate_active=TestGateActive,effective_allow_fire=state!=null ? (bool?)(state.Output.AllowFire && !TestGateActive) : null,
             model_fire_suppression_owned=state?.Suppression>0,event_weapon=eventWeapon,other_pawn=otherPawn,damage});
     }
     private void WriteTelemetry<T>(T row)
@@ -96,6 +101,11 @@ public partial class BotAimImprover
     private void StopAimTelemetry()
     {
         var writer=_telemetry;_telemetry=null;_telemetryRules=null;
+        if(writer!=null)
+        {
+            try{writer.WriteLine(JsonSerializer.Serialize(new {kind="session_end",tick=Server.TickCount,time=Server.CurrentTime,native_phase_calls=_nativePhaseCalls}));}
+            catch(IOException){}
+        }
         try { writer?.Dispose(); } catch(IOException) { }
     }
 }

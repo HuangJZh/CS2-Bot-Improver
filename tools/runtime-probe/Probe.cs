@@ -2,6 +2,8 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Capabilities;
 using CounterStrikeSharp.API.Modules.Utils;
+using CounterStrikeSharp.API.Modules.Memory;
+using CounterStrikeSharp.API.Modules.Memory.DynamicFunctions;
 using BotControllerApi;
 using System.Text.Json;
 public sealed class HumanAimProbe:BasePlugin
@@ -16,6 +18,25 @@ public sealed class HumanAimProbe:BasePlugin
  private float _recordUntil;
  private readonly List<object> _recordClock=new();
  private readonly HashSet<int> _primaryLocks=new();
+ private CounterStrikeSharp.API.Modules.Timers.Timer? _forcedPerception;
+ private MemoryFunctionVoid<nint,nint>? _setEyeAngles;
+ private MemoryFunctionVoid<nint>? _lookHook;
+ private readonly Dictionary<nint,(int Slot,uint Pawn,float Until,float Yaw)> _facePoses=new();
+ private HookResult OnFixtureLookPost(DynamicHook hook)
+ {
+  var pointer=hook.GetParam<nint>(0);
+  if(!_facePoses.TryGetValue(pointer,out var pose))return HookResult.Continue;
+  var player=Utilities.GetPlayerFromSlot(pose.Slot);
+  if(Server.CurrentTime>=pose.Until || player is not {IsValid:true,PawnIsAlive:true} || player.PlayerPawn.Raw!=pose.Pawn)
+  {_facePoses.Remove(pointer);return HookResult.Continue;}
+  var pawn=player.PlayerPawn.Value!;
+  if(pawn.Bot is {} bot && bot.IsEnemyVisible && bot.Enemy.Raw!=uint.MaxValue)
+  {_facePoses.Remove(pointer);return HookResult.Continue;}
+  var angles=new QAngle(0,pose.Yaw,0);uint flags=player.Flags;
+  try{if(OperatingSystem.IsWindows())player.Flags=flags|0x100u;_setEyeAngles!.Invoke(pawn.Handle,angles.Handle);}
+  finally{if(OperatingSystem.IsWindows() && player.IsValid)player.Flags=flags;}
+  return HookResult.Continue;
+ }
  private void StopMotionCapture()
  {
   if(_recordSlot<0 || _api==null)return;
@@ -32,14 +53,19 @@ public sealed class HumanAimProbe:BasePlugin
  private void ReleaseControls()
  {
   StopMotionCapture();_budgetToken=0;_budgetActor=-1;
+  _forcedPerception?.Kill();_forcedPerception=null;
+  _facePoses.Clear();
   foreach(int slot in _primaryLocks)_api?.Unlock(slot,LockKind.Weapon);
   _primaryLocks.Clear();
   foreach(var c in _controls)try { if(c.Kind=="move")_api?.CancelUsercmdMovement(c.Slot,c.Token);else if(c.Kind=="suppress")_api?.CancelUsercmdSuppression(c.Slot,c.Token);else _api?.CancelUsercmdInjection(c.Slot,c.Token); }catch { }
   _controls.Clear();
  }
- public override void Unload(bool hotReload)=>ReleaseControls();
+ public override void Unload(bool hotReload)
+ {
+  ReleaseControls();_lookHook?.Unhook(OnFixtureLookPost,HookMode.Post);
+ }
  public override string ModuleName=>"HumanAimProbe";
- public override string ModuleVersion=>"2-capture-fixture";
+ public override string ModuleVersion=>"4-open-facing-fixture";
  public override void Load(bool hotReload)
  {
   // Never run this fixture in a normal client. Deliberately constrained to our test server.
@@ -47,6 +73,14 @@ public sealed class HumanAimProbe:BasePlugin
   int port=Array.IndexOf(args,"-port"),ip=Array.IndexOf(args,"-ip");
   if(!args.Contains("-dedicated") || port<0 || port+1>=args.Length || args[port+1]!="27025"
      || ip<0 || ip+1>=args.Length || args[ip+1]!="127.0.0.1")return;
+  using(var data=JsonDocument.Parse(File.ReadAllText(Path.GetFullPath(Path.Combine(ModuleDirectory,"../../../../addons/BotController/gamedata.json")))))
+  {
+   string platform=OperatingSystem.IsWindows() ? "windows" : "linux";
+   _setEyeAngles=new(data.RootElement.GetProperty("CCSPlayerPawn::SetEyeAngles").GetProperty("signatures").GetProperty(platform).GetString()!);
+   _lookHook=new(data.RootElement.GetProperty("CCSBot::UpdateLookAngles").GetProperty("signatures").GetProperty(platform).GetString()!);
+   if(_setEyeAngles.Handle==nint.Zero || _lookHook.Handle==nint.Zero)throw new InvalidOperationException("Fixture view signatures unavailable");
+   _lookHook.Hook(OnFixtureLookPost,HookMode.Post);
+  }
   RegisterListener<Listeners.OnMapEnd>(ReleaseControls);
   RegisterListener<Listeners.OnTick>(()=>{
    if(_recordSlot<0 || _api==null)return;
@@ -76,6 +110,16 @@ public sealed class HumanAimProbe:BasePlugin
    if(p!=null)return;
    var bots=Utilities.GetPlayers().Where(b=>b.IsBot && b.TeamNum is 2 or 3 && b.PlayerPawn.Value is {IsValid:true}).ToArray();
    var action=c.ArgCount>1 ? c.GetArg(1) : "status";
+   if(action=="face_open")
+   {
+    if(Server.MapName!="de_dust2")throw new InvalidOperationException("Fixed view requires de_dust2");
+    foreach(var b in bots.Where(b=>b.PawnIsAlive))
+    {
+     if(b.PlayerPawn.Value?.Bot is {} bot)
+      _facePoses[bot.Handle]=(b.Slot,b.PlayerPawn.Raw,Server.CurrentTime+2,b.TeamNum==2 ? 29.85f : -150.15f);
+    }
+    Server.PrintToConsole("[PROBE] scripted pre-contact view, <=2s, released on native visual acquisition; no enemy or Attack injection");
+   }
    if(action=="lock_primary")
    {
     _api=new PluginCapability<IBotControllerApi>("botcontroller:api").Get();
@@ -93,8 +137,9 @@ public sealed class HumanAimProbe:BasePlugin
     _recordSlot=actor.Slot;_recordPawn=actor.PlayerPawn.Raw;_recordUntil=Server.CurrentTime+10;
     _recordClock.Clear();Server.PrintToConsole("[PROBE] recording native motion for10 simulation seconds; no replay started");
    }
-   if(action is "scenario" or "scenario_static")
+   if(action is "scenario" or "scenario_static" or "scenario_open")
    {
+    if(action=="scenario_open" && Server.MapName!="de_dust2")throw new InvalidOperationException("Open fixture coordinates require de_dust2");
     var a=bots.First(b=>b.TeamNum==2);var b=bots.First(b=>b.TeamNum==3);
     if(!a.PawnIsAlive)a.Respawn();if(!b.PawnIsAlive)b.Respawn();
     AddTimer(.5f,()=>{
@@ -105,7 +150,22 @@ public sealed class HumanAimProbe:BasePlugin
      var pawn=a.PlayerPawn.Value!;var target=b.PlayerPawn.Value!;var pos=pawn.AbsOrigin!;
      // Keep observer's current view unchanged; place the target inside that field of view.
      float yaw=pawn.EyeAngles.Y*MathF.PI/180;
-     target.Teleport(new Vector(pos.X+MathF.Cos(yaw)*100,pos.Y+MathF.Sin(yaw)*100,pos.Z),new QAngle(0,pawn.EyeAngles.Y+180,0),new Vector(0,0,0));
+     if(action=="scenario_open")
+     {
+      // Two actual spawn-ground positions from the user-provided Dust2 demo.
+      // Static mesh says clear; an independent live brush trace is logged below.
+      pawn.Teleport(new Vector(-1076,-843,116.789474f),new QAngle(0,29.85f,0),new Vector(0,0,0));
+      target.Teleport(new Vector(-1015,-808,116.082634f),new QAngle(0,-150.15f,0),new Vector(0,0,0));
+     }
+     else target.Teleport(new Vector(pos.X+MathF.Cos(yaw)*100,pos.Y+MathF.Sin(yaw)*100,pos.Z),new QAngle(0,pawn.EyeAngles.Y+180,0),new Vector(0,0,0));
+     AddTimer(.3f,()=>{
+      if(!a.IsValid || !b.IsValid || !a.PawnIsAlive || !b.PawnIsAlive)return;
+      var ap=a.PlayerPawn.Value!;var bp=b.PlayerPawn.Value!;var ao=ap.AbsOrigin!;var bo=bp.AbsOrigin!;
+      var trace=Trace.TraceEndShape(new Vector(ao.X,ao.Y,ao.Z+ap.ViewOffset.Z),new Vector(bo.X,bo.Y,bo.Z+bp.ViewOffset.Z),options:new TraceOptions{InteractsWith=Masks.SolidBrushOnly});
+      File.AppendAllText(Path.Combine(ModuleDirectory,"scene-traces.jsonl"),JsonSerializer.Serialize(new {time=Server.CurrentTime,scene=action,fraction=trace.Fraction,
+       observer=new {x=ao.X,y=ao.Y,z=ao.Z,eye=ap.ViewOffset.Z,flags=ap.Flags},target=new {x=bo.X,y=bo.Y,z=bo.Z,eye=bp.ViewOffset.Z,flags=bp.Flags}})+"\n");
+      Server.PrintToConsole($"[PROBE] live brush trace fraction={trace.Fraction}; not full visual truth");
+     });
      if(action=="scenario")AddTimer(2f,()=>{
       if(!b.IsValid || !b.PawnIsAlive)return;
       var targetPawn=b.PlayerPawn.Value!;var current=targetPawn.AbsOrigin!;
@@ -120,15 +180,17 @@ public sealed class HumanAimProbe:BasePlugin
    if(action=="force")
    {
     var a=bots.First(b=>b.TeamNum==2);var b=bots.First(b=>b.TeamNum==3);int remaining=200;
-    AddTimer(.05f,()=>{
-     if(remaining--<=0 || !a.IsValid || !b.IsValid)return;
+    uint aPawn=a.PlayerPawn.Raw,bPawn=b.PlayerPawn.Raw;
+    _forcedPerception?.Kill();
+    _forcedPerception=AddTimer(.05f,()=>{
+     if(remaining--<=0 || !a.IsValid || !b.IsValid || a.PlayerPawn.Raw!=aPawn || b.PlayerPawn.Raw!=bPawn){_forcedPerception?.Kill();_forcedPerception=null;return;}
      foreach(var pair in new[]{(a,b),(b,a)})
      {
       if(!pair.Item1.PawnIsAlive || !pair.Item2.PawnIsAlive)continue;
       var bot=pair.Item1.PlayerPawn.Value?.Bot;if(bot==null)continue;
       bot.Enemy.Raw=pair.Item2.PlayerPawn.Raw;bot.IsEnemyVisible=true;bot.IsAttacking=true;
      }
-    },CounterStrikeSharp.API.Modules.Timers.TimerFlags.REPEAT);
+    },CounterStrikeSharp.API.Modules.Timers.TimerFlags.REPEAT | CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
     Server.PrintToConsole("[PROBE] forced perception handles for adapter test only");
    }
    if(action is "stabilize_native_stance" or "stabilize_stand" or "stabilize_crouch" or "strafe_stand")
@@ -188,7 +250,8 @@ public sealed class HumanAimProbe:BasePlugin
      Server.PrintToConsole($"[PROBE] injected attack slot={b.Slot} token={token}; shoot_one ends at30 AK events or60s wall-clock lease");
     }
    }
-   foreach(var b in bots.Take(4))Server.PrintToConsole($"[PROBE] slot={b.Slot} alive={b.PawnIsAlive} weapon={b.PlayerPawn.Value?.WeaponServices?.ActiveWeapon.Value?.DesignerName}");
+   _api??=new PluginCapability<IBotControllerApi>("botcontroller:api").Get();
+   foreach(var b in bots.Take(4))Server.PrintToConsole($"[PROBE] slot={b.Slot} alive={b.PawnIsAlive} weapon={b.PlayerPawn.Value?.WeaponServices?.ActiveWeapon.Value?.DesignerName} controller_flags={b.Flags:X} all_lock={_api?.IsLocked(b.Slot,LockKind.All)} aim_lock={_api?.IsLocked(b.Slot,LockKind.Aim)} weapon_lock={_api?.GetWeaponLock(b.Slot)} replay={_api?.IsReplaying(b.Slot)} enemy={b.PlayerPawn.Value?.Bot?.Enemy.Raw}");
   });
  }
 }

@@ -32,4 +32,9 @@ class CaptureAudit(unittest.TestCase):
    result=audit(self.write(d,[{'schema':'bot-aim-telemetry-v1'},
     {'kind':'weapon_fire_callback','event_weapon':'weapon_ak47'}]))
    self.assertEqual(result['fire_gate']['status'],'insufficient-gate-state')
+ def test_effective_test_override_not_lost(self):
+  with tempfile.TemporaryDirectory() as d:
+   result=audit(self.write(d,[{'schema':'bot-aim-telemetry-v1'},
+    {'kind':'weapon_fire_callback','event_weapon':'weapon_ak47','allow_fire':True,'effective_allow_fire':False,'model_fire_suppression_owned':True}]))
+   self.assertEqual(result['fire_gate']['blocked_and_suppression_owned'],1)
 if __name__=='__main__':unittest.main()

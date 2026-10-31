@@ -41,12 +41,31 @@ public partial class BotAimImprover
     private IBotControllerApi? _humanController;
     private string _humanDifficulty="Medium";
     private long _humanLookCalls;
+    private float _testGateUntil=float.NegativeInfinity;
+    private bool TestGateActive=>Server.CurrentTime<_testGateUntil;
     private bool HumanActive => _humanSettings.Enabled && _humanController != null && _updateLook != null;
 
     private void InitializeHumanAim()
     {
         ReadHumanSettings();
         InitializeAimTelemetry();
+        var processArgs=Environment.GetCommandLineArgs();
+        int testPort=Array.IndexOf(processArgs,"-port"),testIp=Array.IndexOf(processArgs,"-ip");
+        if(processArgs.Contains("-dedicated") && testPort>=0 && testPort+1<processArgs.Length && processArgs[testPort+1]=="27025"
+            && testIp>=0 && testIp+1<processArgs.Length && processArgs[testIp+1]=="127.0.0.1")
+            AddCommand("bot_aim_test_gate","Loopback fixture only: block [seconds<=5], release",(caller,c)=>{
+                if(caller!=null)return;
+                string action=c.ArgCount>1 ? c.GetArg(1) : "status";
+                if(action=="block")
+                {
+                    float seconds=c.ArgCount>2 && float.TryParse(c.GetArg(2),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var value) && float.IsFinite(value) ? Math.Clamp(value,.5f,5) : 3;
+                    _testGateUntil=Server.CurrentTime+seconds;
+                }
+                if(action=="release")_testGateUntil=float.NegativeInfinity;
+                WriteTelemetry(new {kind="test_gate_control",tick=Server.TickCount,time=Server.CurrentTime,action,active=TestGateActive,
+                    until=TestGateActive ? (float?)_testGateUntil : null});
+                Server.PrintToConsole($"[HumanAimTestGate] active={TestGateActive}; expires automatically, local dedicated fixture only");
+            });
         // Use the installed BotController gamedata, not an invented/current-upstream signature.
         var path=Path.GetFullPath(Path.Combine(ModuleDirectory,"../../../../addons/BotController/gamedata.json"));
         try
@@ -59,6 +78,8 @@ public partial class BotAimImprover
             _updateLook.Hook(OnHumanLook,HookMode.Pre);
             InitializeDirectView(document.RootElement,platform);
             _updateLook.Hook(OnHumanLookPost,HookMode.Post);
+            try{InitializeNativePhases(document.RootElement,platform);}
+            catch(Exception error){UninstallNativePhases();Logger.LogWarning(error,"Native phase diagnostics unavailable");}
         }
         catch(Exception error)
         {
@@ -88,6 +109,7 @@ public partial class BotAimImprover
             var action=c.ArgCount>1 ? c.GetArg(1).ToLowerInvariant() : "status";
             if(action is "on" or "off") { _humanSettings.Enabled=action=="on";ResetHuman(); }
             if(action=="reload") { ResetHuman();ReadHumanSettings(); }
+            if(action is "on" or "off" or "reload")WriteTelemetry(new {kind="model_control",tick=Server.TickCount,time=Server.CurrentTime,action,enabled=_humanSettings.Enabled,active=HumanActive});
             Server.PrintToConsole($"[HumanAim] active={HumanActive} difficulty={_humanDifficulty} direct_requested={_humanSettings.DirectViewControl} direct_available={_setEyeAngles!=null} calls={_humanLookCalls} bots={Utilities.GetPlayers().Count(p=>p.IsBot)} alive={Utilities.GetPlayers().Count(p=>p.PawnIsAlive)} states={_humanStates.Count} phases={JsonSerializer.Serialize(_humanPhases)}");
         });
         AddTimer(10f,() => {
@@ -135,6 +157,7 @@ public partial class BotAimImprover
     }
     private void ResetHuman()
     {
+        _testGateUntil=float.NegativeInfinity;
         foreach(var slot in _humanStates.Keys.ToArray())ReleaseHuman(slot);
         _modelSpots.Clear();_humanPhases.Clear();ReadHumanDifficulty();
     }
@@ -220,6 +243,7 @@ public partial class BotAimImprover
     }
     private void GateHumanFire(int slot,HumanState state,bool allow)
     {
+        allow=allow && !TestGateActive;
         if(!allow)
         {
             if(state.Suppression<=0)state.Suppression=_humanController!.StartUsercmdSuppression(slot,(ulong)PlayerButtons.Attack);
