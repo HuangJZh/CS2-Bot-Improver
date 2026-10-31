@@ -226,7 +226,28 @@ public sealed class HumanAimProbe:BasePlugin
     });
    }
 
-   if(action=="record_stop")StopMotionCapture();
+   if(action=="dump_entities")
+   {
+    var path=Path.Combine(ModuleDirectory,"map-entities.jsonl");
+    var lines=new List<string>();int dumped=0;
+    foreach(var ent in Utilities.GetAllEntities())
+    {
+     if(ent==null || !ent.IsValid)continue;
+     try
+     {
+      var baseEnt=ent.As<CBaseEntity>();
+      var o=baseEnt.AbsOrigin;
+      string cls=ent.DesignerName;
+      float rp=0,ry=0;
+      try{var r=baseEnt.AbsRotation;ry=r?.Y ?? 0f;rp=r?.X ?? 0f;}catch(Exception){}
+      lines.Add(JsonSerializer.Serialize(new {classname=cls,x=o?.X,y=o?.Y,z=o?.Z,pitch=rp,yaw=ry}));
+      dumped++;
+     }
+     catch(Exception){ }
+    }
+    File.WriteAllLines(path,lines);
+    Server.PrintToConsole($"[PROBE] dumped {dumped} entities to {path}");
+   }   if(action=="record_stop")StopMotionCapture();
    if(action=="record_start")
    {
     StopMotionCapture();_api=new PluginCapability<IBotControllerApi>("botcontroller:api").Get();
