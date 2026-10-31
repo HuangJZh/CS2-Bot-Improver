@@ -29,10 +29,10 @@ public sealed record HumanAimProfile(float Reaction, float SensorDelay, float Sa
         _ => new(.170f,.065f,.035f,.125f,.16f,.011f,.070f,650,.80f)
     };
     // Mean relative view drift (degrees) by shot index during a pro rifle spray,
-    // measured from 639 bursts >=2 rounds across five maps from two pro series
-    // (Aurora vs Falcons BO3, Vitality vs MOUZ BO3). Burst median 5 rounds.
-    public static readonly float[] ProSprayPitch={0f,.21f,.98f,2.10f,3.53f,5.06f,6.15f,7.00f,7.57f,8.38f,8.57f,9.02f,9.04f,8.64f,7.86f,7.78f,7.79f,8.11f,8.36f,8.52f,9.75f};
-    public static readonly float[] ProSprayYaw={0f,.14f,.13f,.03f,-.06f,-.51f,-1.04f,-1.62f,-1.58f,-.57f,1.80f,2.40f,3.40f,3.59f,3.55f,5.78f,6.19f,6.39f,6.41f,6.44f,6.18f};
+    // measured from 1,445 bursts >=2 rounds across eight maps from three pro series
+    // (Aurora vs Falcons, Vitality vs MOUZ, Vitality vs NAVI). Burst median 5.
+    public static readonly float[] ProSprayPitch={0f,.23f,.94f,2.02f,3.40f,4.87f,5.98f,6.78f,7.31f,7.94f,8.03f,8.20f,8.02f,8.00f,7.68f,7.64f,7.70f,7.87f,8.36f,7.45f,9.75f};
+    public static readonly float[] ProSprayYaw={0f,.08f,.12f,.12f,.03f,-.40f,-.81f,-1.31f,-1.26f,-.36f,1.76f,2.83f,3.43f,3.57f,3.96f,4.38f,4.45f,4.62f,4.13f,4.52f,6.18f};
 }
 public readonly record struct AimObservation(float Time, Vector3 Position,float Radius=8,float Uncertainty=0);
 public readonly record struct AimOutput(Vector2 Angles, bool AllowFire, string Phase, float ObservationAge);

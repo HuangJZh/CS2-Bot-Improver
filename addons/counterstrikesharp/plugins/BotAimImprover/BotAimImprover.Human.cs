@@ -52,6 +52,7 @@ public partial class BotAimImprover
     private readonly Dictionary<int,HumanState> _humanStates=new();
     private readonly Dictionary<string,long> _humanPhases=new();
     private readonly Dictionary<nint,Vec> _modelSpots=new();
+    private readonly Dictionary<int,(float Yaw,float Pitch,float Until)> _soundPreaim=new();
     private MemoryFunctionVoid<nint>? _updateLook;
     private IBotControllerApi? _humanController;
     private string _humanDifficulty="Medium";
@@ -111,7 +112,7 @@ public partial class BotAimImprover
             }
             MaintainFireGuards();
         });
-        RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);}return HookResult.Continue; });
+        RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);}return HookResult.Continue; });
         // Track bursts so the aim output can model human recoil control after the
         // first few rounds instead of holding a perfectly steady target point.
         RegisterEventHandler<EventWeaponFire>((e,i) => {
@@ -130,6 +131,30 @@ public partial class BotAimImprover
                 if(fireState.SprayShots==1 && shooter.PlayerPawn.Value is {} firePawn)
                     fireState.SprayBasePitchError=firePawn.EyeAngles.X-fireState.Model.LastDesiredAngles.X;
             }
+            // Sound cue for other bots without a live visual target: remember the
+            // shooter direction for about a second and let them preaim toward it.
+            if(HumanActive && e.Userid is {IsValid:true} soundShooter && soundShooter.TeamNum is 2 or 3
+                && soundShooter.PlayerPawn.Value is {} soundPawn && soundPawn.AbsOrigin is {} soundOrigin)
+            {
+                foreach(var listener in Utilities.GetPlayers().Where(p=>p.IsValid && p.IsBot && p.PawnIsAlive && p.TeamNum!=soundShooter.TeamNum))
+                {
+                    if(_humanStates.ContainsKey(listener.Slot))continue;
+                    var listenerPawn=listener.PlayerPawn.Value;
+                    if(listenerPawn?.AbsOrigin is not {} listenerOrigin)continue;
+                    float dx=soundOrigin.X-listenerOrigin.X,dy=soundOrigin.Y-listenerOrigin.Y;
+                    float dz=(soundOrigin.Z+(soundPawn.ViewOffset?.Z ?? 64f))-(listenerOrigin.Z+(listenerPawn.ViewOffset?.Z ?? 64f));
+                    float distance=MathF.Sqrt(dx*dx+dy*dy);
+                    if(distance>1600f)continue;
+                    float yaw=MathF.Atan2(dy,dx)*180f/MathF.PI;
+                    float pitch=-MathF.Atan2(dz,MathF.Max(1f,distance))*180f/MathF.PI;
+                    float error=1f+HumanAimProfile.For(_humanDifficulty).PerceptionError*12f;
+                    yaw+=(Random.Shared.NextSingle()*2f-1f)*error;
+                    pitch+=(Random.Shared.NextSingle()*2f-1f)*error*.6f;
+                    _soundPreaim[listener.Slot]=(yaw,pitch,Server.CurrentTime+.85f);
+                    WriteTelemetry(new {kind="sound_preaim",tick=Server.TickCount,time=Server.CurrentTime,
+                        slot=listener.Slot,shooter_slot=soundShooter.Slot,distance=distance,error_deg=error});
+                }
+            }
             return HookResult.Continue;
         });
         RegisterEventHandler<EventPlayerHurt>((e,i) => {
@@ -138,7 +163,7 @@ public partial class BotAimImprover
                 state.UnderFireUntil=Server.CurrentTime+.6f;
             return HookResult.Continue;
         });
-        RegisterEventHandler<EventPlayerDisconnect>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);}return HookResult.Continue; });
+        RegisterEventHandler<EventPlayerDisconnect>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);}return HookResult.Continue; });
         RegisterEventHandler<EventItemEquip>((e,i) => {
             if(e.Userid is {IsValid:true} player)
             {
@@ -202,13 +227,29 @@ public partial class BotAimImprover
         _testGateUntil=float.NegativeInfinity;
         foreach(var slot in _humanStates.Keys.ToArray())ReleaseHuman(slot);
         foreach(var slot in _fireGuards.Keys.ToArray())ReleaseFireGuard(slot);
-        _modelSpots.Clear();_humanPhases.Clear();ReadHumanDifficulty();
+        _modelSpots.Clear();_humanPhases.Clear();_soundPreaim.Clear();ReadHumanDifficulty();
     }
     private static bool IsGun(CCSPlayerPawn pawn)
         => pawn.WeaponServices?.ActiveWeapon.Value?.As<CCSWeaponBase>().VData?.GearSlot is gear_slot_t.GEAR_SLOT_RIFLE or gear_slot_t.GEAR_SLOT_PISTOL;
     private bool OtherViewOwner(int slot) => _humanController!.IsLocked(slot,LockKind.Aim)
         || _humanController.IsLocked(slot,LockKind.All) || _humanController.IsReplaying(slot);
 
+    // Simple sound preaim: an enemy gunshot within earshot sets a short-lived
+    // direction estimate. Bots without a live visual target turn toward it with a
+    // bounded turn rate and a tier-scaled angular error, instead of ignoring sound.
+    private bool TryApplySoundPreaim(CCSPlayerController controller,CCSBot bot,nint pointer,CCSPlayerPawn pawn,Vec eyeVec,float now)
+    {
+        if(!_soundPreaim.TryGetValue(controller.Slot,out var aim))return false;
+        if(now>aim.Until){_soundPreaim.Remove(controller.Slot);return false;}
+        var current=new Angles(pawn.EyeAngles.X,pawn.EyeAngles.Y);
+        var delta=AimMath.Delta(new Angles(aim.Pitch,aim.Yaw),current);
+        var step=new Angles(Math.Clamp(delta.X,-12f,12f),Math.Clamp(delta.Y,-18f,18f));
+        var spot=AimMath.Ray(eyeVec,AimMath.Normalize(current+step));
+        _modelSpots[pointer]=spot;
+        WriteModelSpot(bot,spot);
+        RefreshFireGuard(controller);
+        return true;
+    }
     private HookResult OnHumanLook(DynamicHook hook)
     {
         _humanLookCalls++;
@@ -228,6 +269,7 @@ public partial class BotAimImprover
             var bot=new CCSBot(pointer);
             if(bot.Enemy.Value is not {IsValid:true} enemy || enemy.LifeState!=0 || enemy.TeamNum==controller.TeamNum)
             {
+                if(TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
                 // The native enemy handle can flicker between peeks. Keep the memory
                 // based plan for a short grace period instead of resetting every
                 // model (reset means a fresh sensor delay and reaction before the
@@ -243,6 +285,7 @@ public partial class BotAimImprover
                 }
                 ReleaseHuman(controller.Slot);_modelSpots.Remove(pointer);RefreshFireGuard(controller);return HookResult.Continue;
             }
+            _soundPreaim.Remove(controller.Slot);
             if(!_humanStates.TryGetValue(controller.Slot,out var state) || state.Pawn!=controller.PlayerPawn.Raw || state.Enemy!=enemy.EntityHandle.Raw)
             {
                 ReleaseHuman(controller.Slot);
@@ -348,6 +391,16 @@ public partial class BotAimImprover
                 sway+=(Random.Shared.NextSingle()*2f-1f)*.35f;
                 sway=Math.Clamp(sway,-8f,8f);
             }
+            // Pro hit rate falls with engagement distance (35% under 500 u, 26% at
+            // 500-1000, ~10% beyond 1000 in the demo sample); scale the lateral
+            // sway with distance instead of keeping the same spread at all ranges.
+            if(enemy.AbsOrigin is {} enemyOrigin)
+            {
+                float engagementDistance=Vec.Distance(eyeVec,new Vec(enemyOrigin.X,enemyOrigin.Y,enemyOrigin.Z));
+                float distanceScale=Math.Clamp(.75f+engagementDistance/1200f*.55f,.85f,1.5f);
+                sway*=distanceScale;
+            }
+            sway=Math.Clamp(sway,-9f,9f);
             state.SpraySway=sway;
             var spot=AimMath.Ray(eyeVec,AimMath.Normalize(state.Output.Angles+new Angles(0f,sway)));
             _modelSpots[pointer]=spot;

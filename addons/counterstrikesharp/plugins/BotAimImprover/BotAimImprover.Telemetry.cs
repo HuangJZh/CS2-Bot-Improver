@@ -124,6 +124,7 @@ public partial class BotAimImprover
             spray_sway_degrees=state?.SpraySway,
             burst_cooldown_active=state!=null && Server.CurrentTime<state.BurstCooldownUntil,
             burst_target_length=state?.Model.Profile.BurstLength,
+            sound_preaim_active=_soundPreaim.TryGetValue(player.Slot,out var soundAim) && Server.CurrentTime<soundAim.Until,
             fire_tolerance_degrees=state?.Model.LastFireDecision.ToleranceDegrees,
             under_fire=state!=null && Server.CurrentTime<state.UnderFireUntil,
             allow_latch_active=state!=null && Server.CurrentTime<state.AllowLatchUntil,
