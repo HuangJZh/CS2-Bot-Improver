@@ -10,7 +10,7 @@ namespace BotSupport;
 public sealed class BotSupport : BasePlugin
 {
     public override string ModuleName => "BotSupport";
-    public override string ModuleVersion => "1.0.3";
+    public override string ModuleVersion => "1.0.4";
     public override string ModuleAuthor => "HuangJZh fork";
     public override string ModuleDescription => "Wheel weapon requests and probabilistic post-shot stops";
     private readonly Dictionary<int, float> _requests = new();
@@ -61,25 +61,60 @@ public sealed class BotSupport : BasePlugin
     }
     private HookResult Wheel(CCSPlayerController? p, CommandInfo c)
     {
-        for(var i=1;i<c.ArgCount;i++) if(SupportPolicy.IsWeaponRequest(c.GetArg(i))) return Request(p,"auto");
+        // Diagnostic: the game sends chat-wheel choices as the playerchatwheel
+        // command with the localized token (e.g. #Chatwheel_requestweapon).
+        var args=string.Join(' ',Enumerable.Range(1,Math.Max(0,c.ArgCount-1)).Select(c.GetArg));
+        for(var i=1;i<c.ArgCount;i++)
+            if(SupportPolicy.IsWeaponRequest(c.GetArg(i)))
+            {
+                Logger.LogInformation("Chat wheel weapon request: slot={Slot} args=[{Args}]",p?.Slot,args);
+                return Request(p,"auto");
+            }
+        Logger.LogInformation("Chat wheel used (not a weapon request): slot={Slot} args=[{Args}]",p?.Slot,args);
         return HookResult.Continue;
     }
     private HookResult Request(CCSPlayerController? caller, string request)
     {
         if(caller is not { IsValid:true, IsBot:false, PawnIsAlive:true } || caller.TeamNum is not (2 or 3)
-            || caller.PlayerPawn.Value is not { IsValid:true } pawn) return HookResult.Continue;
-        if(_requests.TryGetValue(caller.Slot,out var last) && Server.CurrentTime-last < 2) return HookResult.Handled;
-        _requests[caller.Slot]=Server.CurrentTime;
-        if(HasPrimary(caller)) { Reply(caller,"你已有主武器，请先丢下再请求。"); return HookResult.Handled; }
+            || caller.PlayerPawn.Value is not { IsValid:true } pawn)
+        {
+            Logger.LogInformation("Weapon request ignored: caller is not a living human player");
+            return HookResult.Continue;
+        }
+        if(HasPrimary(caller))
+        {
+            Logger.LogInformation("Weapon request rejected: slot={Slot} already has a primary weapon",caller.Slot);
+            Reply(caller,"你已有主武器，请先丢下再请求。");
+            return HookResult.Handled;
+        }
         var rules=Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault()?.GameRules;
         if(rules == null || rules.BuyTimeEnded || !pawn.InBuyZone)
-        { Reply(caller,"请在购买时间内、购买区中请求发枪。"); return HookResult.Handled; }
+        {
+            Logger.LogInformation("Weapon request rejected: slot={Slot} rules={HasRules} buyEnded={BuyEnded} inBuyZone={InZone}",
+                caller.Slot,rules!=null,rules?.BuyTimeEnded,pawn.InBuyZone);
+            Reply(caller,"请在购买时间内、购买区中请求发枪。");
+            return HookResult.Handled;
+        }
+        if(_requests.TryGetValue(caller.Slot,out var last) && Server.CurrentTime-last < 2)
+        {
+            Logger.LogInformation("Weapon request rate-limited: slot={Slot}",caller.Slot);
+            return HookResult.Handled;
+        }
         var bots=Utilities.GetPlayers().Where(b => b.IsValid && b.IsBot && b.PawnIsAlive && !b.ControllingBot && !b.HasBeenControlledByPlayerThisRound
             && b.TeamNum==caller.TeamNum && b.PlayerPawn.Value is { IsValid:true, InBuyZone:true } bp
             && bp.Bot != null && !bp.Bot.IsAttacking && !bp.Bot.IsEnemyVisible && HasPrimary(b)
             && b.InGameMoneyServices != null).ToArray();
+        var teamBots=Utilities.GetPlayers().Count(b => b is { IsValid:true, IsBot:true } && b.TeamNum==caller.TeamNum);
+        Logger.LogInformation("Weapon request slot={Slot}: teammate bots={TeamBots} eligible donors={Donors}",
+            caller.Slot,teamBots,bots.Length);
         var choice=SupportPolicy.Select(bots.Select(b => new Donor(b.Slot,b.InGameMoneyServices!.Account,Distance(b,caller))),caller.TeamNum,request);
-        if(choice == null) { Reply(caller,"没有符合条件的队友：需要在附近购买区、有主武器，余额足够支付武器价格。可选 auto/awp/ak/m4a1/m4a4。"); return HookResult.Handled; }
+        if(choice == null)
+        {
+            Logger.LogInformation("Weapon request failed: no donor can afford the requested weapon");
+            Reply(caller,"没有符合条件的队友：需要在附近购买区、有主武器，余额足够支付武器价格。可选 auto/awp/ak/m4a1/m4a4。");
+            return HookResult.Handled;
+        }
+        _requests[caller.Slot]=Server.CurrentTime;
         var (donor,gun)=choice.Value;
         var bot=bots.Single(b => b.Slot==donor.Slot);
         var money=bot.InGameMoneyServices!;
@@ -97,6 +132,8 @@ public sealed class BotSupport : BasePlugin
             Reply(caller,"购买失败，队友资金已退回。"); return HookResult.Handled;
         }
         Utilities.SetStateChanged(bot,"CCSPlayerController","m_pInGameMoneyServices");
+        Logger.LogInformation("Weapon request fulfilled: slot={Slot} donor={Donor} gun={Gun} price={Price}",
+            caller.Slot,bot.PlayerName,gun.Item,gun.Price);
         Reply(caller,$"{bot.PlayerName} 已花费 {gun.Price} 元给你购买 {gun.Label}。");
         return HookResult.Handled;
     }

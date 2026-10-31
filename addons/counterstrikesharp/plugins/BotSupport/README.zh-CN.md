@@ -12,3 +12,7 @@
 使用本机 API 编译：`dotnet build -c Release -p:CounterStrikeSharpApiPath=<csgo>/addons/counterstrikesharp/api`。
 纯规则检查：`dotnet run --project tests/SupportTests.csproj -c Release`。
 安装 `bin/Release/net10.0/` 中的 BotSupport.dll、BotSupport.deps.json 和 BotSupport.pdb 到游戏 `addons/counterstrikesharp/plugins/BotSupport/`；重启机器人模式。
+
+## 1.0.4 诊断日志
+
+每次 `playerchatwheel` 轮盘操作会先记录原始参数（slot 与 args）；命中“需要武器”时会继续记录被拒绝的原因（已有主武器/不在购买时间或购买区/冷却）、同队 Bot 数、符合条件的候选队友数，以及最终发枪的队友、武器和价格，或失败原因。这样若轮盘仍无反应，可直接从 `counterstrikesharp/logs` 判断是命令未到达、时机/区域不符，还是候选队友与资金问题。日志只用于诊断，不改变发枪规则。

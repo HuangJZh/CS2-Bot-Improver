@@ -178,3 +178,13 @@ SourceTV文件可携带录制命令之前的缓冲事件：本次站姿demo含�
 本轮仍未完成：采样/生命周期仍是首要缺口（下一轮优先：原生可见但未采样时的中心质量/近似点回退、放宽重获目标重置、采样失败归因统计）；开火容许度与接敌反应参数未按Low/Medium/High标定；压枪/RCS、架点/移动预瞄的完整准备状态、动态可见性回放核验、普通玩家分层样本和独立自然实战验收仍缺。模型允许率仍明显低于受控场景，真实交战时序仍常由原生AI接管。
 
 安装与证据：`2.1.8-human.8.5-experimental`已安装，安装DLL与编译产物哈希一致（46BEE237…），`human-aim.json`（Enabled=true）保持不变；测试期间临时补回gameinfo的metamod路径做专用服验证，结束后已按字节恢复测试前的用户/面板状态；HumanAimProbe已归档，当前无CS2进程。修复前8.4安装文件备份在E:/csdemo/bot-captures/model-round10-20261031/before-install。证据：E:/csdemo/bot-captures/model-round10-20261031（三轮自然采集、受控接触、日志、gameinfo前后快照）、model-round10-analysis（独立校准报告）。
+
+## 2026-10-31 深夜：发枪/投掷插件安装版本核对（BotSupport/NadeSystem）
+
+用户反馈“发枪逻辑”和“道具投掷逻辑”疑似损坏。检查结论：**源码中的修复已经提交，但游戏里安装的是旧构建**，所以实际运行的是修复前行为。
+
+- 证据：从安装DLL的内嵌SourceRevisionId读出BotSupport=`032372e`（比HEAD少提交`9470c61 Randomize affordable main weapon requests and remove AUG`），NadeSystem=`5a50848`（比HEAD少提交`edbbc29 Buy bot grenades at round start and consume actual inventory on throws`）。两个插件在CSS中加载正常，用户19:00对局及之后专用服日志均无相关异常，因此不是插件加载失败。
+- 处理：用本机.NET 10 SDK重新构建两个插件HEAD的Release版本并安装；BotSupport升到1.0.4，新增发枪诊断日志（`playerchatwheel`参数、拒绝原因、候选队友数量、成功/失败）；NadeSystem安装HEAD构建（包含冻结结束时用余钱购买、投掷前检查实际背包、成功生成投掷物后扣一颗的行为）。
+- 验证：BotSupport 33项规则检查通过（AUG已不在发枪列表、随机池包含可买得起的AWP/AK/M4、买不起时降档）；用户`=`轮盘配置token为`#Chatwheel_requestweapon`，游戏client.dll/server.dll均含`playerchatwheel`命令，命令映射与规则检查一致，但“人类玩家实际按轮盘”的运行时链路仍需真实客户端验收；诊断日志已为下次实测准备好。NadeSystem在专用服10 Bot、约110秒：控制台出现购买行smoke 15/molotov 15/flash 13/he 15与投掷回放行smoke 11/molotov 2/he 1/flash 1，无失败/异常；投掷前要求持有对应道具，成功后扣除一颗（AnnounceGrenadeThrow→ConsumeInventoryGrenade）。
+- 安装状态：BotSupport/NadeSystem安装文件与HEAD Release构建哈希一致（内嵌commit `81828590`），BotSupport 1.0.4 SHA256 `B0FC4975…`，NadeSystem SHA256 `9A638640…`；旧安装备份在E:/csdemo/bot-captures/plugin-refresh-20261031/before-*；测试期间临时补gameinfo metamod路径并已逐字节恢复；BotState仍为旧安装二进制（沿用此前“保持原版BotState行为”的决定，未刷新），BotAI/BotBuy/BotRandomizer/BotHider/BotController/BotVision未改。
+- 待验收：用户用`=`轮盘实测“需要武器”；若仍无反应，CSS日志会记录`Chat wheel ...`或`Weapon request ...`行，可直接区分是命令未到达、购买时间/区域限制，还是候选队友/资金问题。道具方面可在正常对局中观察开局购买和投掷后的剩余数量。
