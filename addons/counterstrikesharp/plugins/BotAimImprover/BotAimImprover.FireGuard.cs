@@ -77,9 +77,11 @@ public partial class BotAimImprover
         if(_fireGuards.TryGetValue(slot,out var old) && old.Pawn!=player.PlayerPawn.Raw)ReleaseFireGuard(slot);
         if(decision.Allow)
         {
-            if(_humanStates.TryGetValue(slot,out var allowed) && allowed.Pawn==player.PlayerPawn.Raw)
+            // Only a real model allow (planned-shot) refreshes the latch. An
+            // allow-latch must let the latch expire so burst discipline can engage.
+            if(decision.Reason=="planned-shot" && _humanStates.TryGetValue(slot,out var allowed) && allowed.Pawn==player.PlayerPawn.Raw)
                 allowed.AllowLatchUntil=Server.CurrentTime+.15f;
-            ReleaseFireGuard(slot,"planned-shot");return;
+            ReleaseFireGuard(slot,decision.Reason);return;
         }
         // No live visual plan: release instead of holding. The previous "keep fire
         // prohibited until a valid plan exists" rule turned every partial/invisible
@@ -128,6 +130,9 @@ public partial class BotAimImprover
         // authorized fire, instead of re-holding for a single misaligned tick and
         // forcing another Attack release edge in the middle of the trigger.
         if(now<state.AllowLatchUntil)return new(true,false,"allow-latch");
+        // Human burst discipline: after the planned number of rounds, release the
+        // trigger for a short human-like pause instead of holding a perfect spray.
+        if(now<state.BurstCooldownUntil)return new(false,false,"burst-pause");
         if(state.Output.AllowFire)
         {
             if(advanceTimers){state.PlanHoldSince=null;state.PlanHoldTimedOut=false;}

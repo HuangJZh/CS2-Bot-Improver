@@ -16,12 +16,22 @@ public sealed record HumanAimProfile(float Reaction, float SensorDelay, float Sa
     // burst into an aim correction; they are gameplay hypotheses to calibrate.
     public float RecoilControlGain {get;init;}=.50f;
     public int RecoilControlStartShot {get;init;}=3;
+    // Burst discipline and spray shape, derived from the Aurora vs Falcons pro
+    // demos: median rifle burst six rounds, human spray yaw sweeps left then right
+    // rather than holding a laser-straight line. Values are calibration hypotheses.
+    public int BurstLength {get;init;}=6;
+    public float BurstPause {get;init;}=.28f;
+    public float SpraySwayGain {get;init;}=1f;
     public static HumanAimProfile For(string level) => level switch
     {
-        "Low" => new(.200f,.090f,.050f,.155f,.32f,.020f,.105f,480,.60f){PerceptionError=.12f,FeedbackWeight=.35f,RecoilControlGain=.30f,RecoilControlStartShot=3},
-        "High" => new(.130f,.045f,.025f,.095f,.07f,.006f,.045f,850,.92f){PerceptionError=.035f,FeedbackWeight=.65f,RecoilControlGain=.70f,RecoilControlStartShot=2},
+        "Low" => new(.200f,.090f,.050f,.155f,.32f,.020f,.105f,480,.60f){PerceptionError=.12f,FeedbackWeight=.35f,RecoilControlGain=.30f,RecoilControlStartShot=3,BurstLength=4,BurstPause=.32f,SpraySwayGain=1.3f},
+        "High" => new(.130f,.045f,.025f,.095f,.07f,.006f,.045f,850,.92f){PerceptionError=.035f,FeedbackWeight=.65f,RecoilControlGain=.70f,RecoilControlStartShot=2,BurstLength=8,BurstPause=.24f,SpraySwayGain=.7f},
         _ => new(.170f,.065f,.035f,.125f,.16f,.011f,.070f,650,.80f)
     };
+    // Mean relative view drift (degrees) by shot index during a pro rifle spray,
+    // measured from 82 bursts >=2 rounds across the three Aurora vs Falcons maps.
+    public static readonly float[] ProSprayPitch={0f,.18f,.81f,1.84f,3.40f,5.16f,6.43f,7.66f,8.24f,8.05f,8.54f,8.60f,8.51f,8.21f,8.27f,8.34f,8.47f,8.52f,8.68f,8.81f,9.75f};
+    public static readonly float[] ProSprayYaw={0f,.12f,.17f,.15f,.09f,-1.22f,-1.87f,-3.33f,-2.47f,-.40f,1.07f,2.14f,2.90f,4.42f,5.23f,6.51f,6.62f,6.01f,6.26f,6.49f,6.18f};
 }
 public readonly record struct AimObservation(float Time, Vector3 Position,float Radius=8,float Uncertainty=0);
 public readonly record struct AimOutput(Vector2 Angles, bool AllowFire, string Phase, float ObservationAge);

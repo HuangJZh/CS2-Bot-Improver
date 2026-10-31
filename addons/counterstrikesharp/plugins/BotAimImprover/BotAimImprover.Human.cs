@@ -45,6 +45,8 @@ public partial class BotAimImprover
         public int SprayShots;
         public float SprayBasePitchError;
         public float RecoilCompensation;
+        public float BurstCooldownUntil;
+        public float SpraySway;
     }
     private HumanSettings _humanSettings=new();
     private readonly Dictionary<int,HumanState> _humanStates=new();
@@ -120,6 +122,11 @@ public partial class BotAimImprover
                 if(fireNow-fireState.LastShotAt<.25f)fireState.SprayShots++;
                 else {fireState.SprayShots=1;fireState.SprayBasePitchError=0f;}
                 fireState.LastShotAt=fireNow;
+                if(fireState.SprayShots>=fireState.Model.Profile.BurstLength)
+                {
+                    float pause=fireState.Model.Profile.BurstPause*(.8f+Random.Shared.NextSingle()*.4f);
+                    fireState.BurstCooldownUntil=fireNow+pause;
+                }
                 if(fireState.SprayShots==1 && shooter.PlayerPawn.Value is {} firePawn)
                     fireState.SprayBasePitchError=firePawn.EyeAngles.X-fireState.Model.LastDesiredAngles.X;
             }
@@ -329,7 +336,20 @@ public partial class BotAimImprover
             // correcting the observed climb over-rotated the crosshair upward.
             // Do not inject a correction until bullet-direction truth is measured.
             state.RecoilCompensation=0f;
-            var spot=AimMath.Ray(eyeVec,state.Output.Angles);
+            // Spray shape: a real spray does not hold a laser line. Follow the
+            // pro-demo mean lateral drift once the burst is established, with a
+            // little per-tick noise and tier scaling; pitch is left to the engine
+            // because the native view already carries recoil motion.
+            float sway=0f;
+            if(state.SprayShots>=3 && now-state.LastShotAt<1.6f)
+            {
+                int idx=Math.Clamp(state.SprayShots-1,0,HumanAimProfile.ProSprayYaw.Length-1);
+                sway=HumanAimProfile.ProSprayYaw[idx]*state.Model.Profile.SpraySwayGain;
+                sway+=(Random.Shared.NextSingle()*2f-1f)*.35f;
+                sway=Math.Clamp(sway,-8f,8f);
+            }
+            state.SpraySway=sway;
+            var spot=AimMath.Ray(eyeVec,AimMath.Normalize(state.Output.Angles+new Angles(0f,sway)));
             _modelSpots[pointer]=spot;
             WriteModelSpot(bot,spot);
             RefreshFireGuard(controller);
