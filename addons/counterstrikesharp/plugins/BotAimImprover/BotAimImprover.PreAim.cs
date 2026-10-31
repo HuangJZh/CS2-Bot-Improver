@@ -37,6 +37,7 @@ public partial class BotAimImprover
         public Vec Point;
         public float Until;
         public float NextScan;
+        public int NodeIndex = -1;
     }
     private readonly Dictionary<string, List<PreAimPoint>> _preaimByMap = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<int, PreAimTarget> _preaimTargets = new();
@@ -89,28 +90,45 @@ public partial class BotAimImprover
         if (!hasTarget || now > target!.Until)
         {
             if (hasTarget && now < target!.NextScan) return false;
-            PreAimPoint? best = null;
-            float bestScore = float.MaxValue;
             float currentYaw = pawn.EyeAngles.Y;
-            foreach (var p in points)
+            Vec chosen = default;
+            int nodeIndex = -1;
+            bool found = false;
+            var searchNodes = CurrentSearchNodes();
+            if (searchNodes is { Count: > 0 })
+                found = TrySelectSearchNode(controller, botPos, currentYaw, now, searchNodes, out nodeIndex, out chosen);
+            if (!found)
             {
-                float dx = p.X - botPos.X, dy = p.Y - botPos.Y, dz = p.Z - botPos.Z;
-                float distance = MathF.Sqrt(dx * dx + dy * dy);
-                if (distance < 120f || distance > 3200f) continue;
-                float targetYaw = MathF.Atan2(dy, dx) * 180f / MathF.PI;
-                float yawDelta = MathF.Abs(((targetYaw - currentYaw + 540f) % 360f) - 180f);
-                if (yawDelta > 100f) continue;
-                float score = distance + yawDelta * 18f;
-                if (score < bestScore) { bestScore = score; best = p; }
+                // Fallback when the clustered node file is unavailable: use the raw
+                // aim_target points with the same distance/FOV filter.
+                PreAimPoint? best = null;
+                float bestScore = float.MaxValue;
+                foreach (var p in points)
+                {
+                    float dx = p.X - botPos.X, dy = p.Y - botPos.Y;
+                    float distance = MathF.Sqrt(dx * dx + dy * dy);
+                    if (distance < 120f || distance > 3200f) continue;
+                    float targetYaw = MathF.Atan2(dy, dx) * 180f / MathF.PI;
+                    float yawDelta = MathF.Abs(((targetYaw - currentYaw + 540f) % 360f) - 180f);
+                    if (yawDelta > 100f) continue;
+                    float score = distance + yawDelta * 18f;
+                    if (score < bestScore) { bestScore = score; best = p; }
+                }
+                if (best != null)
+                {
+                    chosen = new Vec(best.X, best.Y, best.Z);
+                    found = true;
+                }
             }
-            if (best == null)
+            if (!found)
             {
                 _preaimTargets[controller.Slot] = new PreAimTarget { NextScan = now + .5f };
                 return false;
             }
             target = new PreAimTarget
             {
-                Point = new Vec(best.X, best.Y, best.Z),
+                Point = chosen,
+                NodeIndex = nodeIndex,
                 Until = now + 1.1f,
                 NextScan = now + 1.1f,
             };

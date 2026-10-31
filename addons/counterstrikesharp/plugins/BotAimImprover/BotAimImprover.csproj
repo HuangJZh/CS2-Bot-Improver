@@ -19,5 +19,6 @@
 
   <ItemGroup>
     <None Include="preaim-points.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="preaim-nodes.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
