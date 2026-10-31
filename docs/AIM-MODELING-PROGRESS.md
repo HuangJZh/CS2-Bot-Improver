@@ -524,3 +524,13 @@ A局未采样比例从8.5同口径的30.8%降到3.9%；扇形回退在这两局�
 - `soundevents/game_sounds_weapons.vsndevts`：`Weapon_AK47.Single` **2500**、`Weapon_M4A1.Single` **2500**、`Weapon_DEagle.Single` **2500**、`Weapon_Glock.Single` **2500**、`Weapon_FAMAS/GalilAR/SSG08.Single` 2500、`Weapon_AWP.Single` **2800**；消音武器 `Weapon_M4A1.Silenced` **1400**、`Weapon_USP.SilencedShot` **1400**。`SingleDistant`（约800）是远程附加音层，不是最大可听距离。
 
 8.24据此把Bot听力改为：脚步 **1100**；普通枪声 **2500**（AWP **2800**）；消音枪 **1400**。之前用“正常玩家感觉”估的6000/7000/1800是错的，已替换为上述实际值。静步脚步声音事件的最大衰减距离同样是1100，但混音音量更低，因此仍保留更大的听觉误差和反应延迟。编译0警告0错误；安装哈希`19F34D99…`；运行验证待下次对局。
+## 第二十九轮：BotAI 全局听觉补丁关闭（human.8.24 配套）
+
+针对“防守 Bot 喜欢前压出点”，定位到不是 BotAimImprover 移动逻辑，而是 BotAI 插件把原生听觉门限 NOP 成全局听觉：
+`OnAudibleEvent_GlobalHearRange`、`BombBeep_CT_GlobalHearRange`、`BombPickup_CT_GlobalHearRange`、`InvestigateNoise_SkipSelfDefenseCheck` 等（旧安装日志为 Applied 40/40）。
+
+修复方式：使用 `CS2-Bot-Improver-custom/addons/counterstrikesharp/plugins/BotAI` 源码中的 `CombatPatchPolicy` 重新编译 BotAI（Release），该策略禁用上述听觉/调查/视觉/射击节奏类“超人类”补丁，保留崩溃/导航修复。安装后日志变为 **Applied 15/15**，上述全局听觉补丁不再应用，听觉重新由引擎原生 `CCSBot::OnAudibleEvent` 的逐声音事件范围门限判定（即实际 soundevent 距离，如脚步1100、AK 2500、AWP 2800、消音1400，以及原生炸弹beep 1500/pickup 1000）。
+
+注意：`CT_Defuse_EngageAndInvestigate` / `DefuseBombState_*_EngageAndInvestigate` 仍被应用（不在禁用表），如果防守方在拆包时仍前压，下一步再单独禁用这三项。该重编译同时关闭了若干视觉/射击节奏类超人类补丁，Bot 行为会整体更接近原生；BotAimImprover 的瞄准模型不受影响。
+
+安装：BotAI `1.8.14-human.1`，哈希`D6F0EE60…`；gameinfo已恢复（3B18F0CA…）；无CS2进程。源码位置：`E:/steam/steam/steamapps/common/Counter-Strike Global Offensive/CS2-Bot-Improver-custom/addons/counterstrikesharp/plugins/BotAI`。
