@@ -17,6 +17,7 @@ public partial class BotAimImprover
     {
         public bool Enabled {get;set;}=true;
         public bool Diagnostics {get;set;}=false;
+        public bool DirectViewControl {get;set;}=false; // Experimental until recoil/weapon checks are validated.
         public float HorizontalFieldOfView {get;set;}=110;
     }
     private sealed class HumanState
@@ -34,7 +35,7 @@ public partial class BotAimImprover
     private readonly Dictionary<int,HumanState> _humanStates=new();
     private readonly Dictionary<string,long> _humanPhases=new();
     private readonly Dictionary<nint,Vec> _modelSpots=new();
-    private MemoryFunctionVoid<nint,float>? _updateLook;
+    private MemoryFunctionVoid<nint>? _updateLook;
     private IBotControllerApi? _humanController;
     private string _humanDifficulty="Medium";
     private long _humanLookCalls;
@@ -51,9 +52,11 @@ public partial class BotAimImprover
             using var document=JsonDocument.Parse(File.ReadAllText(path));
             var platform=OperatingSystem.IsWindows() ? "windows" : "linux";
             var signature=document.RootElement.GetProperty("CCSBot::UpdateLookAngles").GetProperty("signatures").GetProperty(platform).GetString()!;
-            _updateLook=new MemoryFunctionVoid<nint,float>(signature);
+            _updateLook=new MemoryFunctionVoid<nint>(signature);
             if(_updateLook.Handle==nint.Zero)throw new InvalidOperationException("UpdateLookAngles unavailable");
             _updateLook.Hook(OnHumanLook,HookMode.Pre);
+            InitializeDirectView(document.RootElement,platform);
+            _updateLook.Hook(OnHumanLookPost,HookMode.Post);
         }
         catch(Exception error)
         {
@@ -77,7 +80,7 @@ public partial class BotAimImprover
             var action=c.ArgCount>1 ? c.GetArg(1).ToLowerInvariant() : "status";
             if(action is "on" or "off") { _humanSettings.Enabled=action=="on";ResetHuman(); }
             if(action=="reload") { ResetHuman();ReadHumanSettings(); }
-            Server.PrintToConsole($"[HumanAim] active={HumanActive} difficulty={_humanDifficulty} calls={_humanLookCalls} bots={Utilities.GetPlayers().Count(p=>p.IsBot)} alive={Utilities.GetPlayers().Count(p=>p.PawnIsAlive)} states={_humanStates.Count} phases={JsonSerializer.Serialize(_humanPhases)}");
+            Server.PrintToConsole($"[HumanAim] active={HumanActive} difficulty={_humanDifficulty} direct_requested={_humanSettings.DirectViewControl} direct_available={_setEyeAngles!=null} calls={_humanLookCalls} bots={Utilities.GetPlayers().Count(p=>p.IsBot)} alive={Utilities.GetPlayers().Count(p=>p.PawnIsAlive)} states={_humanStates.Count} phases={JsonSerializer.Serialize(_humanPhases)}");
         });
         AddTimer(10f,() => {
             if(_humanSettings.Diagnostics && HumanActive)
@@ -119,7 +122,8 @@ public partial class BotAimImprover
     {
         if(!_humanStates.Remove(slot,out var state))return;
         _modelSpots.Remove(state.Pointer);
-        if(state.Suppression>0)_humanController?.CancelUsercmdSuppression(slot,state.Suppression);
+        try { if(state.Suppression>0)_humanController?.CancelUsercmdSuppression(slot,state.Suppression); }
+        catch(Exception error) { Logger.LogWarning(error,"Cannot release aim suppression for slot {Slot}",slot); }
     }
     private void ResetHuman()
     {

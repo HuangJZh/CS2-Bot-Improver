@@ -30,3 +30,36 @@ Plugin `2.1.8-human.2` adds local-console-only commands:
 Files go under plugin `telemetry/`. Bot-only JSONL records pawn generation, tick/time, actual recorded view/velocity/weapon, model angles/phase/fire permission, and fire/hurt/death callbacks. No network upload; capture is off by default and does not change aim parameters.
 
 Event-callback angles are not guaranteed exact subtick shot angles. Server observations and planning can occur at different times within a tick. Runtime capture validation remains pending.
+
+## Full-tick candidate contacts and shot-state comparison
+
+```powershell
+python tools/compare_shot_state.py E:/csdemo/evidence/matches
+python tools/build_contact_candidates.py E:/csdemo/evidence/matches --assets E:/csdemo/evidence/assets/2000930 --out E:/csdemo/evidence/contacts-v2
+python tools/enrich_contact_candidates.py E:/csdemo/evidence/matches --candidate-root E:/csdemo/evidence/contacts-v2
+python tools/audit_aim_capture.py E:/csdemo/bot-captures/controlled-20261031
+```
+
+Full scans currently default to NiKo, kyousuke, TeSeS and m0NESY as observers; all opponents are considered. Pass `--viewers` without names for all observers. Contacts bridge at most250ms of estimated visibility loss; deaths, recording gaps, phases and rounds end or censor them. Row round index is zero-based. Fire events remain unattributed to a target unless separately reviewed. First-fire/damage deltas are candidate metrics, not validated reaction time or TTD.
+
+Raw view snapshots can repeat stale network state. The15.625ms server tick interval is not proof of a fresh view update at every tick. `fire_bullets` has separate recorded angles, origins, spread, inaccuracy and recoil index; these must not be conflated with raw mouse input or with the network view.
+
+Runtime fixture source lives under `tools/runtime-probe`. It only registers commands for a dedicated server explicitly using port27025. Its scene, perception handles and attack inputs are scripted; it does not establish natural AI behavior. Temporary binaries were archived outside the game after testing.
+
+## Experimental direct view
+
+`DirectViewControl` defaults to false and was restored off after testing. The installed native reference at BotController bb19124 declares `UpdateLookAngles` as void(bot*) and `SetEyeAngles` as void(pawn*,float*). The adapter now uses the matching arity.
+
+In a scripted lateral-step fixture, point-target-only control showed persistent recorded-vs-planned yaw differences. The experimental post-hook drives engine eye angles and restores the temporary controller flag in a finally block, following the installed native replay helper. Recorded angles tracked the plan in this fixture, including fire/hurt/death callbacks. This does NOT validate recoil compensation, natural engagements, or player-rank strength. Direct control overrides the native final-view path; it must not be enabled as final gameplay until those checks pass.
+
+Native reference: https://github.com/XBribo/CS2-Bot-Controller/blob/bb19124/src/features/controller/BotController.cpp .
+
+The second contact version explicitly uses freeze-end to round-end windows and prioritizes recorded deaths at same-tick round transitions. Physical visibility caches are keyed by code and source-data hashes and checked for coverage; cached replay was verified to reproduce candidate rows exactly. That test proves reproducibility, not visual ground truth.
+
+```powershell
+python tools/make_contact_review_queue.py E:/csdemo/evidence/matches --candidate-root E:/csdemo/evidence/contacts-v2 --out E:/csdemo/evidence/contact-review-queue-v2.csv
+```
+
+Standing/crouched/transition descriptions are not causal comparisons unless weapon, movement and recoil stage are controlled. The first recoil fixture allowed native crouching; that run is deliberately not used to fit a recoil estimator. A later paired stance protocol must suppress jump/movement and control Duck separately, while final gameplay retains appropriate crouch/spray coordination.
+
+Installed original BotState 1.10.5 has two conflicting mechanisms: per-shot random crouch decisions and weapon-dependent mandatory speed changes after fire. Its installed hash matches the preserved original backup, and installed IL method references were inspected. A burst-stable posture policy is now source-built and tested but NOT installed. Forced velocity remains unchanged in that candidate and requires a separate ownership fix; don't assume BotSupport75/85/95% is currently the only stopping mechanism.

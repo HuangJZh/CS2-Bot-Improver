@@ -6,6 +6,7 @@ namespace BotAimImprover;
 public partial class BotAimImprover
 {
     private StreamWriter? _telemetry;
+    private CCSGameRules? _telemetryRules;
     private float _telemetryUntil,_telemetryFlush;
     private int _telemetryTick=-1;
     private string? _telemetryPath;
@@ -42,8 +43,9 @@ public partial class BotAimImprover
                     var directory=Path.Combine(ModuleDirectory,"telemetry");Directory.CreateDirectory(directory);
                     _telemetryPath=Path.Combine(directory,$"aim-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.jsonl");
                     _telemetry=new StreamWriter(new FileStream(_telemetryPath,FileMode.CreateNew,FileAccess.Write,FileShare.Read),new System.Text.UTF8Encoding(false),65536);
+                    _telemetryRules=Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault(p=>p.IsValid)?.GameRules;
                     _telemetryUntil=Server.CurrentTime+seconds;_telemetryTick=-1;
-                    WriteTelemetry(new {kind="session",schema="bot-aim-telemetry-v1",map=Server.MapName,difficulty=_humanDifficulty,model_active=HumanActive,tick_interval=Server.TickInterval,
+                    WriteTelemetry(new {kind="session",schema="bot-aim-telemetry-v1",map=Server.MapName,difficulty=_humanDifficulty,model_active=HumanActive,module_version=ModuleVersion,direct_view_requested=_humanSettings.DirectViewControl,direct_view_available=_setEyeAngles!=null,tick_interval=Server.TickInterval,
                         note="Tick observations and event-callback angles; not raw usercmd or exact subtick shot angles. Captures bots only. No network upload."});
                 }
                 catch(Exception error) { StopAimTelemetry();Logger.LogError(error,"Cannot start aim capture"); }
@@ -56,10 +58,23 @@ public partial class BotAimImprover
         if(_telemetry == null || !player.IsValid || !player.IsBot || player.HasBeenControlledByPlayerThisRound)return;
         var pawn=player.PlayerPawn.Value;if(pawn is not {IsValid:true})return;
         _humanStates.TryGetValue(player.Slot,out var state);
+        CCSPlayer_AimPunchServices? punch=pawn.AimPunchServices;
+        if(punch?.Handle==nint.Zero)punch=null;
         var angles=pawn.EyeAngles;var pos=pawn.AbsOrigin;var vel=pawn.AbsVelocity;var bot=pawn.Bot;
         WriteTelemetry(new {kind,tick=Server.TickCount,time=Server.CurrentTime,slot=player.Slot,pawn=player.PlayerPawn.Raw,alive=player.PawnIsAlive,
+            game_warmup=_telemetryRules?.WarmupPeriod,game_freeze=_telemetryRules?.FreezePeriod,rounds_played=_telemetryRules?.TotalRoundsPlayed,
             x=pos?.X,y=pos?.Y,z=pos?.Z,pitch=angles.X,yaw=angles.Y,vx=vel.X,vy=vel.Y,vz=vel.Z,flags=pawn.Flags,
             weapon=pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName,scoped=pawn.IsScoped,
+            view_offset_z=pawn.ViewOffset.Z,native_crouching=bot?.IsCrouching,native_attacking=bot?.IsAttacking,
+            shots_fired=pawn.ShotsFired,
+            punch_predictable_pitch=punch?.PredictableBaseAngle.X,punch_predictable_yaw=punch?.PredictableBaseAngle.Y,
+            punch_predictable_vel_pitch=punch?.PredictableBaseAngleVel.X,punch_predictable_vel_yaw=punch?.PredictableBaseAngleVel.Y,
+            punch_predictable_tick=punch?.PredictableBaseTick,punch_predictable_tick_interp=punch?.PredictableBaseTickInterpAmount,
+            punch_unpredictable_pitch=punch?.UnpredictableBaseAngle.X,punch_unpredictable_yaw=punch?.UnpredictableBaseAngle.Y,punch_unpredictable_tick=punch?.UnpredictableBaseTick,
+            native_look_pitch=bot?.LookPitch,native_look_yaw=bot?.LookYaw,
+            native_goal_pitch=bot?.AimGoal.X,native_goal_yaw=bot?.AimGoal.Y,
+            native_look_at_x=bot?.LookAtSpot.X,native_look_at_y=bot?.LookAtSpot.Y,native_look_at_z=bot?.LookAtSpot.Z,native_look_at_attack=bot?.LookAtSpotAttack,
+            native_target_x=bot?.TargetSpot.X,native_target_y=bot?.TargetSpot.Y,native_target_z=bot?.TargetSpot.Z,
             enemy=bot?.Enemy.Raw,native_visible=bot?.IsEnemyVisible,sensor_visible=state?.LastSight,
             planned_pitch=state?.Output.Angles.X,planned_yaw=state?.Output.Angles.Y,phase=state?.Output.Phase,allow_fire=state?.Output.AllowFire,
             observation_age=state!=null && float.IsFinite(state.Output.ObservationAge) ? (float?)state.Output.ObservationAge : null,
@@ -73,7 +88,7 @@ public partial class BotAimImprover
     }
     private void StopAimTelemetry()
     {
-        var writer=_telemetry;_telemetry=null;
+        var writer=_telemetry;_telemetry=null;_telemetryRules=null;
         try { writer?.Dispose(); } catch(IOException) { }
     }
 }

@@ -15,7 +15,7 @@ namespace BotAimImprover;
 public partial class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8-human.2";
+    public override string ModuleVersion => "2.1.8-human.3-experimental";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 
@@ -223,6 +223,7 @@ public partial class BotAimImprover : BasePlugin
         StopAimTelemetry();
         ResetHuman();
         try { _updateLook?.Unhook(OnHumanLook,HookMode.Pre); } catch { }
+        try { _updateLook?.Unhook(OnHumanLookPost,HookMode.Post); } catch { }
         try { _pickNewAimSpot?.Unhook(OnPickNewAimSpotPost, HookMode.Post); }
         catch { /* ignore */ }
     }
@@ -330,8 +331,11 @@ public partial class BotAimImprover : BasePlugin
         if (_botToControllerUserId.TryGetValue(pCCSBot, out int cachedUserId))
         {
             foreach (var ctrl in Utilities.GetPlayers())
-                if (ctrl != null && ctrl.IsValid && ctrl.UserId.HasValue && ctrl.UserId.Value == cachedUserId)
-                    return ctrl;
+                if (ctrl != null && ctrl.IsValid && ctrl.IsBot && ctrl.UserId.HasValue && ctrl.UserId.Value == cachedUserId)
+                {
+                    var currentPawn=ctrl.PlayerPawn?.Value;
+                    if(currentPawn is {IsValid:true} && currentPawn.Bot?.Handle==pCCSBot)return ctrl;
+                }
             _botToControllerUserId.TryRemove(pCCSBot, out int _); // stale
         }
 
