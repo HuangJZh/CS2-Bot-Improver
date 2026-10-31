@@ -75,7 +75,12 @@ public partial class BotAimImprover
     {
         int slot=player.Slot;
         if(_fireGuards.TryGetValue(slot,out var old) && old.Pawn!=player.PlayerPawn.Raw)ReleaseFireGuard(slot);
-        if(decision.Allow){ReleaseFireGuard(slot,"planned-shot");return;}
+        if(decision.Allow)
+        {
+            if(_humanStates.TryGetValue(slot,out var allowed) && allowed.Pawn==player.PlayerPawn.Raw)
+                allowed.AllowLatchUntil=Server.CurrentTime+.15f;
+            ReleaseFireGuard(slot,"planned-shot");return;
+        }
         // No live visual plan: release instead of holding. The previous "keep fire
         // prohibited until a valid plan exists" rule turned every partial/invisible
         // acquisition into an indefinite block (bots stopped firing in natural play).
@@ -119,6 +124,10 @@ public partial class BotAimImprover
         if(state.PlannedWeapon!=(pawn.WeaponServices?.ActiveWeapon.Raw ?? uint.MaxValue))return new(false,false,"weapon-changed");
         float now=Server.CurrentTime;
         if(now-state.LastUsed>.05f || now-state.Model.LastVisible>.20f)return new(false,false,"stale-plan");
+        // A short permission latch keeps a burst going after the model has already
+        // authorized fire, instead of re-holding for a single misaligned tick and
+        // forcing another Attack release edge in the middle of the trigger.
+        if(now<state.AllowLatchUntil)return new(true,false,"allow-latch");
         if(state.Output.AllowFire)
         {
             if(advanceTimers){state.PlanHoldSince=null;state.PlanHoldTimedOut=false;}

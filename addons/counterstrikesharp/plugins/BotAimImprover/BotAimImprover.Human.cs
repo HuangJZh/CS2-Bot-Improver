@@ -39,6 +39,7 @@ public partial class BotAimImprover
         public int LastSampleAttempts;
         public string LastSamplePoint="none";
         public float? LastSampleRayFraction;
+        public float AllowLatchUntil;
     }
     private HumanSettings _humanSettings=new();
     private readonly Dictionary<int,HumanState> _humanStates=new();
@@ -281,8 +282,11 @@ public partial class BotAimImprover
                     if(state.LastVisualEstimate.HasValue)state.FirstVisualAt??=now;
                 }
             }
-            // Preserve native search/navigation without permitting hidden-target fire.
-            if((!visible && !state.Model.HasObservation) || (!visible && now-state.Model.LastVisible>.35f))
+            // Preserve native search/navigation once visual memory is gone. While a
+            // recent observation is still usable, keep the memory-based plan alive so
+            // the model holds/predicts the last seen angle instead of snapping back to
+            // perfect native search aim during short peeks and cover flickers.
+            if((!visible && !state.Model.HasObservation) || (!visible && now-state.Model.LastVisible>ReacquireResetSeconds))
             {
                 _modelSpots.Remove(pointer);
                 state.Output=state.Model.Step(now,eyeVec,false);

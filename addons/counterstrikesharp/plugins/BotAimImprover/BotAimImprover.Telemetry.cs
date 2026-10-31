@@ -117,6 +117,9 @@ public partial class BotAimImprover
             fire_expected_error_degrees=state?.Model.LastFireDecision.ExpectedErrorDegrees,
             fire_tolerance_degrees=state?.Model.LastFireDecision.ToleranceDegrees,
             under_fire=state!=null && Server.CurrentTime<state.UnderFireUntil,
+            allow_latch_active=state!=null && Server.CurrentTime<state.AllowLatchUntil,
+            model_memory_aim=state is {} memoryState && !memoryState.LastSight && memoryState.Model.HasObservation
+                && Server.CurrentTime-memoryState.Model.LastVisible<=ReacquireResetSeconds,
             test_gate_active=TestGateActive,effective_allow_fire=gate?.Allow,
             fire_guard_hold_since=state?.PlanHoldSince,fire_guard_hold_timed_out=state?.PlanHoldTimedOut,
             model_fire_suppression_owned=_fireGuards.TryGetValue(player.Slot,out var guard) && guard.Pawn==player.PlayerPawn.Raw && guard.Token>0,
