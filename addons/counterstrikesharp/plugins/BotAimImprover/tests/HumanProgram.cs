@@ -107,6 +107,11 @@ FireDecision FireAt(float error,float radius,AimWeaponClass weapon,bool underFir
  =>HumanFireDecision.Evaluate(new(0,error),Vector2.Zero,radius,uncertainty,visible,.05f,false,new(weapon,underFire),motorError);
 Check(FireAt(.4f,.5f,AimWeaponClass.Rifle).Allow && !FireAt(.4f,.5f,AimWeaponClass.Sniper).Allow,
  "sniper requests tighter expected alignment than rifle");
+var plannedOnly=FireAt(.3f,.5f,AimWeaponClass.Rifle);
+var withActual=HumanFireDecision.Evaluate(new(0,.3f),Vector2.Zero,.5f,0,true,.05f,false,new(AimWeaponClass.Rifle),.16f,2.0f,.5f);
+Check(plannedOnly.Allow && withActual.Allow && withActual.ActualErrorDegrees is >1.9f,
+ "actual crosshair error is recorded without vetoing an intended-aligned shot");
+Check(plannedOnly.ActualErrorDegrees==null,"without actual-view input no crosshair error is reported");
 Check(FireAt(.6f,1,AimWeaponClass.Rifle).Allow && !FireAt(.6f,.1f,AimWeaponClass.Rifle).Allow,
  "angular target size changes fire acceptance independently of flick progress");
 Check(!FireAt(.8f,.5f,AimWeaponClass.Rifle).Allow && FireAt(.8f,.5f,AimWeaponClass.Rifle,true).Allow,

@@ -29,7 +29,7 @@ public readonly record struct HumanFireContext(AimWeaponClass Weapon= AimWeaponC
     };
     public float BulletSpeed=>BulletSpeedFor(Weapon);
 }
-public readonly record struct FireDecision(bool Allow,string Reason,float? ExpectedErrorDegrees,float? ToleranceDegrees);
+public readonly record struct FireDecision(bool Allow,string Reason,float? ExpectedErrorDegrees,float? ToleranceDegrees,float? ActualErrorDegrees=null);
 
 // Provisional speed/accuracy trade-off, not measured rank data or a hit predictor.
 // Uses delayed beliefs and intended movement; never tests true target hitboxes.
@@ -41,7 +41,8 @@ public static class HumanFireDecision
     // impossible. motorError is the profile's hand/precision scale and raises the
     // floor for less precise difficulty tiers.
     public static FireDecision Evaluate(Vector2 intendedAim,Vector2 estimatedBearing,float angularRadius,float uncertainty,
-        bool visible,float observationAge,bool correctionPending,HumanFireContext context,float motorError=.16f)
+        bool visible,float observationAge,bool correctionPending,HumanFireContext context,float motorError=.16f,
+        float? actualErrorDegrees=null,float feedbackWeight=.50f)
     {
         if(!visible)return new(false,"not-visible",null,null);
         if(!float.IsFinite(observationAge) || observationAge<0 || observationAge>=.20f)return new(false,"stale-observation",null,null);
@@ -63,7 +64,12 @@ public static class HumanFireDecision
         float baseTolerance=.5f*effectiveRadius+.45f+motorError*.5f;
         float tolerance=Math.Clamp(baseTolerance*weaponFactor*(context.UnderFire ? 1.3f : 1),.25f,4);
         float error=AimMath.Delta(estimatedBearing,intendedAim).Length();
+        // The actual crosshair error is recorded for telemetry/calibration but does
+        // not veto fire here: the engine view execution gap (median several degrees
+        // in natural play) is currently larger than the fire tolerance, so gating on
+        // raw actual view would silence the model instead of improving shots.
+        float? actualError=actualErrorDegrees is {} actual && float.IsFinite(actual) && actual>=0 ? actual : null;
         bool allow=error<=tolerance;
-        return new(allow,allow ? "expected-alignment" : "waiting-for-alignment",error,tolerance);
+        return new(allow,allow ? "expected-alignment" : "waiting-for-alignment",error,tolerance,actualError);
     }
 }

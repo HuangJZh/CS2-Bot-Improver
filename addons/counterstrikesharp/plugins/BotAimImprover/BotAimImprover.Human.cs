@@ -40,6 +40,7 @@ public partial class BotAimImprover
         public string LastSamplePoint="none";
         public float? LastSampleRayFraction;
         public float AllowLatchUntil;
+        public float LastAimFeedbackCorrection;
     }
     private HumanSettings _humanSettings=new();
     private readonly Dictionary<int,HumanState> _humanStates=new();
@@ -209,7 +210,7 @@ public partial class BotAimImprover
                     && now-held.LastUsed<.35f && held.Model.HasObservation && now-held.Model.LastVisible<.50f)
                 {
                     held.LastUsed=now;
-                    held.Output=held.Model.Step(now,eyeVec,false);
+                    held.Output=held.Model.Step(now,eyeVec,false,default,new(pawn.EyeAngles.X,pawn.EyeAngles.Y));
                     _modelSpots.Remove(pointer);
                     RefreshFireGuard(controller);
                     return HookResult.Continue;
@@ -289,14 +290,19 @@ public partial class BotAimImprover
             if((!visible && !state.Model.HasObservation) || (!visible && now-state.Model.LastVisible>ReacquireResetSeconds))
             {
                 _modelSpots.Remove(pointer);
-                state.Output=state.Model.Step(now,eyeVec,false);
+                state.Output=state.Model.Step(now,eyeVec,false,default,new(pawn.EyeAngles.X,pawn.EyeAngles.Y));
                 RefreshFireGuard(controller);
                 return HookResult.Continue;
             }
             var fireContext=new HumanFireContext(HumanFireContext.Classify(pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName),now<state.UnderFireUntil);
             state.PlannedWeapon=pawn.WeaponServices?.ActiveWeapon.Raw ?? uint.MaxValue;
-            state.Output=state.Model.Step(now,eyeVec,visible,fireContext);
+            state.Output=state.Model.Step(now,eyeVec,visible,fireContext,new(pawn.EyeAngles.X,pawn.EyeAngles.Y));
             _humanPhases[state.Output.Phase]=_humanPhases.GetValueOrDefault(state.Output.Phase)+1;
+            // Execution feedback is measured for calibration but not injected: natural
+            // captures show the engine view lags the plan by several degrees and a
+            // naive correction of the target spot worsened planned-vs-actual error.
+            var actualView=new Angles(pawn.EyeAngles.X,pawn.EyeAngles.Y);
+            state.LastAimFeedbackCorrection=AimMath.Delta(state.Model.LastDesiredAngles,actualView).Length();
             var spot=AimMath.Ray(eyeVec,state.Output.Angles);
             _modelSpots[pointer]=spot;
             WriteModelSpot(bot,spot);

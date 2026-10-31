@@ -6,10 +6,15 @@ public sealed record HumanAimProfile(float Reaction, float SensorDelay, float Sa
     float FlickTime, float MotorError, float AmplitudeError, float TrackingTime, float MaxSpeed, float Prediction)
 {
     public float PerceptionError {get;init;}=.07f;
+    // How much the fire decision trusts the actual crosshair position versus the
+    // intended motor plan. Humans see where their crosshair actually is, but can
+    // also fire during a planned movement; more skilled profiles rely more on the
+    // real crosshair. Calibration hypothesis, not measured rank data.
+    public float FeedbackWeight {get;init;}=.50f;
     public static HumanAimProfile For(string level) => level switch
     {
-        "Low" => new(.200f,.090f,.050f,.155f,.32f,.020f,.105f,480,.60f){PerceptionError=.12f},
-        "High" => new(.130f,.045f,.025f,.095f,.07f,.006f,.045f,850,.92f){PerceptionError=.035f},
+        "Low" => new(.200f,.090f,.050f,.155f,.32f,.020f,.105f,480,.60f){PerceptionError=.12f,FeedbackWeight=.35f},
+        "High" => new(.130f,.045f,.025f,.095f,.07f,.006f,.045f,850,.92f){PerceptionError=.035f,FeedbackWeight=.65f},
         _ => new(.170f,.065f,.035f,.125f,.16f,.011f,.070f,650,.80f)
     };
 }
@@ -63,6 +68,9 @@ public sealed class HumanAimModel
     public string ContactKind {get;private set; }="none";
     public float PlanStartedAt => _start;
     public float PlanDuration => _duration;
+    // Latest believed target bearing (before any motor bias); used by the execution
+    // feedback layer to push the target spot toward where the model wants to look.
+    public Vector2 LastDesiredAngles => _lastDesired;
     public FireDecision LastFireDecision {get;private set;}=new(false,"no-observation",null,null);
     public HumanAimModel(HumanAimProfile profile,Vector2 initial,float now,int seed)
     { Profile=profile;_view=_intendedView=initial;_lastStep=now;_random=new(seed);_visual=new(profile.PerceptionError,seed^0x5143A9); }
@@ -83,7 +91,7 @@ public sealed class HumanAimModel
         _pending.Enqueue(new(now,point,radius,uncertainty));
         while(_pending.Count>32)_pending.Dequeue();
     }
-    public AimOutput Step(float now,Vector3 eye,bool visible,HumanFireContext context=default)
+    public AimOutput Step(float now,Vector3 eye,bool visible,HumanFireContext context=default,Vector2? actualView=null)
     {
         float dt=Math.Clamp(now-_lastStep,0,.05f);_lastStep=now;
         while(_pending.TryPeek(out var obs) && obs.Time<=now-Profile.SensorDelay)
@@ -108,6 +116,8 @@ public sealed class HumanAimModel
         float leadSeconds=Math.Clamp(age+flightTime,0,.45f);
         var predicted=latest.Position+_velocity*leadSeconds*Profile.Prediction;
         var desired=AimMath.Angles(eye,predicted);
+        float? actualError=actualView is {} observedView && float.IsFinite(observedView.X+observedView.Y)
+            ? AimMath.Delta(desired,observedView).Length() : null;
         // Track how fast the desired bearing itself is moving. A motor controller
         // without this term lags a constant-rate target by roughly rate*TrackingTime,
         // which would make moving targets effectively un-fireable at range.
@@ -157,7 +167,7 @@ public sealed class HumanAimModel
             var intended=_startView+AimMath.Delta(_intendedEndView,_startView)*AimMath.Ease((now-_start)/_duration);
             _view=AimMath.Advance(_view,planned,dt,.012f,Profile.MaxSpeed);
             _intendedView=AimMath.Advance(_intendedView,intended,dt,.012f,Profile.MaxSpeed);
-            LastFireDecision=HumanFireDecision.Evaluate(_intendedView,desired,angularRadius,latest.Uncertainty,visible,age,false,context,Profile.MotorError);
+            LastFireDecision=HumanFireDecision.Evaluate(_intendedView,desired,angularRadius,latest.Uncertainty,visible,age,false,context,Profile.MotorError,actualError,Profile.FeedbackWeight);
             return new(_view,LastFireDecision.Allow,"flick",age);
         }
         if(now>=_nextBias)
@@ -176,7 +186,7 @@ public sealed class HumanAimModel
             _intendedView=AimMath.Advance(_intendedView,controlTarget,dt,Profile.TrackingTime,Profile.MaxSpeed);
         }
         if(error<1)_correcting=false;
-        LastFireDecision=HumanFireDecision.Evaluate(_intendedView,desired,angularRadius,latest.Uncertainty,visible,age,waiting,context,Profile.MotorError);
+        LastFireDecision=HumanFireDecision.Evaluate(_intendedView,desired,angularRadius,latest.Uncertainty,visible,age,waiting,context,Profile.MotorError,actualError,Profile.FeedbackWeight);
         return new(_view,LastFireDecision.Allow,waiting ? "correction" : "tracking",age);
     }
 }
