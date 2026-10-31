@@ -57,4 +57,50 @@ for(int i=0;i<150;i++)
 Check(after.Angles.Y>=before.Angles.Y,"unexpected reversal cannot be corrected instantly");
 var profileHigh=HumanAimProfile.For("High");var profileLow=HumanAimProfile.For("Low");
 Check(profileHigh.MotorError<profileLow.MotorError && profileHigh.SensorDelay<profileLow.SensorDelay,"difficulty controls precision and sensory delay");
+var center=new VisualLocalization(.1f,777).Estimate(0,eye,new(1000,0,0),Vector2.Zero,4);
+var peripheral=new VisualLocalization(.1f,777).Estimate(0,eye,new(1000,0,0),new(0,50),4);
+Check(peripheral.UncertaintyDegrees>center.UncertaintyDegrees,"peripheral localization is less certain than central localization");
+var distant=new VisualLocalization(.1f,777).Estimate(0,eye,new(3000,0,0),Vector2.Zero,4);
+Check(distant.UncertaintyDegrees>center.UncertaintyDegrees,"smaller angular target increases localization uncertainty");
+var trunk=new VisualLocalization(.1f,777).Estimate(0,eye,new(1000,0,0),Vector2.Zero,8);
+Check(trunk.UncertaintyDegrees<center.UncertaintyDegrees,"larger part-size proxy lowers localization uncertainty");
+Check(center.Position!=new Vector3(1000,0,0),"visual localization has its own error before motor planning");
+var exact=new VisualLocalization(0,1).Estimate(0,eye,target,Vector2.Zero,4);
+Check(Vector3.Distance(exact.Position,target)<.001f,"zero visual uncertainty does not introduce a target offset");
+var visualA=new VisualLocalization(.1f,13);var visualB=new VisualLocalization(.1f,13);
+VisualEstimate v=default,previousVisual=default;
+float largestVisualStep=0;
+for(int i=0;i<2000;i++)
+{
+ float now=i*.001f;v=visualA.Estimate(now,eye,new(1000,0,0),Vector2.Zero,4);
+ var repeat=visualB.Estimate(now,eye,new(1000,0,0),Vector2.Zero,4);
+ if(v!=repeat)throw new Exception("visual process not reproducible");
+ if(i>0)largestVisualStep=MathF.Max(largestVisualStep,AimMath.Delta(AimMath.Angles(eye,v.Position),AimMath.Angles(eye,previousVisual.Position)).Length());
+ previousVisual=v;
+}
+Check(true,"visual localization reproducible from same observed samples and seed");
+Check(largestVisualStep<.005f,"localization error drifts coherently rather than resampling white noise");
+var visualModel=new HumanAimModel(profileHigh,Vector2.Zero,0,12);
+Check(visualModel.ObserveVisual(0,eye,target,Vector2.Zero,4).HasValue,"first visible sample enters perceptual estimator");
+Check(!visualModel.ObserveVisual(.001f,eye,new(1000,800,0),Vector2.Zero,4).HasValue,"oversampling cannot replace delayed observations");
+var delayedVisual=visualModel.Step(profileHigh.SensorDelay-.001f,eye,true);
+Check(delayedVisual.Phase=="perception" && delayedVisual.Angles==Vector2.Zero && !delayedVisual.AllowFire,"noisy visual estimate still waits for sensory delay");
+bool backwardsRejected=false;
+try{visualA.Estimate(0,eye,target,Vector2.Zero,4);}catch(ArgumentException){backwardsRejected=true;}
+Check(backwardsRejected,"visual estimator rejects backwards clock instead of reusing future state");
+foreach(var level in new[]{"Low","Medium","High"})
+{
+ var observed=new HumanAimModel(HumanAimProfile.For(level),Vector2.Zero,0,671);
+ var view=Vector2.Zero;AimOutput result=default;
+ for(int i=0;i<256;i++)
+ {
+  float now=i/128f;
+  observed.ObserveVisual(now,eye,target,view,4);
+  result=observed.Step(now,eye,true);view=result.Angles;CheckFinite(view);
+ }
+ Check(result.AllowFire && AimMath.Delta(view,AimMath.Angles(eye,target)).Length()<2,
+  level+" delayed noisy observations support bounded stationary engagement");
+ result=observed.Step(observed.LastVisible+.4f,eye,false);
+ Check(!result.AllowFire && result.Phase=="memory-expired",level+" uncertain localization does not extend hidden target memory");
+}
 Console.WriteLine($"{count} checks passed");

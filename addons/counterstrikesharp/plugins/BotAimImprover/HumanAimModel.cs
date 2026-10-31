@@ -5,10 +5,11 @@ namespace BotAimImprover;
 public sealed record HumanAimProfile(float Reaction, float SensorDelay, float SampleInterval,
     float FlickTime, float MotorError, float AmplitudeError, float TrackingTime, float MaxSpeed, float Prediction)
 {
+    public float PerceptionError {get;init;}=.07f;
     public static HumanAimProfile For(string level) => level switch
     {
-        "Low" => new(.200f,.090f,.050f,.155f,.32f,.020f,.105f,480,.60f),
-        "High" => new(.130f,.045f,.025f,.095f,.07f,.006f,.045f,850,.92f),
+        "Low" => new(.200f,.090f,.050f,.155f,.32f,.020f,.105f,480,.60f){PerceptionError=.12f},
+        "High" => new(.130f,.045f,.025f,.095f,.07f,.006f,.045f,850,.92f){PerceptionError=.035f},
         _ => new(.170f,.065f,.035f,.125f,.16f,.011f,.070f,650,.80f)
     };
 }
@@ -43,6 +44,7 @@ public sealed class HumanAimModel
 {
     public HumanAimProfile Profile {get;}
     private readonly Random _random;
+    private readonly VisualLocalization _visual;
     private readonly Queue<AimObservation> _pending=new();
     private AimObservation? _latest,_previous;
     private float _nextSample=float.NegativeInfinity,_lastVisible=float.NegativeInfinity;
@@ -53,10 +55,17 @@ public sealed class HumanAimModel
     public float LastVisible => _lastVisible;
     public bool HasObservation => _latest.HasValue || _pending.Count>0;
     public HumanAimModel(HumanAimProfile profile,Vector2 initial,float now,int seed)
-    { Profile=profile;_view=initial;_lastStep=now;_random=new(seed); }
+    { Profile=profile;_view=initial;_lastStep=now;_random=new(seed);_visual=new(profile.PerceptionError,seed^0x5143A9); }
     private float Symmetric() => (float)(_random.NextDouble()+_random.NextDouble()-1);
     private Vector2 Noise(float magnitude) => new(Symmetric()*magnitude,Symmetric()*magnitude);
     public bool NeedsObservation(float now) => now>=_nextSample;
+    public VisualEstimate? ObserveVisual(float now,Vector3 eye,Vector3 visiblePoint,Vector2 actualView,float radius)
+    {
+        if(!NeedsObservation(now))return null;
+        var estimate=_visual.Estimate(now,eye,visiblePoint,actualView,radius);
+        Observe(now,estimate.Position);
+        return estimate;
+    }
     public void Observe(float now,Vector3 point)
     {
         if(now<_nextSample || !float.IsFinite(point.X+point.Y+point.Z))return;

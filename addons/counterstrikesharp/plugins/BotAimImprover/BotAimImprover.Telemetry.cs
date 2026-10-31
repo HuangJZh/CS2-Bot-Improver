@@ -78,6 +78,9 @@ public partial class BotAimImprover
             enemy=bot?.Enemy.Raw,native_visible=bot?.IsEnemyVisible,sensor_visible=state?.LastSight,
             planned_pitch=state?.Output.Angles.X,planned_yaw=state?.Output.Angles.Y,phase=state?.Output.Phase,allow_fire=state?.Output.AllowFire,
             observation_age=state!=null && float.IsFinite(state.Output.ObservationAge) ? (float?)state.Output.ObservationAge : null,
+            visual_uncertainty_degrees=state?.LastVisualEstimate?.UncertaintyDegrees,
+            visual_eccentricity_degrees=state?.LastVisualEstimate?.EccentricityDegrees,
+            visual_angular_radius_degrees=state?.LastVisualEstimate?.AngularRadiusDegrees,
             model_fire_suppression_owned=state?.Suppression>0,event_weapon=eventWeapon,other_pawn=otherPawn,damage});
     }
     private void WriteTelemetry<T>(T row)

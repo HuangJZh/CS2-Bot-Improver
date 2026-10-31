@@ -30,6 +30,7 @@ public partial class BotAimImprover
         public float NextSensorCheck;
         public bool LastSight;
         public AimOutput Output;
+        public VisualEstimate? LastVisualEstimate;
     }
     private HumanSettings _humanSettings=new();
     private readonly Dictionary<int,HumanState> _humanStates=new();
@@ -167,7 +168,8 @@ public partial class BotAimImprover
             {
                 state.NextSensorCheck=now+state.Model.Profile.SampleInterval;
                 Vec sample=default;
-                visible=bot.IsEnemyVisible && pawn.BlindUntilTime<=now && TrySelectHumanPoint(bot,pawn,enemy,eye,out sample);
+                float sampleRadius=4;
+                visible=bot.IsEnemyVisible && pawn.BlindUntilTime<=now && TrySelectHumanPoint(bot,pawn,enemy,eye,out sample,out sampleRadius);
                 state.LastSight=visible;
                 if(visible)
                 {
@@ -181,7 +183,7 @@ public partial class BotAimImprover
                         _humanStates[controller.Slot]=state;
                     }
                     // The sample, not the live entity, enters the model's delay queue.
-                    state.Model.Observe(now,sample);
+                    state.LastVisualEstimate=state.Model.ObserveVisual(now,eyeVec,sample,new(pawn.EyeAngles.X,pawn.EyeAngles.Y),sampleRadius);
                 }
             }
             // Preserve native search/navigation without permitting hidden-target fire.
@@ -218,9 +220,9 @@ public partial class BotAimImprover
             _humanController!.CancelUsercmdSuppression(slot,state.Suppression);state.Suppression=0;
         }
     }
-    private bool TrySelectHumanPoint(CCSBot bot,CCSPlayerPawn pawn,CCSPlayerPawn enemy,Vector eye,out Vec point)
+    private bool TrySelectHumanPoint(CCSBot bot,CCSPlayerPawn pawn,CCSPlayerPawn enemy,Vector eye,out Vec point,out float radius)
     {
-        point=default;
+        point=default;radius=4;
         var weapon=pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName;
         var order=_aimMode switch
         {
@@ -237,7 +239,9 @@ public partial class BotAimImprover
             if(MathF.Abs(AimMath.Delta(angle,forward).Y)>_humanSettings.HorizontalFieldOfView*.5f
                 || MathF.Abs(AimMath.Delta(angle,forward).X)>50)continue;
             if(!PointVisibleFromEye(eye,x,y,z) || HumanSmokeBlocks(eye,candidate))continue;
-            point=candidate;return true;
+            point=candidate;
+            radius=index is >=3 and <=7 or 10 or 11 ? 8 : 4;
+            return true;
         }
         return false;
     }
