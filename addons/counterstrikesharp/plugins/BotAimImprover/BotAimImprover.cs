@@ -15,7 +15,7 @@ namespace BotAimImprover;
 public partial class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8-human.8.19-experimental";
+    public override string ModuleVersion => "2.1.8-human.8.20-experimental";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 

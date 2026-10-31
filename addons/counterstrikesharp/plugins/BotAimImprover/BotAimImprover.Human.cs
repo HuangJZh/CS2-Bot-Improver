@@ -112,7 +112,7 @@ public partial class BotAimImprover
             }
             MaintainFireGuards();
         });
-        RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);}return HookResult.Continue; });
+        RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);ResetSilentMovement(p.Slot);}return HookResult.Continue; });
         // Track bursts so the aim output can model human recoil control after the
         // first few rounds instead of holding a perfectly steady target point.
         RegisterEventHandler<EventWeaponFire>((e,i) => {
@@ -163,7 +163,7 @@ public partial class BotAimImprover
                 state.UnderFireUntil=Server.CurrentTime+.6f;
             return HookResult.Continue;
         });
-        RegisterEventHandler<EventPlayerDisconnect>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);}return HookResult.Continue; });
+        RegisterEventHandler<EventPlayerDisconnect>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);ResetSilentMovement(p.Slot);}return HookResult.Continue; });
         RegisterEventHandler<EventItemEquip>((e,i) => {
             if(e.Userid is {IsValid:true} player)
             {
@@ -227,7 +227,7 @@ public partial class BotAimImprover
         _testGateUntil=float.NegativeInfinity;
         foreach(var slot in _humanStates.Keys.ToArray())ReleaseHuman(slot);
         foreach(var slot in _fireGuards.Keys.ToArray())ReleaseFireGuard(slot);
-        _modelSpots.Clear();_humanPhases.Clear();_soundPreaim.Clear();ReadHumanDifficulty();
+        _modelSpots.Clear();_humanPhases.Clear();_soundPreaim.Clear();ResetAllSilentMovement();ReadHumanDifficulty();
     }
     private static bool IsGun(CCSPlayerPawn pawn)
         => pawn.WeaponServices?.ActiveWeapon.Value?.As<CCSWeaponBase>().VData?.GearSlot is gear_slot_t.GEAR_SLOT_RIFLE or gear_slot_t.GEAR_SLOT_PISTOL;
@@ -267,6 +267,7 @@ public partial class BotAimImprover
             var eyeVec=new Vec(eye.X,eye.Y,eye.Z);
             float now=Server.CurrentTime;
             var bot=new CCSBot(pointer);
+            TickSilentMovement(controller,pawn,bot,now);
             if(bot.Enemy.Value is not {IsValid:true} enemy || enemy.LifeState!=0 || enemy.TeamNum==controller.TeamNum)
             {
                 if(TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;

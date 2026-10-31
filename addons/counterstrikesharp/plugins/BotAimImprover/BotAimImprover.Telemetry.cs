@@ -130,6 +130,8 @@ public partial class BotAimImprover
             preaim_target_y=_preaimTargets.TryGetValue(player.Slot,out var preaimPointY) && preaimPointY!=null ? (float?)preaimPointY.Point.Y : null,
             preaim_target_z=_preaimTargets.TryGetValue(player.Slot,out var preaimPointZ) && preaimPointZ!=null ? (float?)preaimPointZ.Point.Z : null,
             preaim_node_id=_preaimTargets.TryGetValue(player.Slot,out var preaimNode) && preaimNode!=null ? preaimNode.NodeIndex : (int?)null,
+            silent_mode=_silentStates.TryGetValue(player.Slot,out var silentState) ? silentState.Mode : null,
+            silent_reason=_silentStates.TryGetValue(player.Slot,out var silentReasonState) ? silentReasonState.Reason : null,
             fire_tolerance_degrees=state?.Model.LastFireDecision.ToleranceDegrees,
             under_fire=state!=null && Server.CurrentTime<state.UnderFireUntil,
             allow_latch_active=state!=null && Server.CurrentTime<state.AllowLatchUntil,
