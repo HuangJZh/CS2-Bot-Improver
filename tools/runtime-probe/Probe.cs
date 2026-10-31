@@ -7,6 +7,9 @@ public sealed class HumanAimProbe:BasePlugin
 {
  private readonly List<(int Slot,long Token,string Kind)> _controls=new();
  private IBotControllerApi? _api;
+ private int _budgetActor=-1,_budgetCount;
+ private uint _budgetPawn;
+ private long _budgetToken;
  private void ReleaseControls()
  {
   foreach(var c in _controls)try { if(c.Kind=="move")_api?.CancelUsercmdMovement(c.Slot,c.Token);else if(c.Kind=="suppress")_api?.CancelUsercmdSuppression(c.Slot,c.Token);else _api?.CancelUsercmdInjection(c.Slot,c.Token); }catch { }
@@ -22,6 +25,23 @@ public sealed class HumanAimProbe:BasePlugin
   int port=Array.IndexOf(args,"-port"),ip=Array.IndexOf(args,"-ip");
   if(!args.Contains("-dedicated") || port<0 || port+1>=args.Length || args[port+1]!="27025"
      || ip<0 || ip+1>=args.Length || args[ip+1]!="127.0.0.1")return;
+  RegisterListener<Listeners.OnMapEnd>(ReleaseControls);
+  RegisterEventHandler<EventWeaponFire>((e,i)=>{
+   var player=e.Userid;
+   if(_budgetToken>0 && player is {IsValid:true} && player.Slot==_budgetActor && player.PlayerPawn.Raw==_budgetPawn && e.Weapon.Replace("weapon_","")=="ak47")
+   {
+    if(++_budgetCount>=30)
+    {
+     long token=_budgetToken;int slot=_budgetActor;uint pawn=_budgetPawn;_budgetToken=0;
+     Server.NextFrame(()=>{
+      _api?.CancelUsercmdInjection(slot,token);
+      var p=Utilities.GetPlayerFromSlot(slot);
+      if(p is {IsValid:true} && p.PlayerPawn.Raw==pawn && _api!=null)_controls.Add((slot,_api.StartUsercmdSuppression(slot,(ulong)PlayerButtons.Attack),"suppress"));
+     });
+    }
+   }
+   return HookResult.Continue;
+  });
   AddCommand("css_aim_probe","Controlled local capture fixture",(p,c)=>{
    if(p!=null)return;
    var bots=Utilities.GetPlayers().Where(b=>b.IsBot && b.TeamNum is 2 or 3 && b.PlayerPawn.Value is {IsValid:true}).ToArray();
@@ -64,19 +84,19 @@ public sealed class HumanAimProbe:BasePlugin
     },CounterStrikeSharp.API.Modules.Timers.TimerFlags.REPEAT);
     Server.PrintToConsole("[PROBE] forced perception handles for adapter test only");
    }
-   if(action is "stabilize_native_stance" or "stabilize_stand" or "stabilize_crouch")
+   if(action is "stabilize_native_stance" or "stabilize_stand" or "stabilize_crouch" or "strafe_stand")
    {
     ReleaseControls();_api=new PluginCapability<IBotControllerApi>("botcontroller:api").Get();
     if(_api==null)throw new InvalidOperationException("Fixture requires BotController");
     var actor=bots.First(b=>b.TeamNum==2);
     foreach(var b in bots.Where(b=>b.PawnIsAlive))
     {
-     _controls.Add((b.Slot,_api.StartUsercmdMovement(b.Slot,0,0),"move"));
+     _controls.Add((b.Slot,_api.StartUsercmdMovement(b.Slot,0,b.Slot==actor.Slot && action=="strafe_stand" ? 1 : 0),"move"));
      ulong mask=(ulong)PlayerButtons.Jump;
-     if(b.Slot!=actor.Slot || action=="stabilize_stand")mask|=(ulong)PlayerButtons.Duck;
+     if(b.Slot!=actor.Slot || (action=="stabilize_stand" || action=="strafe_stand"))mask|=(ulong)PlayerButtons.Duck;
      if(b.Slot!=actor.Slot)mask|=(ulong)PlayerButtons.Attack;
      _controls.Add((b.Slot,_api.StartUsercmdSuppression(b.Slot,mask),"suppress"));
-     if(b.Slot==actor.Slot && action=="stabilize_crouch")_controls.Add((b.Slot,_api.InjectUsercmd(b.Slot,(ulong)PlayerButtons.Duck,15000),"inject"));
+     if(b.Slot==actor.Slot && action=="stabilize_crouch")_controls.Add((b.Slot,_api.InjectUsercmd(b.Slot,(ulong)PlayerButtons.Duck,60000),"inject"));
     }
     if(_controls.Any(c=>c.Token<=0))throw new InvalidOperationException("Fixture control failed");
     Server.PrintToConsole("[PROBE] input condition="+action+"; scripted movement suppression, not gameplay policy");
@@ -112,8 +132,14 @@ public sealed class HumanAimProbe:BasePlugin
    if(action is "shoot" or "shoot_one")
    {
     var api=new PluginCapability<IBotControllerApi>("botcontroller:api").Get();
+    _api=api;
     foreach(var b in bots.Where(b=>b.PawnIsAlive).Take(action=="shoot_one" ? 1 : 2))
-     Server.PrintToConsole($"[PROBE] injected attack slot={b.Slot} token={api?.InjectUsercmd(b.Slot,(ulong)PlayerButtons.Attack,action=="shoot_one" ? 4000 : 1200)}");
+    {
+     long token=api?.InjectUsercmd(b.Slot,(ulong)PlayerButtons.Attack,action=="shoot_one" ? 60000 : 1200) ?? -1;
+     if(action=="shoot_one"){_budgetActor=b.Slot;_budgetPawn=b.PlayerPawn.Raw;_budgetCount=0;_budgetToken=token;}
+     _controls.Add((b.Slot,token,"inject"));
+     Server.PrintToConsole($"[PROBE] injected attack slot={b.Slot} token={token}; shoot_one ends at30 AK events or60s wall-clock lease");
+    }
    }
    foreach(var b in bots.Take(4))Server.PrintToConsole($"[PROBE] slot={b.Slot} alive={b.PawnIsAlive} weapon={b.PlayerPawn.Value?.WeaponServices?.ActiveWeapon.Value?.DesignerName}");
   });

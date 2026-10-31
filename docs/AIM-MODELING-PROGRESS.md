@@ -45,6 +45,28 @@
 
 当前目标仍未完成。下一轮先继续实际控制与RCS/姿态验证，然后补准备阶段；普通高手/普通玩家分层样本、可见时刻回放核验、自然对局和独立验收仍缺证据。
 
+## 蹲姿与连射：描述性样本及实验边界
+
+用户补充蹲下与压枪协同。新增summarize_spray_posture.py，针对已有正式阶段AK/M4事件，以同玩家、回合、武器且相邻开火间隔不超过32tick（这些demo为64tick）构造至少5发的序列。网络duck_amount>=0.9计充分蹲下。共525段，309段至少一次充分蹲下；NiKo24/59、TeSeS25/36、kyousuke14/48、m0NESY35/48。仅同一BO3的描述性计数；序列不保证同目标或持续扣扳机，不能解释为战术意图、因果收益或职业群体概率。输出E:/csdemo/evidence/spray-posture-sequences.csv。
+
+模型应分别处理站姿射击、连射中转蹲、保持蹲姿与撤离，不把蹲下等同自动后坐力补偿。姿态导致的眼位变化也必须进入瞄准运动；压枪补偿和武器精度由各自状态决定。暂不据这些计数设置三档蹲下概率。
+
+站立/蹲下配对物理测试尚未通过：站立条件30发有效；第一次蹲下条件中途起身，第二次仅6发。原始文件留存在E:/csdemo/bot-captures/paired-stance-20261031，不用于完整配对或最终RCS标定。测试输入持续时间按墙钟计算，已在工具源码加入更长租约和30发事件预算，但该新工具版本尚未完成运行验证。
+
+移除BotState旧强制速度归零、保留BotSupport概率执行方的改动目前仅保留源码候选。测试中的开火前移动样本数为0，不能声称验证75/85/95的物理结果。已停止本轮专用测试进程12244，恢复测试前BotState stance.1及BotSupport安装文件，归档临时HumanAimProbe。用户human-aim.json恢复，DirectViewControl仍缺省false。
+
+## 第四轮：完整姿态物理对照
+
+修订后的工具已编译（0警告0错误）并在新专用服进程27224运行。两组均关闭人性化模型、强制输入和近距离目标位置，仅用于隔离姿态。站姿/蹲姿各30发AK，recoil_index完整0..29；所有开火回调着地标志成立，水平速度0；网络duck_amount分别全0/全1。验证工具compare_stance_trials.py会拒绝发数、序号或姿态不满足的输入。
+
+SourceTV文件可携带录制命令之前的缓冲事件：本次站姿demo含先前蹲姿30发及本次站姿30发。保留完整原始demo和standing-budget-all-shots.parquet；按独立JSONL开火时间窗54.109375至57.009377秒（两端容差0.03秒）及demo的game_time筛选本次30发，不能按duck值选择样本。第一组蹲姿开火时间28.875至31.775秒。不能用demo相对tick直接对齐服务器tick。
+
+本机1.41.9.4单次对照：首发inaccuracy站姿0.006410、蹲姿0.004810，减少约25%；recoil_index5..20的中位数站姿0.019623、蹲姿0.015288，减少约22%。这描述武器不精确度字段，不是散布面积、命中率、鼠标压枪误差或职业能力的提升百分比。尚未标定RCS、自然转蹲时机、眼位补偿或三档能力。
+
+证据、校验摘要、JSONL、完整demo位于E:/csdemo/bot-captures/paired-stance-20261031。两个较早无效蹲姿尝试仍保留，不能把crouched-valid-shots.parquet旧文件名当作通过证明。新通过文件为standing-budget-shots.parquet和crouched-budget-shots.parquet，对应validated-pair-summary.json和paired-telemetry-check.json。
+
+本轮结束已停止进程27224，临时工具归档fixture-budget-archived。正常安装仍保持BotState stance.1及原BotSupport，DirectViewControl关闭。下一步需检验原生usercmd/射击后坐力时序，再接入带延迟和误差的压枪；完整目标不变。
+
 当前安装核对：Aim插件已更新为3-experimental的诊断构建，安装文件与当前编译产物哈希一致；原human-aim.json保留，DirectViewControl缺省false。BotState仍为安装的原始1.10.5（SHA256 7717E2F42E1C65BBEC61E4A0FE891E70AEAE9F886F7540D019A31FF03A99A199），新的姿态策略未安装。所有临时测试服务器已停止，测试插件已恢复性归档在证据目录。
 
 ## 第三轮：姿态执行验证
