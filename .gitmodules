@@ -10,10 +10,6 @@
 	path = addons/BotVision
 	url = https://github.com/XBribo/CS2-Bot-Vision.git
 	branch = main
-[submodule "addons/counterstrikesharp/plugins/BotState"]
-	path = addons/counterstrikesharp/plugins/BotState
-	url = https://github.com/ed0ard/CS2-Smarter-Bot.git
-	branch = main
 [submodule "addons/counterstrikesharp/plugins/BotAI"]
 	path = addons/counterstrikesharp/plugins/BotAI
 	url = https://github.com/ed0ard/CS2-BotAI.git
