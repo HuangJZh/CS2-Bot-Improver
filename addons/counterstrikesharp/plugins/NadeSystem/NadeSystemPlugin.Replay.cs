@@ -84,10 +84,10 @@ public partial class NadeSystemPlugin : BasePlugin
             // no limits
         }
 
-        if (!EnsureInventoryGrenade(bot, gtype))
+        if (!HasInventoryGrenade(bot, gtype))
         {
-            Server.PrintToConsole($"[NadeSystem] Replay skipped: no {gtype} inventory/grant");
-            Logger.LogWarning("[NadeSystem] Replay skipped: no {Type} inventory/grant for {Bot}", gtype, bot.PlayerName);
+            Server.PrintToConsole($"[NadeSystem] Replay skipped: no {gtype} inventory (strict buy/hold/throw)");
+            Logger.LogWarning("[NadeSystem] Replay skipped: no {Type} inventory for {Bot} (strict buy/hold/throw)", gtype, bot.PlayerName);
             return;
         }
 
@@ -155,7 +155,11 @@ public partial class NadeSystemPlugin : BasePlugin
                     return;
                 }
 
-                if (!EnsureInventoryGrenade(bot, gtype)) return;
+                if (!HasInventoryGrenade(bot, gtype))
+                {
+                    Logger.LogWarning("[NadeSystem] Spawn skipped: no {Type} inventory for {Bot} (strict buy/hold/throw)", gtype, bot.PlayerName);
+                    return;
+                }
 
                 // ── FLASH — CreateEntityByName is sufficient ───────────
                 // No native factory needed.

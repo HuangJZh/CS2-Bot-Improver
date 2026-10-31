@@ -106,6 +106,13 @@ public partial class NadeSystemPlugin : BasePlugin
     {
         _freezeEndTime = Server.CurrentTime;
         BuyRoundGrenades();
+        // Strict buy/hold/throw: retry the purchase a few times inside the buy
+        // window so late-buying bots still get their grenades, without ever
+        // granting free items at throw time.
+        int buyRound = _inventoryRound;
+        AddTimer(0.5f, () => RetryBuyRoundGrenades(buyRound));
+        AddTimer(1.5f, () => RetryBuyRoundGrenades(buyRound));
+        AddTimer(2.5f, () => RetryBuyRoundGrenades(buyRound));
         _roundNadeMoneyPerBot.Clear();
         foreach (var bot in Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller"))
         {
@@ -118,6 +125,13 @@ public partial class NadeSystemPlugin : BasePlugin
     }
 
     // * Checks whether a bot still has enough freeze-end money for a grenade
+    private void RetryBuyRoundGrenades(int round)
+    {
+        if (round != _inventoryRound || _roundOver) return;
+        var rules = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault()?.GameRules;
+        if (rules == null || rules.WarmupPeriod || rules.BuyTimeEnded) return;
+        BuyRoundGrenades();
+    }
     private bool HasLockedNadeMoney(uint botIdx, int cost)
         => _roundNadeMoneyPerBot.TryGetValue(botIdx, out int availableMoney)
             && availableMoney >= cost;
