@@ -534,3 +534,6 @@ A局未采样比例从8.5同口径的30.8%降到3.9%；扇形回退在这两局�
 注意：`CT_Defuse_EngageAndInvestigate` / `DefuseBombState_*_EngageAndInvestigate` 仍被应用（不在禁用表），如果防守方在拆包时仍前压，下一步再单独禁用这三项。该重编译同时关闭了若干视觉/射击节奏类超人类补丁，Bot 行为会整体更接近原生；BotAimImprover 的瞄准模型不受影响。
 
 安装：BotAI `1.8.14-human.1`，哈希`D6F0EE60…`；gameinfo已恢复（3B18F0CA…）；无CS2进程。源码位置：`E:/steam/steam/steamapps/common/Counter-Strike Global Offensive/CS2-Bot-Improver-custom/addons/counterstrikesharp/plugins/BotAI`。
+### 2026-11-01 补充：只开启炸弹全局听觉
+
+按用户要求“炸弹全局听觉启动”，从 `CombatPatchPolicy.Disabled` 中移除 `BombBeep_CT_GlobalHearRange`、`BombPickup_CT_GlobalHearRange`，重新编译安装 BotAI。专用服日志：`Applied 17/17 patches`，`BombBeep_CT_GlobalHearRange`、`BombPickup_CT_GlobalHearRange` 已应用；`OnAudibleEvent_GlobalHearRange`、`InvestigateNoise_SkipSelfDefenseCheck` 仍未应用——即**普通脚步/枪声保持原生正常人听觉范围**，只让 CT 全局感知炸弹 beep/捡包（原生炸弹 beep 1500、pickup 1000 的限制被取消）。安装 BotAI 哈希`30D61F1C…`；gameinfo已恢复（3B18F0CA…），无CS2进程。需重启游戏加载。
