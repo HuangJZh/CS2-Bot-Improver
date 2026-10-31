@@ -23,6 +23,63 @@ public sealed class HumanAimProbe:BasePlugin
  private MemoryFunctionVoid<nint>? _lookHook;
  private readonly Dictionary<nint,(int Slot,uint Pawn,float Until,float Yaw)> _facePoses=new();
  private CCSGameRules? FixtureRules()=>Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault(p=>p.IsValid)?.GameRules;
+ // Long-range fixture helpers: find a ground point and verify a clear eye-to-chest
+ // line. The pair -1076,-843 / -1015,-808 comes from a user-provided Dust2 demo;
+ // the search only accepts points that are both on the world brush and visible.
+ private static bool TryFindGround(float x,float y,float zHint,out float z)
+ {
+  z=0;
+  var start=new Vector(x,y,zHint+250f);var end=new Vector(x,y,zHint-450f);
+  var trace=Trace.TraceEndShape(start,end,options:new TraceOptions{InteractsWith=Masks.SolidBrushOnly});
+  float f=trace.Fraction;
+  if(!(f>.02f && f<.98f))return false;
+  z=start.Z+(end.Z-start.Z)*f;
+  return true;
+ }
+ private bool TryPlaceRange(float distance,CCSPlayerController actor,CCSPlayerController target)
+ {
+  if(actor.PlayerPawn.Value is not {IsValid:true} ap || target.PlayerPawn.Value is not {IsValid:true} tp)return false;
+  var origin=new Vector(-1076f,-843f,116.789474f);
+  ap.Teleport(origin,new QAngle(0,29.85f,0),new Vector(0,0,0));
+  var eye=new Vector(origin.X,origin.Y,origin.Z+(ap.ViewOffset?.Z ?? 64f));
+  float baseAngle=MathF.Atan2(0.497f,0.867f);
+  float[] offsets={0f,8f,-8f,16f,-16f,24f,-24f,32f,-32f,40f,-40f,60f,-60f,90f,-90f,120f,-120f,150f,-150f,180f};
+  foreach(float off in offsets)
+  {
+   float rad=baseAngle+off*MathF.PI/180f;
+   float x=origin.X+MathF.Cos(rad)*distance;
+   float y=origin.Y+MathF.Sin(rad)*distance;
+   if(!TryFindGround(x,y,origin.Z,out float z))continue;
+   float targetEye=tp.ViewOffset?.Z ?? 64f;
+   var chest=new Vector(x,y,z+targetEye*.8f);
+   var head=new Vector(x,y,z+targetEye);
+   try
+   {
+    var chestTrace=Trace.TraceEndShape(eye,chest,options:new TraceOptions{InteractsWith=Masks.SolidBrushOnly});
+    if(chestTrace.Fraction<.995f)continue;
+    var headTrace=Trace.TraceEndShape(eye,head,options:new TraceOptions{InteractsWith=Masks.SolidBrushOnly});
+    if(headTrace.Fraction<.995f)continue;
+    float yawToTarget=MathF.Atan2(y-origin.Y,x-origin.X)*180f/MathF.PI;
+    tp.Teleport(new Vector(x,y,z),new QAngle(0,yawToTarget+180f,0),new Vector(0,0,0));
+    try
+    {
+     uint flags=actor.Flags;
+     if(OperatingSystem.IsWindows())actor.Flags=flags|0x100u;
+     _setEyeAngles!.Invoke(ap.Handle,new QAngle(0,yawToTarget,0).Handle);
+     if(OperatingSystem.IsWindows() && actor.IsValid)actor.Flags=flags;
+    }
+    catch(Exception) { }
+    Server.PrintToConsole($"[PROBE] contact_range distance={distance:F0} offset={off:F0} target=({x:F1},{y:F1},{z:F1}) chest={chestTrace.Fraction:F3} head={headTrace.Fraction:F3}");
+    File.AppendAllText(Path.Combine(ModuleDirectory,"fixture-events.jsonl"),JsonSerializer.Serialize(new {kind="scene_placed",scene="contact_range",distance,
+      offset=off,tick=Server.TickCount,time=Server.CurrentTime,observer_slot=actor.Slot,target_slot=target.Slot,
+      target_x=x,target_y=y,target_z=z,chest_fraction=chestTrace.Fraction,head_fraction=headTrace.Fraction,
+      warmup=FixtureRules()?.WarmupPeriod,freeze=FixtureRules()?.FreezePeriod})+"\n");
+    return true;
+   }
+   catch(Exception) { }
+  }
+  return false;
+ }
  private HookResult OnFixtureLookPost(DynamicHook hook)
  {
   var pointer=hook.GetParam<nint>(0);
@@ -149,6 +206,26 @@ public sealed class HumanAimProbe:BasePlugin
     if(_api==null || !_api.Lock(actor.Slot,LockTarget.Slot1))throw new InvalidOperationException("Primary lock failed");
     _primaryLocks[actor.Slot]=actor.PlayerPawn.Raw;_api.SwitchBotWeapon(actor.Slot,7);
    }
+   if(action=="contact_range")
+   {
+    if(Server.MapName!="de_dust2")throw new InvalidOperationException("Range fixture requires de_dust2");
+    if(FixtureRules() is not {WarmupPeriod:false,FreezePeriod:false})
+    {Server.PrintToConsole("[PROBE] refused range contact: warmup/freeze/unknown phase");return;}
+    _api=new PluginCapability<IBotControllerApi>("botcontroller:api").Get();
+    var rangeActor=bots.First(b=>b.TeamNum==2);var rangeTarget=bots.First(b=>b.TeamNum==3);
+    if(!rangeActor.PawnIsAlive)rangeActor.Respawn();
+    if(!rangeTarget.PawnIsAlive)rangeTarget.Respawn();
+    float distance=c.ArgCount>2 && float.TryParse(c.GetArg(2),System.Globalization.NumberStyles.Float,System.Globalization.CultureInfo.InvariantCulture,out var requested)
+     ? Math.Clamp(requested,300f,900f) : 600f;
+    AddTimer(.4f,()=>{
+     if(!rangeActor.IsValid || !rangeTarget.IsValid)return;
+     if(rangeActor.PlayerPawn.Value is {} rap)rap.Health=12000;
+     if(rangeTarget.PlayerPawn.Value is {} rtp)rtp.Health=12000;
+     if(!TryPlaceRange(distance,rangeActor,rangeTarget))
+      Server.PrintToConsole($"[PROBE] contact_range {distance:F0} unavailable: no clear ground sightline in searched directions");
+    });
+   }
+
    if(action=="record_stop")StopMotionCapture();
    if(action=="record_start")
    {
