@@ -148,6 +148,9 @@ public partial class BotAimImprover
             if(HumanActive && e.Userid is {IsValid:true} soundShooter && soundShooter.TeamNum is 2 or 3
                 && soundShooter.PlayerPawn.Value is {} soundPawn && soundPawn.AbsOrigin is {} soundOrigin)
             {
+                string gunEventWeapon=e.Weapon ?? "";
+                bool suppressedWeapon=gunEventWeapon.Contains("silencer");
+                float gunRange=suppressedWeapon?1800f:(gunEventWeapon.Contains("awp")||gunEventWeapon.Contains("scar")||gunEventWeapon.Contains("g3sg1")?7000f:6000f);
                 foreach(var listener in Utilities.GetPlayers().Where(p=>p.IsValid && p.IsBot && p.PawnIsAlive && p.TeamNum!=soundShooter.TeamNum))
                 {
                     if(_humanStates.TryGetValue(listener.Slot,out var listenerState) && listenerState.LastSight)continue;
@@ -156,7 +159,7 @@ public partial class BotAimImprover
                     float dx=soundOrigin.X-listenerOrigin.X,dy=soundOrigin.Y-listenerOrigin.Y;
                     float dz=(soundOrigin.Z+(soundPawn.ViewOffset?.Z ?? 64f))-(listenerOrigin.Z+(listenerPawn.ViewOffset?.Z ?? 64f));
                     float distance=MathF.Sqrt(dx*dx+dy*dy);
-                    if(distance>2200f)continue;
+                    if(distance>gunRange)continue;
                     float yaw=MathF.Atan2(dy,dx)*180f/MathF.PI;
                     float pitch=-MathF.Atan2(dz,MathF.Max(1f,distance))*180f/MathF.PI;
                     float error=1f+HumanAimProfile.For(_humanDifficulty).PerceptionError*12f;
@@ -174,7 +177,7 @@ public partial class BotAimImprover
             var velocity=walkerPawn.AbsVelocity;
             float speed=velocity==null?0f:MathF.Sqrt(velocity.X*velocity.X+velocity.Y*velocity.Y);
             bool quiet=speed<170f;
-            float range=quiet?900f:1500f;
+            float range=quiet?850f:1800f;
             foreach(var listener in Utilities.GetPlayers().Where(p=>p.IsValid && p.IsBot && p.PawnIsAlive && p.TeamNum!=walker.TeamNum))
             {
                 if(_humanStates.TryGetValue(listener.Slot,out var listenerState) && listenerState.LastSight)continue;
