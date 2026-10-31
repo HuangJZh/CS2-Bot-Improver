@@ -10,7 +10,7 @@ namespace BotSupport;
 public sealed class BotSupport : BasePlugin
 {
     public override string ModuleName => "BotSupport";
-    public override string ModuleVersion => "1.0.5";
+    public override string ModuleVersion => "1.0.6";
     public override string ModuleAuthor => "HuangJZh fork";
     public override string ModuleDescription => "Wheel weapon requests and probabilistic post-shot stops";
     private readonly Dictionary<int, float> _requests = new();
@@ -127,13 +127,13 @@ public sealed class BotSupport : BasePlugin
                     .FirstOrDefault(p => p.IsValid && p.Slot==slot && p.PlayerPawn.Raw==queued.Raw);
                 if(player!=null) Request(player,request);
             });
-            Reply(caller,"已收到要枪请求，等队友买好自己的枪后给你发枪。");
+            Reply(caller,"已收到要枪请求，稍后为你处理。");
             return HookResult.Handled;
         }
         var controllers=Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller").ToArray();
         var bots=controllers.Where(b => b.IsValid && b.IsBot && b.PawnIsAlive && !b.ControllingBot && !b.HasBeenControlledByPlayerThisRound
             && b.TeamNum==caller.TeamNum && b.PlayerPawn.Value is { IsValid:true, InBuyZone:true } bp
-            && bp.Bot != null && !bp.Bot.IsAttacking && !bp.Bot.IsEnemyVisible && HasPrimary(b)
+            && bp.Bot != null && !bp.Bot.IsAttacking && !bp.Bot.IsEnemyVisible
             && b.InGameMoneyServices != null).ToArray();
         var teamBots=controllers.Count(b => b is { IsValid:true, IsBot:true } && b.TeamNum==caller.TeamNum);
         Logger.LogInformation("Weapon request slot={Slot}: teammate bots={TeamBots} eligible donors={Donors}",
@@ -142,7 +142,7 @@ public sealed class BotSupport : BasePlugin
         if(choice == null)
         {
             Logger.LogInformation("Weapon request failed: no donor can afford the requested weapon");
-            Reply(caller,"没有符合条件的队友：需要在附近购买区、有主武器，余额足够支付武器价格。可选 auto/awp/ak/m4a1/m4a4。");
+            Reply(caller,"没有符合条件的队友：需要在附近购买区、未交战，余额足够支付武器价格。可选 auto/awp/ak/m4a1/m4a4。");
             return HookResult.Handled;
         }
         _requests[caller.Slot]=Server.CurrentTime;
