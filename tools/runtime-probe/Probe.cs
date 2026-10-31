@@ -3,6 +3,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Capabilities;
 using CounterStrikeSharp.API.Modules.Utils;
 using BotControllerApi;
+using System.Text.Json;
 public sealed class HumanAimProbe:BasePlugin
 {
  private readonly List<(int Slot,long Token,string Kind)> _controls=new();
@@ -10,8 +11,29 @@ public sealed class HumanAimProbe:BasePlugin
  private int _budgetActor=-1,_budgetCount;
  private uint _budgetPawn;
  private long _budgetToken;
+ private int _recordSlot=-1;
+ private uint _recordPawn;
+ private float _recordUntil;
+ private readonly List<object> _recordClock=new();
+ private readonly HashSet<int> _primaryLocks=new();
+ private void StopMotionCapture()
+ {
+  if(_recordSlot<0 || _api==null)return;
+  int slot=_recordSlot;_recordSlot=-1;
+  _api.StopRecord(slot);
+  var (ticks,subs,commands)=_api.GetRecordedMotionExtended(slot);
+  var directory=Path.Combine(ModuleDirectory,"recordings");Directory.CreateDirectory(directory);
+  var path=Path.Combine(directory,$"motion-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.json");
+  File.WriteAllText(path,JsonSerializer.Serialize(new {schema="probe-native-motion-v1",slot,pawn=_recordPawn,
+   note="Recording only, no replay. Clock counts bracket native records; no exact subtick timestamp claim. Command Fields=0 may mean absent data.",
+   clocks=_recordClock,ticks,subs,commands},new JsonSerializerOptions{IncludeFields=true}));
+  _recordClock.Clear();Server.PrintToConsole($"[PROBE] native recording ticks={ticks.Length} commands={commands.Length} subs={subs.Length} path={path}");
+ }
  private void ReleaseControls()
  {
+  StopMotionCapture();_budgetToken=0;_budgetActor=-1;
+  foreach(int slot in _primaryLocks)_api?.Unlock(slot,LockKind.Weapon);
+  _primaryLocks.Clear();
   foreach(var c in _controls)try { if(c.Kind=="move")_api?.CancelUsercmdMovement(c.Slot,c.Token);else if(c.Kind=="suppress")_api?.CancelUsercmdSuppression(c.Slot,c.Token);else _api?.CancelUsercmdInjection(c.Slot,c.Token); }catch { }
   _controls.Clear();
  }
@@ -26,8 +48,16 @@ public sealed class HumanAimProbe:BasePlugin
   if(!args.Contains("-dedicated") || port<0 || port+1>=args.Length || args[port+1]!="27025"
      || ip<0 || ip+1>=args.Length || args[ip+1]!="127.0.0.1")return;
   RegisterListener<Listeners.OnMapEnd>(ReleaseControls);
+  RegisterListener<Listeners.OnTick>(()=>{
+   if(_recordSlot<0 || _api==null)return;
+   var player=Utilities.GetPlayerFromSlot(_recordSlot);
+   if(Server.CurrentTime>=_recordUntil || player is not {IsValid:true} || player.PlayerPawn.Raw!=_recordPawn){StopMotionCapture();return;}
+   _recordClock.Add(new {kind="tick_count_bracket",tick=Server.TickCount,time=Server.CurrentTime,count=_api.RecordedTickCount(_recordSlot)});
+  });
   RegisterEventHandler<EventWeaponFire>((e,i)=>{
    var player=e.Userid;
+   if(_recordSlot>=0 && player is {IsValid:true} && player.Slot==_recordSlot)
+    _recordClock.Add(new {kind="weapon_fire_bracket",tick=Server.TickCount,time=Server.CurrentTime,count=_api?.RecordedTickCount(_recordSlot),weapon=e.Weapon});
    if(_budgetToken>0 && player is {IsValid:true} && player.Slot==_budgetActor && player.PlayerPawn.Raw==_budgetPawn && e.Weapon.Replace("weapon_","")=="ak47")
    {
     if(++_budgetCount>=30)
@@ -46,6 +76,23 @@ public sealed class HumanAimProbe:BasePlugin
    if(p!=null)return;
    var bots=Utilities.GetPlayers().Where(b=>b.IsBot && b.TeamNum is 2 or 3 && b.PlayerPawn.Value is {IsValid:true}).ToArray();
    var action=c.ArgCount>1 ? c.GetArg(1) : "status";
+   if(action=="lock_primary")
+   {
+    _api=new PluginCapability<IBotControllerApi>("botcontroller:api").Get();
+    var actor=bots.First(b=>b.TeamNum==2 && b.PawnIsAlive);
+    actor.GiveNamedItem("weapon_ak47");
+    if(_api==null || !_api.Lock(actor.Slot,LockTarget.Slot1))throw new InvalidOperationException("Primary lock failed");
+    _primaryLocks.Add(actor.Slot);_api.SwitchBotWeapon(actor.Slot,7);
+   }
+   if(action=="record_stop")StopMotionCapture();
+   if(action=="record_start")
+   {
+    StopMotionCapture();_api=new PluginCapability<IBotControllerApi>("botcontroller:api").Get();
+    var actor=bots.First(b=>b.TeamNum==2 && b.PawnIsAlive);
+    if(_api==null || !_api.StartRecord(actor.Slot))throw new InvalidOperationException("Native recording not ready");
+    _recordSlot=actor.Slot;_recordPawn=actor.PlayerPawn.Raw;_recordUntil=Server.CurrentTime+10;
+    _recordClock.Clear();Server.PrintToConsole("[PROBE] recording native motion for10 simulation seconds; no replay started");
+   }
    if(action is "scenario" or "scenario_static")
    {
     var a=bots.First(b=>b.TeamNum==2);var b=bots.First(b=>b.TeamNum==3);

@@ -67,6 +67,18 @@ SourceTV文件可携带录制命令之前的缓冲事件：本次站姿demo含�
 
 本轮结束已停止进程27224，临时工具归档fixture-budget-archived。正常安装仍保持BotState stance.1及原BotSupport，DirectViewControl关闭。下一步需检验原生usercmd/射击后坐力时序，再接入带延迟和误差的压枪；完整目标不变。
 
+## 第五轮：原生命令与实际射击分离
+
+工具新增仅记录、不回放的原生运动采集。IBotControllerApi/Types及InputInjector/MotionRecorder参考固定bb19124版本。录制前后的tick-count时钟用于标明原生缓冲索引边界；不声称取得精确射击subtick。源码确认CaptureUserCommand发生在注入、抑制及移动覆盖之前，且缓冲每个physics边界至多保留最后一份pending command。因此命令Attack=0和模拟后的Attack=1可以同时成立，不能把命令中的0当作没有开火。
+
+有效记录motion-20261031-045658-048098440ac143a3a1081dceec21b4a2.json含640条对齐命令/状态、30次AK开火。按game_time与完整aim-native-command-20261031.dem中的30发一一匹配，最大时间差12.5ms；输入和前后模拟pitch全0，而射击事件pitch最大偏移约11.4度。该受控固定视角记录直接证明输入视角和射击方向不同；不是人类运动误差，也不是自然Bot压枪能力证明。
+
+新采集motion-20261031-045849-5b9ae184a24d4050aaf72a16ec614319.json含639条命令和30次AK开火，与运行JSONL的30次AK回调重叠。但进程10684后续已退出，原因未证实；对应SourceTV文件仅69024字节，解析报ClassMapperNotFoundFirstPass，不能用于完整三方同步。另两次无开火窗口和错误Glock尝试明确保留并排除。所有原始文件和哈希/状态清单在E:/csdemo/bot-captures/native-motion-20261031。
+
+新增audit_native_motion.py与compare_native_shots.py；7项检查通过，覆盖缺失视角字段、缓冲错位、subtick丢失、倒退时钟、测试注入与原命令不同、时间匹配歧义及不重叠窗口。测试工具编译0警告0错误。没有据此拟合或安装RCS。
+
+清理时无cs2.exe进程；HumanAimProbe已恢复性归档，用户human-aim.json保留，DirectViewControl缺省关闭；BotState/BotSupport二进制与测试前备份哈希一致。速度归零所有权候选仍仅在源码中。下一步建立后坐力基态/速度到射击时刻的可靠映射，或改用经验证的引擎读取接口，再实现带延迟、欠补偿和连射姿态协调的输出层。准备状态、可见性回放复核、三档样本校准和独立自然实战验收仍未完成。
+
 当前安装核对：Aim插件已更新为3-experimental的诊断构建，安装文件与当前编译产物哈希一致；原human-aim.json保留，DirectViewControl缺省false。BotState仍为安装的原始1.10.5（SHA256 7717E2F42E1C65BBEC61E4A0FE891E70AEAE9F886F7540D019A31FF03A99A199），新的姿态策略未安装。所有临时测试服务器已停止，测试插件已恢复性归档在证据目录。
 
 ## 第三轮：姿态执行验证
