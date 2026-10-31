@@ -63,3 +63,9 @@ python tools/make_contact_review_queue.py E:/csdemo/evidence/matches --candidate
 Standing/crouched/transition descriptions are not causal comparisons unless weapon, movement and recoil stage are controlled. The first recoil fixture allowed native crouching; that run is deliberately not used to fit a recoil estimator. A later paired stance protocol must suppress jump/movement and control Duck separately, while final gameplay retains appropriate crouch/spray coordination.
 
 Installed original BotState 1.10.5 has two conflicting mechanisms: per-shot random crouch decisions and weapon-dependent mandatory speed changes after fire. Its installed hash matches the preserved original backup, and installed IL method references were inspected. A burst-stable posture policy is now source-built and tested but NOT installed. Forced velocity remains unchanged in that candidate and requires a separate ownership fix; don't assume BotSupport75/85/95% is currently the only stopping mechanism.
+
+## Stance actuator validation
+
+`audit_burst_posture.py` reads actual firing spans and reports intent switches; it is not a probability/skill verifier. BotState1.10.5-stance.1 was run in a loopback fixture with movement/jump controlled but observer Duck left native. Two standing and one crouching30-shot AK spans had zero intra-span intent switches; crouch released after the pause. The wrong-weapon TEC9 attempt was excluded. Manual refills were used, so these runs are not fresh-weapon recoil controls. Evidence and hashes: E:/csdemo/bot-captures/stance-20261031/stance-validation.json .
+
+Final gameplay retains crouch/spray coordination. `stabilize_stand` and `stabilize_crouch` are fixture-only controls for a subsequent paired physical experiment, not final stance policy. The original mandatory velocity changes remain in the stance build and still conflict with BotSupport probability; ownership must be fixed separately.

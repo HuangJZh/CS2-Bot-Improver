@@ -5,6 +5,14 @@ using CounterStrikeSharp.API.Modules.Utils;
 using BotControllerApi;
 public sealed class HumanAimProbe:BasePlugin
 {
+ private readonly List<(int Slot,long Token,string Kind)> _controls=new();
+ private IBotControllerApi? _api;
+ private void ReleaseControls()
+ {
+  foreach(var c in _controls)try { if(c.Kind=="move")_api?.CancelUsercmdMovement(c.Slot,c.Token);else if(c.Kind=="suppress")_api?.CancelUsercmdSuppression(c.Slot,c.Token);else _api?.CancelUsercmdInjection(c.Slot,c.Token); }catch { }
+  _controls.Clear();
+ }
+ public override void Unload(bool hotReload)=>ReleaseControls();
  public override string ModuleName=>"HumanAimProbe";
  public override string ModuleVersion=>"2-capture-fixture";
  public override void Load(bool hotReload)
@@ -55,6 +63,33 @@ public sealed class HumanAimProbe:BasePlugin
      }
     },CounterStrikeSharp.API.Modules.Timers.TimerFlags.REPEAT);
     Server.PrintToConsole("[PROBE] forced perception handles for adapter test only");
+   }
+   if(action is "stabilize_native_stance" or "stabilize_stand" or "stabilize_crouch")
+   {
+    ReleaseControls();_api=new PluginCapability<IBotControllerApi>("botcontroller:api").Get();
+    if(_api==null)throw new InvalidOperationException("Fixture requires BotController");
+    var actor=bots.First(b=>b.TeamNum==2);
+    foreach(var b in bots.Where(b=>b.PawnIsAlive))
+    {
+     _controls.Add((b.Slot,_api.StartUsercmdMovement(b.Slot,0,0),"move"));
+     ulong mask=(ulong)PlayerButtons.Jump;
+     if(b.Slot!=actor.Slot || action=="stabilize_stand")mask|=(ulong)PlayerButtons.Duck;
+     if(b.Slot!=actor.Slot)mask|=(ulong)PlayerButtons.Attack;
+     _controls.Add((b.Slot,_api.StartUsercmdSuppression(b.Slot,mask),"suppress"));
+     if(b.Slot==actor.Slot && action=="stabilize_crouch")_controls.Add((b.Slot,_api.InjectUsercmd(b.Slot,(ulong)PlayerButtons.Duck,15000),"inject"));
+    }
+    if(_controls.Any(c=>c.Token<=0))throw new InvalidOperationException("Fixture control failed");
+    Server.PrintToConsole("[PROBE] input condition="+action+"; scripted movement suppression, not gameplay policy");
+   }
+   if(action=="refill")
+   {
+    foreach(var b in bots.Where(b=>b.PawnIsAlive))
+    {
+     var pawn=b.PlayerPawn.Value!;var gun=pawn.WeaponServices?.ActiveWeapon.Value?.As<CCSWeaponBase>();
+     if(gun!=null){gun.Clip1=30;pawn.ShotsFired=0;Utilities.SetStateChanged(gun,"CBasePlayerWeapon","m_iClip1");}
+     pawn.Health=12000;
+    }
+    Server.PrintToConsole("[PROBE] scripted refill; never treat as natural reload evidence");
    }
    if(action is "drive_look" or "drive_spot" or "drive_goal")
    {
