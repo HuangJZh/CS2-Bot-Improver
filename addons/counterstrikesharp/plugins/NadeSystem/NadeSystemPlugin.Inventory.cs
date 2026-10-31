@@ -50,16 +50,26 @@ public partial class NadeSystemPlugin
     // Grenades persist in the actual inventory across rounds and on death/drop.
     private void BuyRoundGrenades()
     {
-        if(_botNadesMode == "off") return;
         var rules=Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault()?.GameRules;
-        if(rules == null || rules.WarmupPeriod || rules.BuyTimeEnded) return;
+        if(_botNadesMode == "off")
+        {
+            Logger.LogInformation("[NadeSystem] buy pass skipped mode=off");
+            return;
+        }
+        if(rules == null || rules.WarmupPeriod || rules.BuyTimeEnded)
+        {
+            Logger.LogInformation("[NadeSystem] buy pass blocked rules={Rules} warmup={Warmup} buyTimeEnded={Ended} mode={Mode} sinceRound={Since:0.1}",
+                rules != null, rules?.WarmupPeriod == true, rules?.BuyTimeEnded == true, _botNadesMode, Server.CurrentTime-_roundStartTime);
+            return;
+        }
         int limit=Math.Clamp(ConVar.Find("ammo_grenade_limit_total")?.GetPrimitiveValue<int>() ?? 4,0,4);
-        int eligible=0,bought=0;
+        int bots=0,eligible=0,bought=0,noMoney=0,already=0;
         foreach(var bot in Utilities.GetPlayers())
         {
             if(bot is not { IsValid:true, IsBot:true, PawnIsAlive:true } || bot.HasBeenControlledByPlayerThisRound
                 || bot.TeamNum is not (2 or 3) || bot.PlayerPawn.Value is not { IsValid:true } pawn
                 || pawn.WeaponServices == null || bot.InGameMoneyServices == null) continue;
+            bots++;
             var money=bot.InGameMoneyServices;
             bool isCT=bot.TeamNum==3;
             int budget=GetRoundSpendCap(isCT,money.Account < 2800);
@@ -76,9 +86,9 @@ public partial class NadeSystemPlugin
             {
                 if(total >= limit) break;
                 eligible++;
-                if(FindInventoryGrenade(bot,type) != null) continue;
+                if(FindInventoryGrenade(bot,type) != null) { already++; continue; }
                 int cost=(isCT ? CostCT : CostT)[type];
-                if(money.Account < cost || budget < cost) continue;
+                if(money.Account < cost || budget < cost) { noMoney++; continue; }
                 int before=money.Account;
                 money.Account-=cost;
                 try
@@ -90,6 +100,7 @@ public partial class NadeSystemPlugin
                 {
                     money.Account=before;
                     Server.PrintToConsole($"[NadeSystem] Purchase failed: {error.Message}");
+                    Logger.LogWarning("[NadeSystem] Purchase failed for {Bot} {Type}: {Error}", bot.PlayerName, type, error.Message);
                     continue;
                 }
                 budget-=cost;
@@ -99,6 +110,6 @@ public partial class NadeSystemPlugin
                 Logger.LogInformation("[NadeSystem] Purchased {Type} for {Bot}, cost={Cost}", type, bot.PlayerName, cost);
             }
         }
-        if(bought>0 || eligible>0) Logger.LogInformation("[NadeSystem] Buy pass freezetime={Freeze} buyTimeEnded={Ended} eligible={Eligible} bought={Bought} mode={Mode}",rules.FreezePeriod,rules.BuyTimeEnded,eligible,bought,_botNadesMode);
-    }
-}
+        Logger.LogInformation("[NadeSystem] Buy pass mode={Mode} sinceRound={Since:0.1} bots={Bots} eligible={Eligible} already={Already} noMoney={NoMoney} bought={Bought}",
+            _botNadesMode, Server.CurrentTime-_roundStartTime, bots, eligible, already, noMoney, bought);
+    }}

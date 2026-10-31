@@ -479,3 +479,12 @@ A局未采样比例从8.5同口径的30.8%降到3.9%；扇形回退在这两局�
 边界：`is_walking/ducking`是demo字段；无接触/同行/控图均为距离代理，不是真实可见性；只用了3张图；职业“控图”前20秒实测几乎不静步（跑图占位），所以“控图静步摸排”被压到很低概率。下一步：更多图/分段、按经济/回合阶段分层，并做“静步接近→到位→突然冲刺”的状态机。
 
 安装：BotAimImprover `2.1.8-human.8.21-experimental`（哈希`E84A1B4F…`）；gameinfo已恢复（3B18F0CA…），无CS2进程。证据：E:/csdemo/analysis/silent-calibration.json、silent-calibration-output.txt，E:/csdemo/bot-captures/model-round33-20261101（20秒验证采集）。
+### 2026-11-01 再次修复：购买看门狗独立于事件 + 无条件诊断
+
+用户重启后仍无购买，且日志里没有任何`Buy pass`（上一版只在`eligible/bought>0`时打印，无法区分“没调用”与“全被条件跳过”）。进一步修改：
+
+- 购买看门狗改为每0.5秒检查`rules.TotalRoundsPlayed`，自行检测回合变化并重置购买窗口，不再依赖`EventRoundStart/FreezeEnd`是否触发；
+- `BuyRoundGrenades`每次调用**无条件**打印`Buy pass mode/sinceRound/bots/eligible/already/noMoney/bought`；被mode/规则挡住时打印`buy pass blocked/skipped`及`warmup/buyTimeEnded`；购买失败也写Logger；
+- 去掉了`InBuyZone`限制（上一版已做），保留购买窗口`BuyTimeEnded=false`和严格持有语义。
+
+专用服验证：`Buy pass mode=normal sinceRound=51 bots=10 eligible=33 already=20 noMoney=0 bought=13`，随后因Bot已满/已有道具`eligible=0`，购买正常。安装哈希`49A0622D…`；用户下次重启游戏后日志会直接显示购买是否被条件挡住，若仍无购买可据此定位。

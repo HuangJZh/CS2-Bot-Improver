@@ -247,21 +247,32 @@ public partial class NadeSystemPlugin : BasePlugin
             if (_tick % 256 == 0) PruneCooldowns();
             return;
         }
-        // Purchase watchdog: if freeze-end handling differs on a listen/local server,
-        // keep retrying inside the buy window (still strict: no free grants later).
-        float nowTick=Server.CurrentTime;
-        float sinceBuyWindow=_freezeEndTime>0f ? nowTick-_freezeEndTime : nowTick-_roundStartTime;
-        bool inBuyWindow=_freezeEndTime>0f ? (sinceBuyWindow>0f && sinceBuyWindow<14f) : (sinceBuyWindow>=3f && sinceBuyWindow<14f);
-        if(!_roundOver && inBuyWindow && nowTick-_lastBuyAttempt>=1.2f)
+        // Purchase watchdog: every ~0.5 s, independent of FreezeEnd event delivery,
+        // retry buying inside the legal buy window. Round changes are detected from
+        // rules.TotalRoundsPlayed so this also works on local listen servers.
+        if(_tick % 32 == 0)
         {
             var buyRules=Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault()?.GameRules;
-            if(buyRules is {WarmupPeriod:false,BuyTimeEnded:false})
+            if(buyRules!=null && !buyRules.WarmupPeriod)
             {
-                _lastBuyAttempt=nowTick;
-                BuyRoundGrenades();
+                int round=buyRules.TotalRoundsPlayed;
+                if(_lastKnownRound!=round)
+                {
+                    _lastKnownRound=round;
+                    _roundStartTime=Server.CurrentTime;
+                    _freezeEndTime=0f;
+                    _lastBuyAttempt=0f;
+                }
+                float nowTick2=Server.CurrentTime;
+                float since=_freezeEndTime>0f ? nowTick2-_freezeEndTime : nowTick2-_roundStartTime;
+                bool inBuyWindow=_freezeEndTime>0f ? (since>0f && since<14f) : (since>=3f && since<14f);
+                if(!_roundOver && !buyRules.BuyTimeEnded && inBuyWindow && nowTick2-_lastBuyAttempt>=1.2f)
+                {
+                    _lastBuyAttempt=nowTick2;
+                    BuyRoundGrenades();
+                }
             }
-        }
-        if (_tick % 4   == 0) CheckBotZones();
+        }        if (_tick % 4   == 0) CheckBotZones();
         if (_tick % 256 == 0) PruneCooldowns();
     }
 }
