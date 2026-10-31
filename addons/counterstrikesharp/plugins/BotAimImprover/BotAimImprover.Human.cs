@@ -31,6 +31,7 @@ public partial class BotAimImprover
         public bool LastSight;
         public AimOutput Output;
         public VisualEstimate? LastVisualEstimate;
+        public float UnderFireUntil;
     }
     private HumanSettings _humanSettings=new();
     private readonly Dictionary<int,HumanState> _humanStates=new();
@@ -74,6 +75,12 @@ public partial class BotAimImprover
             }
         });
         RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p)ReleaseHuman(p.Slot);return HookResult.Continue; });
+        RegisterEventHandler<EventPlayerHurt>((e,i) => {
+            if(e.Userid is {IsValid:true,IsBot:true} victim && e.Attacker is {IsValid:true} attacker && attacker.TeamNum!=victim.TeamNum
+                && _humanStates.TryGetValue(victim.Slot,out var state) && state.Pawn==victim.PlayerPawn.Raw)
+                state.UnderFireUntil=Server.CurrentTime+.6f;
+            return HookResult.Continue;
+        });
         RegisterEventHandler<EventPlayerDisconnect>((e,i) => { if(e.Userid is {} p)ReleaseHuman(p.Slot);return HookResult.Continue; });
         AddCommand("bot_human_aim","Human aim: status/on/off/reload",(caller,c) =>
         {
@@ -179,7 +186,8 @@ public partial class BotAimImprover
                         ReleaseHuman(controller.Slot);
                         state=new HumanState{Pointer=pointer,Pawn=controller.PlayerPawn.Raw,Enemy=enemy.EntityHandle.Raw,
                             Model=new(HumanAimProfile.For(_humanDifficulty),new(pawn.EyeAngles.X,pawn.EyeAngles.Y),now,Random.Shared.Next()),
-                            LastUsed=now,LastSight=true,NextSensorCheck=now+HumanAimProfile.For(_humanDifficulty).SampleInterval};
+                            LastUsed=now,LastSight=true,NextSensorCheck=now+HumanAimProfile.For(_humanDifficulty).SampleInterval,
+                            UnderFireUntil=state.UnderFireUntil};
                         _humanStates[controller.Slot]=state;
                     }
                     // The sample, not the live entity, enters the model's delay queue.
@@ -190,10 +198,12 @@ public partial class BotAimImprover
             if((!visible && !state.Model.HasObservation) || (!visible && now-state.Model.LastVisible>.35f))
             {
                 _modelSpots.Remove(pointer);
+                state.Output=state.Model.Step(now,eyeVec,false);
                 GateHumanFire(controller.Slot,state,false);
                 return HookResult.Continue;
             }
-            state.Output=state.Model.Step(now,eyeVec,visible);
+            var fireContext=new HumanFireContext(HumanFireContext.Classify(pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName),now<state.UnderFireUntil);
+            state.Output=state.Model.Step(now,eyeVec,visible,fireContext);
             _humanPhases[state.Output.Phase]=_humanPhases.GetValueOrDefault(state.Output.Phase)+1;
             var spot=AimMath.Ray(eyeVec,state.Output.Angles);
             _modelSpots[pointer]=spot;

@@ -103,4 +103,57 @@ foreach(var level in new[]{"Low","Medium","High"})
  result=observed.Step(observed.LastVisible+.4f,eye,false);
  Check(!result.AllowFire && result.Phase=="memory-expired",level+" uncertain localization does not extend hidden target memory");
 }
+FireDecision FireAt(float error,float radius,AimWeaponClass weapon,bool underFire=false,float uncertainty=0,bool visible=true)
+ =>HumanFireDecision.Evaluate(new(0,error),Vector2.Zero,radius,uncertainty,visible,.05f,false,new(weapon,underFire));
+Check(FireAt(.4f,.5f,AimWeaponClass.Rifle).Allow && !FireAt(.4f,.5f,AimWeaponClass.Sniper).Allow,
+ "sniper requests tighter expected alignment than rifle");
+Check(FireAt(.3f,1,AimWeaponClass.Rifle).Allow && !FireAt(.3f,.1f,AimWeaponClass.Rifle).Allow,
+ "angular target size changes fire acceptance independently of flick progress");
+Check(!FireAt(.6f,.5f,AimWeaponClass.Rifle).Allow && FireAt(.6f,.5f,AimWeaponClass.Rifle,true).Allow,
+ "recent incoming damage can trade precision for urgency");
+Check(!FireAt(0,.5f,AimWeaponClass.Rifle,true,0,false).Allow,"urgency cannot bypass lost visibility");
+Check(FireAt(.4f,.5f,AimWeaponClass.Rifle).Allow && !FireAt(.4f,.5f,AimWeaponClass.Rifle,false,.3f).Allow,
+ "uncertain localization requires a more central intended shot");
+Check(!HumanFireDecision.Evaluate(Vector2.Zero,Vector2.Zero,.5f,0,true,.21f,false,default).Allow,
+ "aligned but stale target cannot authorize fire");
+Check(!HumanFireDecision.Evaluate(Vector2.Zero,Vector2.Zero,.5f,0,true,.05f,true,default).Allow,
+ "pending corrective movement is not mistaken for readiness");
+Check(HumanFireContext.Classify("weapon_awp")==AimWeaponClass.Sniper && HumanFireContext.Classify("weapon_deagle")==AimWeaponClass.PrecisePistol
+ && HumanFireContext.Classify("weapon_m4a1_silencer")==AimWeaponClass.Rifle,"weapon adapter distinguishes precise and automatic weapons");
+(float Time,AimOutput Output) FirstFire(HumanAimProfile profile,Vector3 point,AimWeaponClass weapon,int seed=45)
+{
+ var model=new HumanAimModel(profile,Vector2.Zero,0,seed);
+ for(int i=0;i<192;i++)
+ {
+  float now=i/128f;model.Observe(now,point);
+  var output=model.Step(now,eye,true,new(weapon));
+  if(output.AllowFire)return(now,output);
+ }
+ throw new Exception("no first fire in controlled stationary case");
+}
+var rifleFirst=FirstFire(profileHigh,target,AimWeaponClass.Rifle);
+var sniperFirst=FirstFire(profileHigh,target,AimWeaponClass.Sniper);
+Check(sniperFirst.Time>=rifleFirst.Time,"weapon precision requirement changes gate without speeding up motor movement");
+var preparedFirst=FirstFire(profileHigh,new(1000,.1f,0),AimWeaponClass.Rifle);
+Check(preparedFirst.Time<rifleFirst.Time,"already aligned contact need not wait for a fixed fraction of a flick");
+bool imperfectFire=false;
+for(int seed=0;seed<32;seed++)
+{
+ var first=FirstFire(profileHigh with{MotorError=3},target,AimWeaponClass.Rifle,seed);
+ if(AimMath.Delta(first.Output.Angles,AimMath.Angles(eye,target)).Length()>1)imperfectFire=true;
+}
+Check(imperfectFire,"intended alignment does not secretly reject every motor-error miss");
+var delayedSizeA=new HumanAimModel(profileHigh,Vector2.Zero,0,25);
+var delayedSizeB=new HumanAimModel(profileHigh,Vector2.Zero,0,25);
+for(int i=0;i<=25;i++)
+{
+ float now=i/128f;delayedSizeA.Observe(now,target,4);delayedSizeB.Observe(now,target,4);
+ delayedSizeA.Step(now,eye,true);delayedSizeB.Step(now,eye,true);
+}
+delayedSizeA.Observe(.25f,target,100);delayedSizeB.Observe(.25f,target,4);
+delayedSizeA.Step(.294f,eye,true);delayedSizeB.Step(.294f,eye,true);
+Check(delayedSizeA.LastFireDecision==delayedSizeB.LastFireDecision,"future target-size metadata cannot bypass sensory delay");
+delayedSizeA.Step(.30f,eye,true);delayedSizeB.Step(.30f,eye,true);
+Check(delayedSizeA.LastFireDecision.ToleranceDegrees>delayedSizeB.LastFireDecision.ToleranceDegrees,
+ "target-size metadata becomes available with its delayed position sample");
 Console.WriteLine($"{count} checks passed");

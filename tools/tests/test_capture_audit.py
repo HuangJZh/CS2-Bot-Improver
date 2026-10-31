@@ -17,4 +17,19 @@ class CaptureAudit(unittest.TestCase):
  def test_missing_schema_rejected(self):
   with tempfile.TemporaryDirectory() as d:
    with self.assertRaises(ValueError):audit(self.write(d,[{'kind':'session'}]))
+ def test_no_shots_does_not_pass_gating(self):
+  with tempfile.TemporaryDirectory() as d:
+   result=audit(self.write(d,[{'schema':'bot-aim-telemetry-v1'}]))
+   self.assertEqual(result['fire_gate']['status'],'no-classified-gun-fire')
+ def test_blocked_callback_reported(self):
+  with tempfile.TemporaryDirectory() as d:
+   result=audit(self.write(d,[{'schema':'bot-aim-telemetry-v1'},
+    {'kind':'weapon_fire_callback','event_weapon':'weapon_ak47','allow_fire':False,'model_fire_suppression_owned':True}]))
+   self.assertEqual(result['fire_gate']['status'],'blocked-state-fire-callbacks')
+   self.assertEqual(result['fire_gate']['blocked_and_suppression_owned'],1)
+ def test_unknown_gate_state_not_accepted(self):
+  with tempfile.TemporaryDirectory() as d:
+   result=audit(self.write(d,[{'schema':'bot-aim-telemetry-v1'},
+    {'kind':'weapon_fire_callback','event_weapon':'weapon_ak47'}]))
+   self.assertEqual(result['fire_gate']['status'],'insufficient-gate-state')
 if __name__=='__main__':unittest.main()

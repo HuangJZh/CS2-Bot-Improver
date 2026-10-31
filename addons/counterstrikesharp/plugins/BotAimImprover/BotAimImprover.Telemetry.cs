@@ -81,6 +81,10 @@ public partial class BotAimImprover
             visual_uncertainty_degrees=state?.LastVisualEstimate?.UncertaintyDegrees,
             visual_eccentricity_degrees=state?.LastVisualEstimate?.EccentricityDegrees,
             visual_angular_radius_degrees=state?.LastVisualEstimate?.AngularRadiusDegrees,
+            fire_reason=state?.Model.LastFireDecision.Reason,
+            fire_expected_error_degrees=state?.Model.LastFireDecision.ExpectedErrorDegrees,
+            fire_tolerance_degrees=state?.Model.LastFireDecision.ToleranceDegrees,
+            under_fire=state!=null && Server.CurrentTime<state.UnderFireUntil,
             model_fire_suppression_owned=state?.Suppression>0,event_weapon=eventWeapon,other_pawn=otherPawn,damage});
     }
     private void WriteTelemetry<T>(T row)

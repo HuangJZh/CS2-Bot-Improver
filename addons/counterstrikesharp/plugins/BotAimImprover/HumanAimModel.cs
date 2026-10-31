@@ -13,7 +13,7 @@ public sealed record HumanAimProfile(float Reaction, float SensorDelay, float Sa
         _ => new(.170f,.065f,.035f,.125f,.16f,.011f,.070f,650,.80f)
     };
 }
-public readonly record struct AimObservation(float Time, Vector3 Position);
+public readonly record struct AimObservation(float Time, Vector3 Position,float Radius=8,float Uncertainty=0);
 public readonly record struct AimOutput(Vector2 Angles, bool AllowFire, string Phase, float ObservationAge);
 
 public static class AimMath
@@ -48,14 +48,15 @@ public sealed class HumanAimModel
     private readonly Queue<AimObservation> _pending=new();
     private AimObservation? _latest,_previous;
     private float _nextSample=float.NegativeInfinity,_lastVisible=float.NegativeInfinity;
-    private float _lastStep,_start,_ready,_duration,_nextBias,_nextCorrection;
+    private float _lastStep,_start,_duration,_nextBias,_nextCorrection;
     private bool _planned,_correcting;
-    private Vector2 _view,_startView,_endView,_bias;
+    private Vector2 _view,_startView,_endView,_bias,_intendedView,_intendedEndView;
     private Vector3 _velocity;
     public float LastVisible => _lastVisible;
     public bool HasObservation => _latest.HasValue || _pending.Count>0;
+    public FireDecision LastFireDecision {get;private set;}=new(false,"no-observation",null,null);
     public HumanAimModel(HumanAimProfile profile,Vector2 initial,float now,int seed)
-    { Profile=profile;_view=initial;_lastStep=now;_random=new(seed);_visual=new(profile.PerceptionError,seed^0x5143A9); }
+    { Profile=profile;_view=_intendedView=initial;_lastStep=now;_random=new(seed);_visual=new(profile.PerceptionError,seed^0x5143A9); }
     private float Symmetric() => (float)(_random.NextDouble()+_random.NextDouble()-1);
     private Vector2 Noise(float magnitude) => new(Symmetric()*magnitude,Symmetric()*magnitude);
     public bool NeedsObservation(float now) => now>=_nextSample;
@@ -63,17 +64,17 @@ public sealed class HumanAimModel
     {
         if(!NeedsObservation(now))return null;
         var estimate=_visual.Estimate(now,eye,visiblePoint,actualView,radius);
-        Observe(now,estimate.Position);
+        Observe(now,estimate.Position,radius,estimate.UncertaintyDegrees);
         return estimate;
     }
-    public void Observe(float now,Vector3 point)
+    public void Observe(float now,Vector3 point,float radius=8,float uncertainty=0)
     {
-        if(now<_nextSample || !float.IsFinite(point.X+point.Y+point.Z))return;
+        if(now<_nextSample || !float.IsFinite(now+point.X+point.Y+point.Z+radius+uncertainty) || radius<=0 || uncertainty<0)return;
         _nextSample=now+Profile.SampleInterval;_lastVisible=now;
-        _pending.Enqueue(new(now,point));
+        _pending.Enqueue(new(now,point,radius,uncertainty));
         while(_pending.Count>32)_pending.Dequeue();
     }
-    public AimOutput Step(float now,Vector3 eye,bool visible)
+    public AimOutput Step(float now,Vector3 eye,bool visible,HumanFireContext context=default)
     {
         float dt=Math.Clamp(now-_lastStep,0,.05f);_lastStep=now;
         while(_pending.TryPeek(out var obs) && obs.Time<=now-Profile.SensorDelay)
@@ -87,11 +88,12 @@ public sealed class HumanAimModel
                 _velocity=Vector3.Lerp(_velocity,estimate,.65f);
             }
         }
-        if(_latest is not {} latest)return new(_view,false,"perception",float.PositiveInfinity);
+        if(_latest is not {} latest){LastFireDecision=new(false,"no-observation",null,null);return new(_view,false,"perception",float.PositiveInfinity);}
         float age=now-latest.Time;
-        if(!visible && now-_lastVisible>.20f)return new(_view,false,"memory-expired",age);
+        if(!visible && now-_lastVisible>.20f){LastFireDecision=new(false,"memory-expired",null,null);return new(_view,false,"memory-expired",age);}
         var predicted=latest.Position+_velocity*Math.Clamp(age,0,.14f)*Profile.Prediction;
         var desired=AimMath.Angles(eye,predicted);
+        float angularRadius=MathF.Max(.015f,MathF.Atan2(latest.Radius,MathF.Max(1,Vector3.Distance(eye,latest.Position)))*180/MathF.PI);
         if(!_planned)
         {
             _planned=true;_start=latest.Time+Profile.Reaction*(1+Symmetric()*.12f);
@@ -102,17 +104,24 @@ public sealed class HumanAimModel
             // Endpoint error persists for this movement instead of per-frame random jitter.
             _bias=Noise(Profile.MotorError+amplitude*Profile.AmplitudeError);
             _endView=AimMath.Normalize(desired+_bias);
-            _ready=_start+_duration*.88f;_nextBias=_start+_duration+.25f;
+            _intendedEndView=desired;
+            _nextBias=_start+_duration+.25f;
         }
-        if(now<_start)return new(_view,false,"reaction",age);
+        if(now<_start){LastFireDecision=new(false,"reaction",null,null);return new(_view,false,"reaction",age);}
         if(now<_start+_duration)
         {
             // Early smooth regulation uses delayed observations; it never snaps to the live target.
             if(now-_start>.08f)
+            {
                 _endView=AimMath.Advance(_endView,AimMath.Normalize(desired+_bias),dt,.18f,60);
+                _intendedEndView=AimMath.Advance(_intendedEndView,desired,dt,.18f,60);
+            }
             var planned=_startView+AimMath.Delta(_endView,_startView)*AimMath.Ease((now-_start)/_duration);
+            var intended=_startView+AimMath.Delta(_intendedEndView,_startView)*AimMath.Ease((now-_start)/_duration);
             _view=AimMath.Advance(_view,planned,dt,.012f,Profile.MaxSpeed);
-            return new(_view,visible && age<.20f && now>=_ready,"flick",age);
+            _intendedView=AimMath.Advance(_intendedView,intended,dt,.012f,Profile.MaxSpeed);
+            LastFireDecision=HumanFireDecision.Evaluate(_intendedView,desired,angularRadius,latest.Uncertainty,visible,age,false,context);
+            return new(_view,LastFireDecision.Allow,"flick",age);
         }
         if(now>=_nextBias)
         {
@@ -124,11 +133,13 @@ public sealed class HumanAimModel
         // Large missed flicks receive a delayed second movement, not an automatic pause on every shot.
         if(!_correcting && error>2.5f) { _correcting=true;_nextCorrection=now+Profile.SensorDelay; }
         bool waiting=_correcting && now<_nextCorrection;
-        if(!waiting)_view=AimMath.Advance(_view,target,dt,Profile.TrackingTime,Profile.MaxSpeed);
+        if(!waiting)
+        {
+            _view=AimMath.Advance(_view,target,dt,Profile.TrackingTime,Profile.MaxSpeed);
+            _intendedView=AimMath.Advance(_intendedView,desired,dt,Profile.TrackingTime,Profile.MaxSpeed);
+        }
         if(error<1)_correcting=false;
-        bool allow=visible && age<.20f && now>=_ready && (!waiting || error<8);
-        // Hidden information expires; hold view after a short memory window.
-        if(!visible && now-_lastVisible>.20f)allow=false;
-        return new(_view,allow,waiting ? "correction" : "tracking",age);
+        LastFireDecision=HumanFireDecision.Evaluate(_intendedView,desired,angularRadius,latest.Uncertainty,visible,age,waiting,context);
+        return new(_view,LastFireDecision.Allow,waiting ? "correction" : "tracking",age);
     }
 }
