@@ -51,9 +51,18 @@ public sealed class HumanAimModel
     private float _lastStep,_start,_duration,_nextBias,_nextCorrection;
     private bool _planned,_correcting;
     private Vector2 _view,_startView,_endView,_bias,_intendedView,_intendedEndView;
+    private Vector2 _lastDesired,_desiredRate;
+    private bool _hasDesired;
     private Vector3 _velocity;
     public float LastVisible => _lastVisible;
     public bool HasObservation => _latest.HasValue || _pending.Count>0;
+    // Contact geometry of the current plan: how far the crosshair had to travel to
+    // the first believed target direction. Small gaps model a pre-aimed/holding
+    // contact, large gaps an unexpected contact with a startle penalty.
+    public float ContactGapDegrees {get;private set;}=float.NaN;
+    public string ContactKind {get;private set; }="none";
+    public float PlanStartedAt => _start;
+    public float PlanDuration => _duration;
     public FireDecision LastFireDecision {get;private set;}=new(false,"no-observation",null,null);
     public HumanAimModel(HumanAimProfile profile,Vector2 initial,float now,int seed)
     { Profile=profile;_view=_intendedView=initial;_lastStep=now;_random=new(seed);_visual=new(profile.PerceptionError,seed^0x5143A9); }
@@ -91,15 +100,43 @@ public sealed class HumanAimModel
         if(_latest is not {} latest){LastFireDecision=new(false,"no-observation",null,null);return new(_view,false,"perception",float.PositiveInfinity);}
         float age=now-latest.Time;
         if(!visible && now-_lastVisible>.20f){LastFireDecision=new(false,"memory-expired",null,null);return new(_view,false,"memory-expired",age);}
-        var predicted=latest.Position+_velocity*Math.Clamp(age,0,.14f)*Profile.Prediction;
+        // Aim at the believed future position: delayed observation age plus an
+        // approximate projectile flight time. Humans learn to lead moving targets;
+        // without this the planned view systematically lags the target.
+        float targetDistance=Vector3.Distance(eye,latest.Position);
+        float flightTime=Math.Clamp(targetDistance/MathF.Max(1,context.BulletSpeed),0,.35f);
+        float leadSeconds=Math.Clamp(age+flightTime,0,.45f);
+        var predicted=latest.Position+_velocity*leadSeconds*Profile.Prediction;
         var desired=AimMath.Angles(eye,predicted);
-        float angularRadius=MathF.Max(.015f,MathF.Atan2(latest.Radius,MathF.Max(1,Vector3.Distance(eye,latest.Position)))*180/MathF.PI);
+        // Track how fast the desired bearing itself is moving. A motor controller
+        // without this term lags a constant-rate target by roughly rate*TrackingTime,
+        // which would make moving targets effectively un-fireable at range.
+        Vector2 desiredRate=Vector2.Zero;
+        if(_hasDesired && dt>0)
+        {
+            var rawRate=AimMath.Delta(desired,_lastDesired)/dt;
+            if(float.IsFinite(rawRate.X+rawRate.Y))
+                desiredRate=new(Math.Clamp(rawRate.X,-400,400),Math.Clamp(rawRate.Y,-400,400));
+        }
+        _desiredRate=Vector2.Lerp(_desiredRate,desiredRate,.35f);
+        _lastDesired=desired;_hasDesired=true;
+        var controlTarget=AimMath.Normalize(desired+_desiredRate*Profile.TrackingTime);
+        float angularRadius=MathF.Max(.015f,MathF.Atan2(latest.Radius,MathF.Max(1,targetDistance))*180/MathF.PI);
         if(!_planned)
         {
-            _planned=true;_start=latest.Time+Profile.Reaction*(1+Symmetric()*.12f);
-            _startView=_view;
+            _planned=true;
             float amplitude=AimMath.Delta(desired,_view).Length();
-            float angularWidth=MathF.Max(.12f,MathF.Atan2(8,Vector3.Distance(eye,latest.Position))*180/MathF.PI);
+            // Prepared contact: the crosshair was already close to the believed
+            // direction. Unexpected contact: larger travel plus a short startle
+            // penalty before the flick starts. Both are modeling hypotheses to
+            // calibrate, not measured human constants.
+            float reactionScale=amplitude<10f ? .80f : amplitude>45f ? 1.15f : 1f;
+            float startle=amplitude>45f ? .04f : 0f;
+            _start=latest.Time+Profile.Reaction*(1+Symmetric()*.12f)*reactionScale+startle;
+            ContactGapDegrees=amplitude;
+            ContactKind=amplitude<10f ? "prepared" : amplitude>45f ? "unexpected" : "neutral";
+            _startView=_view;
+            float angularWidth=MathF.Max(.12f,MathF.Atan2(8,targetDistance)*180/MathF.PI);
             _duration=amplitude<angularWidth*.5f ? .015f : Profile.FlickTime+.018f*MathF.Log2(1+amplitude/angularWidth);
             // Endpoint error persists for this movement instead of per-frame random jitter.
             _bias=Noise(Profile.MotorError+amplitude*Profile.AmplitudeError);
@@ -113,14 +150,14 @@ public sealed class HumanAimModel
             // Early smooth regulation uses delayed observations; it never snaps to the live target.
             if(now-_start>.08f)
             {
-                _endView=AimMath.Advance(_endView,AimMath.Normalize(desired+_bias),dt,.18f,60);
-                _intendedEndView=AimMath.Advance(_intendedEndView,desired,dt,.18f,60);
+                _endView=AimMath.Advance(_endView,AimMath.Normalize(controlTarget+_bias),dt,.18f,60);
+                _intendedEndView=AimMath.Advance(_intendedEndView,controlTarget,dt,.18f,60);
             }
             var planned=_startView+AimMath.Delta(_endView,_startView)*AimMath.Ease((now-_start)/_duration);
             var intended=_startView+AimMath.Delta(_intendedEndView,_startView)*AimMath.Ease((now-_start)/_duration);
             _view=AimMath.Advance(_view,planned,dt,.012f,Profile.MaxSpeed);
             _intendedView=AimMath.Advance(_intendedView,intended,dt,.012f,Profile.MaxSpeed);
-            LastFireDecision=HumanFireDecision.Evaluate(_intendedView,desired,angularRadius,latest.Uncertainty,visible,age,false,context);
+            LastFireDecision=HumanFireDecision.Evaluate(_intendedView,desired,angularRadius,latest.Uncertainty,visible,age,false,context,Profile.MotorError);
             return new(_view,LastFireDecision.Allow,"flick",age);
         }
         if(now>=_nextBias)
@@ -128,7 +165,7 @@ public sealed class HumanAimModel
             _bias=Vector2.Lerp(_bias,Noise(Profile.MotorError),.35f);
             _nextBias=now+.22f+(float)_random.NextDouble()*.18f;
         }
-        var target=AimMath.Normalize(desired+_bias);
+        var target=AimMath.Normalize(controlTarget+_bias);
         float error=AimMath.Delta(target,_view).Length();
         // Large missed flicks receive a delayed second movement, not an automatic pause on every shot.
         if(!_correcting && error>2.5f) { _correcting=true;_nextCorrection=now+Profile.SensorDelay; }
@@ -136,10 +173,10 @@ public sealed class HumanAimModel
         if(!waiting)
         {
             _view=AimMath.Advance(_view,target,dt,Profile.TrackingTime,Profile.MaxSpeed);
-            _intendedView=AimMath.Advance(_intendedView,desired,dt,Profile.TrackingTime,Profile.MaxSpeed);
+            _intendedView=AimMath.Advance(_intendedView,controlTarget,dt,Profile.TrackingTime,Profile.MaxSpeed);
         }
         if(error<1)_correcting=false;
-        LastFireDecision=HumanFireDecision.Evaluate(_intendedView,desired,angularRadius,latest.Uncertainty,visible,age,waiting,context);
+        LastFireDecision=HumanFireDecision.Evaluate(_intendedView,desired,angularRadius,latest.Uncertainty,visible,age,waiting,context,Profile.MotorError);
         return new(_view,LastFireDecision.Allow,waiting ? "correction" : "tracking",age);
     }
 }

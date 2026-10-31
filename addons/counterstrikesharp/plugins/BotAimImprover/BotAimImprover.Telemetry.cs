@@ -1,5 +1,6 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Utils;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 namespace BotAimImprover;
@@ -65,6 +66,18 @@ public partial class BotAimImprover
         var gun=pawn.WeaponServices?.ActiveWeapon.Value?.As<CCSWeaponBase>();
         var csWeaponServices=pawn.WeaponServices is {} services ? new CCSPlayer_WeaponServices(services.Handle) : null;
         FireGateDecision? gate=bot!=null && EligibleForFireGuard(player,pawn) ? EvaluateFireGate(player,pawn,bot,false) : null;
+        // Enemy world state is recorded for offline analysis only; the human aim
+        // model never receives it (it only consumes its own delayed visual samples).
+        CCSPlayerPawn? enemyPawn=null;
+        try{enemyPawn=bot?.Enemy.Value;}catch(Exception){enemyPawn=null;}
+        Vector? enemyOrigin=enemyPawn is {IsValid:true} ep1 ? ep1.AbsOrigin : null;
+        Vector? enemyVelocity=enemyPawn is {IsValid:true} ep2 ? ep2.AbsVelocity : null;
+        float? enemyDistance=null;
+        if(enemyOrigin!=null && pos!=null)
+        {
+            float dx=enemyOrigin.X-pos.X,dy=enemyOrigin.Y-pos.Y,dz=enemyOrigin.Z-pos.Z;
+            enemyDistance=MathF.Sqrt(dx*dx+dy*dy+dz*dz);
+        }
         WriteTelemetry(new {kind,tick=Server.TickCount,time=Server.CurrentTime,slot=player.Slot,pawn=player.PlayerPawn.Raw,alive=player.PawnIsAlive,
             game_warmup=_telemetryRules?.WarmupPeriod,game_freeze=_telemetryRules?.FreezePeriod,rounds_played=_telemetryRules?.TotalRoundsPlayed,
             x=pos?.X,y=pos?.Y,z=pos?.Z,pitch=angles.X,yaw=angles.Y,vx=vel.X,vy=vel.Y,vz=vel.Z,flags=pawn.Flags,
@@ -82,6 +95,12 @@ public partial class BotAimImprover
             native_goal_pitch=bot?.AimGoal.X,native_goal_yaw=bot?.AimGoal.Y,
             native_look_at_x=bot?.LookAtSpot.X,native_look_at_y=bot?.LookAtSpot.Y,native_look_at_z=bot?.LookAtSpot.Z,native_look_at_attack=bot?.LookAtSpotAttack,
             native_target_x=bot?.TargetSpot.X,native_target_y=bot?.TargetSpot.Y,native_target_z=bot?.TargetSpot.Z,
+            enemy_x=enemyOrigin?.X,enemy_y=enemyOrigin?.Y,enemy_z=enemyOrigin?.Z,
+            enemy_vx=enemyVelocity?.X,enemy_vy=enemyVelocity?.Y,enemy_vz=enemyVelocity?.Z,enemy_distance=enemyDistance,
+            contact_gap_degrees=state!=null && float.IsFinite(state.Model.ContactGapDegrees) ? (float?)state.Model.ContactGapDegrees : null,
+            contact_kind=state?.Model.ContactKind,sample_result=state?.LastSampleResult,
+            model_plan_start_time=state is {} planState && planState.Model.ContactKind!="none" ? (float?)planState.Model.PlanStartedAt : null,
+            model_plan_duration=state is {} durationState && durationState.Model.ContactKind!="none" ? (float?)durationState.Model.PlanDuration : null,
             native_phase=bot!=null ? NativePhase(bot.Handle) : null,
             native_fire_weapon_timestamp=bot?.FireWeaponTimestamp,
             model_last_used_time=state?.LastUsed,

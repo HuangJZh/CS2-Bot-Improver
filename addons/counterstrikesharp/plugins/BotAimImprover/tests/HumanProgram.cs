@@ -103,23 +103,53 @@ foreach(var level in new[]{"Low","Medium","High"})
  result=observed.Step(observed.LastVisible+.4f,eye,false);
  Check(!result.AllowFire && result.Phase=="memory-expired",level+" uncertain localization does not extend hidden target memory");
 }
-FireDecision FireAt(float error,float radius,AimWeaponClass weapon,bool underFire=false,float uncertainty=0,bool visible=true)
- =>HumanFireDecision.Evaluate(new(0,error),Vector2.Zero,radius,uncertainty,visible,.05f,false,new(weapon,underFire));
+FireDecision FireAt(float error,float radius,AimWeaponClass weapon,bool underFire=false,float uncertainty=0,bool visible=true,float motorError=.16f)
+ =>HumanFireDecision.Evaluate(new(0,error),Vector2.Zero,radius,uncertainty,visible,.05f,false,new(weapon,underFire),motorError);
 Check(FireAt(.4f,.5f,AimWeaponClass.Rifle).Allow && !FireAt(.4f,.5f,AimWeaponClass.Sniper).Allow,
  "sniper requests tighter expected alignment than rifle");
-Check(FireAt(.3f,1,AimWeaponClass.Rifle).Allow && !FireAt(.3f,.1f,AimWeaponClass.Rifle).Allow,
+Check(FireAt(.6f,1,AimWeaponClass.Rifle).Allow && !FireAt(.6f,.1f,AimWeaponClass.Rifle).Allow,
  "angular target size changes fire acceptance independently of flick progress");
-Check(!FireAt(.6f,.5f,AimWeaponClass.Rifle).Allow && FireAt(.6f,.5f,AimWeaponClass.Rifle,true).Allow,
+Check(!FireAt(.8f,.5f,AimWeaponClass.Rifle).Allow && FireAt(.8f,.5f,AimWeaponClass.Rifle,true).Allow,
  "recent incoming damage can trade precision for urgency");
 Check(!FireAt(0,.5f,AimWeaponClass.Rifle,true,0,false).Allow,"urgency cannot bypass lost visibility");
-Check(FireAt(.4f,.5f,AimWeaponClass.Rifle).Allow && !FireAt(.4f,.5f,AimWeaponClass.Rifle,false,.3f).Allow,
+Check(FireAt(.7f,.5f,AimWeaponClass.Rifle).Allow && !FireAt(.7f,.5f,AimWeaponClass.Rifle,false,.3f).Allow,
  "uncertain localization requires a more central intended shot");
+Check(FireAt(.45f,.05f,AimWeaponClass.Rifle).Allow && !FireAt(.9f,.05f,AimWeaponClass.Rifle).Allow,
+ "very small distant targets keep a bounded aim floor while still requiring central aim");
+Check(FireAt(.4f,.05f,AimWeaponClass.Rifle,false,0,true,.32f).ToleranceDegrees > FireAt(.4f,.05f,AimWeaponClass.Rifle).ToleranceDegrees,
+ "less precise profile motor error raises the admissible fire envelope for small targets");
 Check(!HumanFireDecision.Evaluate(Vector2.Zero,Vector2.Zero,.5f,0,true,.21f,false,default).Allow,
  "aligned but stale target cannot authorize fire");
 Check(!HumanFireDecision.Evaluate(Vector2.Zero,Vector2.Zero,.5f,0,true,.05f,true,default).Allow,
  "pending corrective movement is not mistaken for readiness");
 Check(HumanFireContext.Classify("weapon_awp")==AimWeaponClass.Sniper && HumanFireContext.Classify("weapon_deagle")==AimWeaponClass.PrecisePistol
  && HumanFireContext.Classify("weapon_m4a1_silencer")==AimWeaponClass.Rifle,"weapon adapter distinguishes precise and automatic weapons");
+Check(HumanFireContext.BulletSpeedFor(AimWeaponClass.Sniper)>HumanFireContext.BulletSpeedFor(AimWeaponClass.Pistol),
+ "projectile lead uses weapon-class speeds");
+var movingLead=new HumanAimModel(profileHigh,Vector2.Zero,0,91);
+bool leadFired=false;float leadDegrees=0;int leadAllows=0;
+for(int i=0;i<256;i++)
+{
+ float now=i/128f;var movingPos=new Vector3(1000,now*250f,0);
+ movingLead.Observe(now,movingPos);
+ var movingOutput=movingLead.Step(now,eye,true,new(AimWeaponClass.Rifle));
+ if(movingOutput.AllowFire && !leadFired)
+ {
+  leadFired=true;leadDegrees=AimMath.Delta(movingOutput.Angles,AimMath.Angles(eye,movingPos)).Y;
+ }
+ if(movingOutput.AllowFire)leadAllows++;
+}
+Check(leadFired && leadDegrees>.2f && leadAllows>32,"moving-target fire plan includes forward projectile lead");
+var preparedPlan=new HumanAimModel(profileHigh,Vector2.Zero,0,7);
+preparedPlan.Observe(.02f,new Vector3(1000,100,0));
+preparedPlan.Step(.02f+profileHigh.SensorDelay+.001f,eye,true);
+var unexpectedPlan=new HumanAimModel(profileHigh,Vector2.Zero,0,7);
+unexpectedPlan.Observe(.02f,new Vector3(100,1000,0));
+unexpectedPlan.Step(.02f+profileHigh.SensorDelay+.001f,eye,true);
+Check(preparedPlan.ContactKind=="prepared" && unexpectedPlan.ContactKind=="unexpected",
+ "contact gap classifies prepared versus unexpected engagement");
+Check(unexpectedPlan.PlanStartedAt-preparedPlan.PlanStartedAt>.03f,
+ "unexpected contact adds reaction delay relative to prepared contact");
 (float Time,AimOutput Output) FirstFire(HumanAimProfile profile,Vector3 point,AimWeaponClass weapon,int seed=45)
 {
  var model=new HumanAimModel(profile,Vector2.Zero,0,seed);

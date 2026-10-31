@@ -35,6 +35,7 @@ public partial class BotAimImprover
         public float? FirstVisualAt;
         public float? PlanHoldSince;
         public bool PlanHoldTimedOut;
+        public string LastSampleResult="none";
     }
     private HumanSettings _humanSettings=new();
     private readonly Dictionary<int,HumanState> _humanStates=new();
@@ -190,12 +191,27 @@ public partial class BotAimImprover
             var pawn=controller.PlayerPawn.Value;
             if(pawn is not {IsValid:true} || !IsGun(pawn) || OtherViewOwner(controller.Slot))
             { ReleaseHuman(controller.Slot);ReleaseFireGuard(controller.Slot);_modelSpots.Remove(pointer);return HookResult.Continue; }
-            var bot=new CCSBot(pointer);
-            if(bot.Enemy.Value is not {IsValid:true} enemy || enemy.LifeState!=0 || enemy.TeamNum==controller.TeamNum)
-            { ReleaseHuman(controller.Slot);_modelSpots.Remove(pointer);RefreshFireGuard(controller);return HookResult.Continue; }
             if(!TryGetBotEyePosition(controller,out var eye))return HookResult.Continue;
             var eyeVec=new Vec(eye.X,eye.Y,eye.Z);
             float now=Server.CurrentTime;
+            var bot=new CCSBot(pointer);
+            if(bot.Enemy.Value is not {IsValid:true} enemy || enemy.LifeState!=0 || enemy.TeamNum==controller.TeamNum)
+            {
+                // The native enemy handle can flicker between peeks. Keep the memory
+                // based plan for a short grace period instead of resetting every
+                // model (reset means a fresh sensor delay and reaction before the
+                // next shot). No target spot is written while the target is gone.
+                if(_humanStates.TryGetValue(controller.Slot,out var held) && held.Pawn==controller.PlayerPawn.Raw
+                    && now-held.LastUsed<.35f && held.Model.HasObservation && now-held.Model.LastVisible<.50f)
+                {
+                    held.LastUsed=now;
+                    held.Output=held.Model.Step(now,eyeVec,false);
+                    _modelSpots.Remove(pointer);
+                    RefreshFireGuard(controller);
+                    return HookResult.Continue;
+                }
+                ReleaseHuman(controller.Slot);_modelSpots.Remove(pointer);RefreshFireGuard(controller);return HookResult.Continue;
+            }
             if(!_humanStates.TryGetValue(controller.Slot,out var state) || state.Pawn!=controller.PlayerPawn.Raw || state.Enemy!=enemy.EntityHandle.Raw)
             {
                 ReleaseHuman(controller.Slot);
@@ -211,7 +227,10 @@ public partial class BotAimImprover
                 state.NextSensorCheck=now+state.Model.Profile.SampleInterval;
                 Vec sample=default;
                 float sampleRadius=4;
-                visible=bot.IsEnemyVisible && pawn.BlindUntilTime<=now && TrySelectHumanPoint(bot,pawn,enemy,eye,out sample,out sampleRadius);
+                bool sensorGate=bot.IsEnemyVisible && pawn.BlindUntilTime<=now;
+                string sampleResult=sensorGate ? "not-sampled" : pawn.BlindUntilTime>now ? "blind" : "native-invisible";
+                visible=sensorGate && TrySelectHumanPoint(bot,pawn,enemy,eye,out sample,out sampleRadius,out sampleResult);
+                state.LastSampleResult=sampleResult;
                 state.LastSight=visible;
                 if(visible)
                 {
@@ -256,9 +275,9 @@ public partial class BotAimImprover
         }
         return HookResult.Continue;
     }
-    private bool TrySelectHumanPoint(CCSBot bot,CCSPlayerPawn pawn,CCSPlayerPawn enemy,Vector eye,out Vec point,out float radius)
+    private bool TrySelectHumanPoint(CCSBot bot,CCSPlayerPawn pawn,CCSPlayerPawn enemy,Vector eye,out Vec point,out float radius,out string result)
     {
-        point=default;radius=4;
+        point=default;radius=4;result="no-point";
         var weapon=pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName;
         var order=_aimMode switch
         {
@@ -269,14 +288,17 @@ public partial class BotAimImprover
         var forward=new Angles(pawn.EyeAngles.X,pawn.EyeAngles.Y);
         foreach(var index in order)
         {
-            if(!TryComputePartPos(enemy,index,out var x,out var y,out var z))continue;
+            if(!TryComputePartPos(enemy,index,out var x,out var y,out var z)){result="bad-part";continue;}
             var candidate=new Vec(x,y,z);
             var angle=AimMath.Angles(new(eye.X,eye.Y,eye.Z),candidate);
-            if(MathF.Abs(AimMath.Delta(angle,forward).Y)>_humanSettings.HorizontalFieldOfView*.5f
-                || MathF.Abs(AimMath.Delta(angle,forward).X)>50)continue;
-            if(!PointVisibleFromEye(eye,x,y,z) || HumanSmokeBlocks(eye,candidate))continue;
+            var delta=AimMath.Delta(angle,forward);
+            if(MathF.Abs(delta.Y)>_humanSettings.HorizontalFieldOfView*.5f){result="fov-yaw";continue;}
+            if(MathF.Abs(delta.X)>50){result="fov-pitch";continue;}
+            if(!PointVisibleFromEye(eye,x,y,z)){result="ray";continue;}
+            if(HumanSmokeBlocks(eye,candidate)){result="smoke";continue;}
             point=candidate;
             radius=index is >=3 and <=7 or 10 or 11 ? 8 : 4;
+            result="ok";
             return true;
         }
         return false;

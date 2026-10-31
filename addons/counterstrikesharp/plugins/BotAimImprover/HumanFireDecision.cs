@@ -18,6 +18,16 @@ public readonly record struct HumanFireContext(AimWeaponClass Weapon= AimWeaponC
             or "weapon_aug" or "weapon_sg556"=>AimWeaponClass.Rifle,
         _=>AimWeaponClass.Other
     };
+    // Approximate projectile speed in world units per second, used only for lead
+    // planning. Values are gameplay hypotheses to calibrate, not measured ballistics.
+    public static float BulletSpeedFor(AimWeaponClass weapon)=>weapon switch
+    {
+        AimWeaponClass.Sniper=>3500f,AimWeaponClass.PrecisePistol=>2600f,
+        AimWeaponClass.Rifle=>3000f,AimWeaponClass.Smg=>2300f,
+        AimWeaponClass.Pistol=>2100f,AimWeaponClass.Shotgun=>1500f,
+        AimWeaponClass.MachineGun=>3000f,_=>2500f
+    };
+    public float BulletSpeed=>BulletSpeedFor(Weapon);
 }
 public readonly record struct FireDecision(bool Allow,string Reason,float? ExpectedErrorDegrees,float? ToleranceDegrees);
 
@@ -25,23 +35,33 @@ public readonly record struct FireDecision(bool Allow,string Reason,float? Expec
 // Uses delayed beliefs and intended movement; never tests true target hitboxes.
 public static class HumanFireDecision
 {
+    // Fire when the planned aim is within a plausible hit envelope of the delayed
+    // target belief: target angular radius scaled by weapon class, reduced by
+    // localization uncertainty, with a small floor so tiny distant targets are not
+    // impossible. motorError is the profile's hand/precision scale and raises the
+    // floor for less precise difficulty tiers.
     public static FireDecision Evaluate(Vector2 intendedAim,Vector2 estimatedBearing,float angularRadius,float uncertainty,
-        bool visible,float observationAge,bool correctionPending,HumanFireContext context)
+        bool visible,float observationAge,bool correctionPending,HumanFireContext context,float motorError=.16f)
     {
         if(!visible)return new(false,"not-visible",null,null);
         if(!float.IsFinite(observationAge) || observationAge<0 || observationAge>=.20f)return new(false,"stale-observation",null,null);
-        if(!float.IsFinite(intendedAim.X+intendedAim.Y+estimatedBearing.X+estimatedBearing.Y+angularRadius+uncertainty)
-            || angularRadius<=0 || uncertainty<0)return new(false,"invalid-belief",null,null);
+        if(!float.IsFinite(intendedAim.X+intendedAim.Y+estimatedBearing.X+estimatedBearing.Y+angularRadius+uncertainty+motorError)
+            || angularRadius<=0 || uncertainty<0 || motorError<0)return new(false,"invalid-belief",null,null);
         if(correctionPending)return new(false,"waiting-for-correction",null,null);
         float weaponFactor=context.Weapon switch
         {
-            AimWeaponClass.Sniper=>.55f,AimWeaponClass.PrecisePistol=>.65f,
-            AimWeaponClass.Pistol=>1.1f,AimWeaponClass.Smg=>1.5f,
-            AimWeaponClass.Shotgun=>1.9f,AimWeaponClass.MachineGun=>1.3f,
-            AimWeaponClass.Other=>.8f,_=>1f
+            AimWeaponClass.Sniper=>.40f,AimWeaponClass.PrecisePistol=>.55f,
+            AimWeaponClass.Pistol=>1.0f,AimWeaponClass.Rifle=>.90f,AimWeaponClass.Smg=>1.15f,
+            AimWeaponClass.Shotgun=>1.4f,AimWeaponClass.MachineGun=>1.0f,
+            AimWeaponClass.Other=>.8f,_=>.9f
         };
-        float margin=MathF.Max(angularRadius*.35f,angularRadius-uncertainty*.5f);
-        float tolerance=Math.Clamp(margin*weaponFactor*(context.UnderFire ? 1.25f : 1),.015f,4);
+        // Aim envelope: half the target's angular radius plus a human "body width"
+        // allowance and the profile's precision scale, reduced by localization
+        // uncertainty. The .45deg term keeps distant/small targets fireable at a
+        // human-like (not pixel-perfect) tolerance; it is a calibration hypothesis.
+        float effectiveRadius=MathF.Max(.02f,angularRadius-uncertainty*.35f);
+        float baseTolerance=.5f*effectiveRadius+.45f+motorError*.5f;
+        float tolerance=Math.Clamp(baseTolerance*weaponFactor*(context.UnderFire ? 1.3f : 1),.25f,4);
         float error=AimMath.Delta(estimatedBearing,intendedAim).Length();
         bool allow=error<=tolerance;
         return new(allow,allow ? "expected-alignment" : "waiting-for-alignment",error,tolerance);
