@@ -41,6 +41,10 @@ public partial class BotAimImprover
         public float? LastSampleRayFraction;
         public float AllowLatchUntil;
         public float LastAimFeedbackCorrection;
+        public float LastShotAt=-999f;
+        public int SprayShots;
+        public float SprayBasePitchError;
+        public float RecoilCompensation;
     }
     private HumanSettings _humanSettings=new();
     private readonly Dictionary<int,HumanState> _humanStates=new();
@@ -106,6 +110,21 @@ public partial class BotAimImprover
             MaintainFireGuards();
         });
         RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);}return HookResult.Continue; });
+        // Track bursts so the aim output can model human recoil control after the
+        // first few rounds instead of holding a perfectly steady target point.
+        RegisterEventHandler<EventWeaponFire>((e,i) => {
+            if(e.Userid is {IsValid:true} shooter && _humanStates.TryGetValue(shooter.Slot,out var fireState)
+                && fireState.Pawn==shooter.PlayerPawn.Raw)
+            {
+                float fireNow=Server.CurrentTime;
+                if(fireNow-fireState.LastShotAt<.25f)fireState.SprayShots++;
+                else {fireState.SprayShots=1;fireState.SprayBasePitchError=0f;}
+                fireState.LastShotAt=fireNow;
+                if(fireState.SprayShots==1 && shooter.PlayerPawn.Value is {} firePawn)
+                    fireState.SprayBasePitchError=firePawn.EyeAngles.X-fireState.Model.LastDesiredAngles.X;
+            }
+            return HookResult.Continue;
+        });
         RegisterEventHandler<EventPlayerHurt>((e,i) => {
             if(e.Userid is {IsValid:true,IsBot:true} victim && e.Attacker is {IsValid:true} attacker && attacker.TeamNum!=victim.TeamNum
                 && _humanStates.TryGetValue(victim.Slot,out var state) && state.Pawn==victim.PlayerPawn.Raw)
@@ -302,7 +321,14 @@ public partial class BotAimImprover
             // captures show the engine view lags the plan by several degrees and a
             // naive correction of the target spot worsened planned-vs-actual error.
             var actualView=new Angles(pawn.EyeAngles.X,pawn.EyeAngles.Y);
-            state.LastAimFeedbackCorrection=AimMath.Delta(state.Model.LastDesiredAngles,actualView).Length();
+            var viewDelta=AimMath.Delta(state.Model.LastDesiredAngles,actualView);
+            state.LastAimFeedbackCorrection=viewDelta.Length();
+            // Recoil-control measurement kept for calibration, but the first
+            // compensation attempt (8.13) reduced hits from .48 to .21 at 600 u:
+            // the engine view already reflects native downward compensation, so
+            // correcting the observed climb over-rotated the crosshair upward.
+            // Do not inject a correction until bullet-direction truth is measured.
+            state.RecoilCompensation=0f;
             var spot=AimMath.Ray(eyeVec,state.Output.Angles);
             _modelSpots[pointer]=spot;
             WriteModelSpot(bot,spot);

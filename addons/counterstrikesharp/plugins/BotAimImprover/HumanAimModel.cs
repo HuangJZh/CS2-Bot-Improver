@@ -11,10 +11,15 @@ public sealed record HumanAimProfile(float Reaction, float SensorDelay, float Sa
     // also fire during a planned movement; more skilled profiles rely more on the
     // real crosshair. Calibration hypothesis, not measured rank data.
     public float FeedbackWeight {get;init;}=.50f;
+    // Recoil-control model: humans start pulling down after a few rounds and do not
+    // compensate perfectly. These scale the observed view-vs-plan climb during a
+    // burst into an aim correction; they are gameplay hypotheses to calibrate.
+    public float RecoilControlGain {get;init;}=.50f;
+    public int RecoilControlStartShot {get;init;}=3;
     public static HumanAimProfile For(string level) => level switch
     {
-        "Low" => new(.200f,.090f,.050f,.155f,.32f,.020f,.105f,480,.60f){PerceptionError=.12f,FeedbackWeight=.35f},
-        "High" => new(.130f,.045f,.025f,.095f,.07f,.006f,.045f,850,.92f){PerceptionError=.035f,FeedbackWeight=.65f},
+        "Low" => new(.200f,.090f,.050f,.155f,.32f,.020f,.105f,480,.60f){PerceptionError=.12f,FeedbackWeight=.35f,RecoilControlGain=.30f,RecoilControlStartShot=3},
+        "High" => new(.130f,.045f,.025f,.095f,.07f,.006f,.045f,850,.92f){PerceptionError=.035f,FeedbackWeight=.65f,RecoilControlGain=.70f,RecoilControlStartShot=2},
         _ => new(.170f,.065f,.035f,.125f,.16f,.011f,.070f,650,.80f)
     };
 }
