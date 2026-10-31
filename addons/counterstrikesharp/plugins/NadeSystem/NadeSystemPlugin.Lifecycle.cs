@@ -64,6 +64,8 @@ public partial class NadeSystemPlugin : BasePlugin
         _inventoryRound++;
         _roundOver  = false;
         _freezeEndTime = 0f;
+        _roundStartTime = Server.CurrentTime;
+        _lastBuyAttempt = 0f;
         _roundCountByTeam.Clear();
         _roundCountByBot.Clear();
         _cooldowns.Clear();
@@ -244,6 +246,20 @@ public partial class NadeSystemPlugin : BasePlugin
         {
             if (_tick % 256 == 0) PruneCooldowns();
             return;
+        }
+        // Purchase watchdog: if freeze-end handling differs on a listen/local server,
+        // keep retrying inside the buy window (still strict: no free grants later).
+        float nowTick=Server.CurrentTime;
+        float sinceBuyWindow=_freezeEndTime>0f ? nowTick-_freezeEndTime : nowTick-_roundStartTime;
+        bool inBuyWindow=_freezeEndTime>0f ? (sinceBuyWindow>0f && sinceBuyWindow<14f) : (sinceBuyWindow>=3f && sinceBuyWindow<14f);
+        if(!_roundOver && inBuyWindow && nowTick-_lastBuyAttempt>=1.2f)
+        {
+            var buyRules=Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault()?.GameRules;
+            if(buyRules is {WarmupPeriod:false,BuyTimeEnded:false})
+            {
+                _lastBuyAttempt=nowTick;
+                BuyRoundGrenades();
+            }
         }
         if (_tick % 4   == 0) CheckBotZones();
         if (_tick % 256 == 0) PruneCooldowns();

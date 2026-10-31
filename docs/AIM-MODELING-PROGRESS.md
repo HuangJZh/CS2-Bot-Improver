@@ -439,3 +439,7 @@ A局未采样比例从8.5同口径的30.8%降到3.9%；扇形回退在这两局�
 边界：尚未实现“在这些点防守/下包后移动过去躲藏”的移动逻辑；忘搜概率与角度/距离未按真实人类数据校准；点位未按CT/T侧、路线顺序或地图区域过滤；只有4张图。下一步：将相同数据用于防守/回防站位（需谨慎接管移动）、按CT/T和路线筛选、加入更多订阅图。
 
 安装：BotAimImprover `2.1.8-human.8.19-experimental`（哈希`A0EC789A…`）+ `preaim-points.json`/`preaim-nodes.json`；gameinfo已恢复（3B18F0CA…），probe已移除，无CS2进程。证据：E:/csdemo/bot-captures/model-round30-20261101（5v5采集、服务端日志与搜索分配记录）。
+
+### 2026-11-01 补充：用户本地对局购买为0的修复
+
+用户反馈“购买结束不主动买道具”。检查用户游戏日志（01:19–01:23）：NadeSystem **0次购买、163次strict跳过**，说明购买函数没有成功执行/或全部被条件跳过；而本机专用服同配置有大量购买。差异定位在两个本地listen服务器容易不满足的条件：`InBuyZone`和只依赖`EventRoundFreezeEnd`的购买时机。修复：去掉`InBuyZone`要求、增加OnTick购买看门狗（购买窗口内每1.2秒重试，仅`BuyTimeEnded=false`时），并加`Buy pass`日志。专用服验证：`Buy pass freezetime=true ... eligible=32 bought=16`，随后看门狗继续每轮买1–3个；严格语义不变（投掷仍要求真实持有）。安装哈希`39D0917F…`。若用户对局仍无购买，日志中的`Buy pass`行会直接显示freezetime/buyTimeEnded/eligible/bought，便于继续定位。

@@ -54,10 +54,11 @@ public partial class NadeSystemPlugin
         var rules=Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault()?.GameRules;
         if(rules == null || rules.WarmupPeriod || rules.BuyTimeEnded) return;
         int limit=Math.Clamp(ConVar.Find("ammo_grenade_limit_total")?.GetPrimitiveValue<int>() ?? 4,0,4);
+        int eligible=0,bought=0;
         foreach(var bot in Utilities.GetPlayers())
         {
             if(bot is not { IsValid:true, IsBot:true, PawnIsAlive:true } || bot.HasBeenControlledByPlayerThisRound
-                || bot.TeamNum is not (2 or 3) || bot.PlayerPawn.Value is not { IsValid:true, InBuyZone:true } pawn
+                || bot.TeamNum is not (2 or 3) || bot.PlayerPawn.Value is not { IsValid:true } pawn
                 || pawn.WeaponServices == null || bot.InGameMoneyServices == null) continue;
             var money=bot.InGameMoneyServices;
             bool isCT=bot.TeamNum==3;
@@ -74,6 +75,7 @@ public partial class NadeSystemPlugin
             foreach(var type in types)
             {
                 if(total >= limit) break;
+                eligible++;
                 if(FindInventoryGrenade(bot,type) != null) continue;
                 int cost=(isCT ? CostCT : CostT)[type];
                 if(money.Account < cost || budget < cost) continue;
@@ -91,11 +93,12 @@ public partial class NadeSystemPlugin
                     continue;
                 }
                 budget-=cost;
-                total++;
+                total++; bought++;
                 Utilities.SetStateChanged(bot,"CCSPlayerController","m_pInGameMoneyServices");
                 Server.PrintToConsole($"[NadeSystem] Purchased {type} for {bot.PlayerName}, cost={cost}");
                 Logger.LogInformation("[NadeSystem] Purchased {Type} for {Bot}, cost={Cost}", type, bot.PlayerName, cost);
             }
         }
+        if(bought>0 || eligible>0) Logger.LogInformation("[NadeSystem] Buy pass freezetime={Freeze} buyTimeEnded={Ended} eligible={Eligible} bought={Bought} mode={Mode}",rules.FreezePeriod,rules.BuyTimeEnded,eligible,bought,_botNadesMode);
     }
 }

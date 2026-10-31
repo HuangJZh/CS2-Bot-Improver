@@ -45,6 +45,8 @@ public partial class NadeSystemPlugin : BasePlugin
     private int                   _tick              = 0;
     private bool                  _roundOver         = false;
     private float                 _freezeEndTime     = 0f;
+    private float                 _roundStartTime    = 0f;
+    private float                 _lastBuyAttempt    = 0f;
     private Dictionary<uint, int> _roundSpendPerBot  = new();
     private Dictionary<uint, int> _roundNadeMoneyPerBot = new();
     private HashSet<uint>         _poorBots          = new();

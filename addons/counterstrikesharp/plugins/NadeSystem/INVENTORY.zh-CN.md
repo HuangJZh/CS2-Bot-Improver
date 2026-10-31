@@ -14,3 +14,7 @@
 ## 2026-11-01：严格“购买—持有—投掷”
 
 按用户要求，点位回放不再临时补发缺失道具：购买阶段（冻结结束+购买窗口内重试）按经济/预算购买，游戏内只在实际持有对应道具时回放并消耗；缺失则跳过并写`Logger`警告。原生Bot道具AI（`bot_allow_grenades 0`）保持关闭，点位选择/DB/冷却等原逻辑不变。
+
+### 2026-11-01：本地listen服务器购买兜底
+
+去掉InBuyZone硬性要求，并在购买窗口内用OnTick看门狗每1.2秒补买（仍只在BuyTimeEnded=false时）；每轮记录Buy pass freezetime/buyTimeEnded/eligible/bought。严格持有语义不变。
