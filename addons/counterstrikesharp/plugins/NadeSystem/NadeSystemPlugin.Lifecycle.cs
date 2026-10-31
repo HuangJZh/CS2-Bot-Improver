@@ -264,8 +264,9 @@ public partial class NadeSystemPlugin : BasePlugin
                     _lastBuyAttempt=0f;
                 }
                 float nowTick2=Server.CurrentTime;
-                float since=_freezeEndTime>0f ? nowTick2-_freezeEndTime : nowTick2-_roundStartTime;
-                bool inBuyWindow=_freezeEndTime>0f ? (since>0f && since<14f) : (since>=3f && since<14f);
+                // Continue checking the real buy window: a human may request a
+                // gun late in freeze time, after the old arbitrary 14s cutoff.
+                bool inBuyWindow=nowTick2-_roundStartTime>=UtilityPurchasePolicy.EarliestPurchaseSeconds;
                 if(!_roundOver && !buyRules.BuyTimeEnded && inBuyWindow && nowTick2-_lastBuyAttempt>=1.2f)
                 {
                     _lastBuyAttempt=nowTick2;

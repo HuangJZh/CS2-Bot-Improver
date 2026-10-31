@@ -46,7 +46,13 @@ public partial class NadeSystemPlugin
         Utilities.SetStateChanged(pawn,"CBasePlayerPawn","m_pWeaponServices");
     }
 
-    // Purchase once at freeze end after the normal gun/armor buying phase.
+    private static bool HasPrimaryWeapon(CCSPlayerController player) =>
+        player.PlayerPawn.Value?.WeaponServices?.MyWeapons.Any(h =>
+            h.Value is { IsValid:true } w && w.As<CCSWeaponBase>().VData?.GearSlot == gear_slot_t.GEAR_SLOT_RIFLE) == true;
+
+    // BotBuy finishes its own purchases and automatic donations in the first
+    // three seconds. BotSupport processes early wheel requests at four seconds.
+    // Every entry point (including FreezeEnd and retries) must respect this gate.
     // Grenades persist in the actual inventory across rounds and on death/drop.
     private void BuyRoundGrenades()
     {
@@ -62,13 +68,20 @@ public partial class NadeSystemPlugin
                 rules != null, rules?.WarmupPeriod == true, rules?.BuyTimeEnded == true, _botNadesMode);
             return;
         }
+        if(Server.CurrentTime - _roundStartTime < UtilityPurchasePolicy.EarliestPurchaseSeconds) return;
+        var controllers=Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller").ToArray();
+        // Keep donation funds until a living human in spawn has bought/received
+        // a primary or left the buy zone. Do not consume those funds on utility.
+        var waitingTeams=controllers.Where(p => p is { IsValid:true, IsBot:false, PawnIsAlive:true }
+            && p.TeamNum is 2 or 3 && p.PlayerPawn.Value is { IsValid:true, InBuyZone:true }
+            && !HasPrimaryWeapon(p)).Select(p => p.TeamNum).ToHashSet();
         int limit=Math.Clamp(ConVar.Find("ammo_grenade_limit_total")?.GetPrimitiveValue<int>() ?? 4,0,4);
         int players=0,notBot=0,dead=0,teamBad=0,pawnBad=0,controlled=0,weaponsNull=0,moneyNull=0;
-        int bots=0,eligible=0,bought=0,noMoney=0,already=0;
+        int bots=0,eligible=0,bought=0,noMoney=0,already=0,waitingWeapon=0,waitingDonation=0;
         // GetPlayers filters by Connected and Server.MaxPlayers. BotHider/local
         // servers can expose live bot entities outside that client roster. Use
         // the same entity enumeration as the grenade throwing logic instead.
-        foreach(var bot in Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller"))
+        foreach(var bot in controllers)
         {
             players++;
             if(bot is not { IsValid:true }) { notBot++; continue; }
@@ -83,6 +96,14 @@ public partial class NadeSystemPlugin
             var services=pawn.WeaponServices;
             if(services==null) { weaponsNull++; continue; }
             bots++;
+            // A genuine pistol round may spend its remaining pistol/armor budget
+            // on grenades. Outside that case, do not spend a gunless bot's cash.
+            bool teammateNeedsGun=waitingTeams.Contains(bot.TeamNum);
+            if(!UtilityPurchasePolicy.CanSpend(HasPrimaryWeapon(bot),IsPistolRound(),money.Account,teammateNeedsGun))
+            {
+                if(teammateNeedsGun) waitingDonation++; else waitingWeapon++;
+                continue;
+            }
             bool isCT=bot.TeamNum==3;
             int budget=GetRoundSpendCap(isCT,money.Account < 2800);
             var types=new[] { "smoke","flash","he","molotov" }.OrderBy(_ => Random.Shared.Next()).ToArray();
@@ -121,6 +142,6 @@ public partial class NadeSystemPlugin
                 Logger.LogInformation("[NadeSystem] Purchased {Type} for {Bot}, cost={Cost}", type, bot.PlayerName, cost);
             }
         }
-        Logger.LogInformation("[NadeSystem] Buy pass mode={Mode} players={Players} notBot={NotBot} dead={Dead} teamBad={TeamBad} pawnBad={PawnBad} controlled={Controlled} weaponsNull={WeaponsNull} moneyNull={MoneyNull} bots={Bots} eligible={Eligible} already={Already} noMoney={NoMoney} bought={Bought}",
-            _botNadesMode, players, notBot, dead, teamBad, pawnBad, controlled, weaponsNull, moneyNull, bots, eligible, already, noMoney, bought);
+        Logger.LogInformation("[NadeSystem] Buy pass mode={Mode} players={Players} notBot={NotBot} dead={Dead} teamBad={TeamBad} pawnBad={PawnBad} controlled={Controlled} weaponsNull={WeaponsNull} moneyNull={MoneyNull} bots={Bots} waitingWeapon={WaitingWeapon} waitingDonation={WaitingDonation} eligible={Eligible} already={Already} noMoney={NoMoney} bought={Bought}",
+            _botNadesMode, players, notBot, dead, teamBad, pawnBad, controlled, weaponsNull, moneyNull, bots, waitingWeapon, waitingDonation, eligible, already, noMoney, bought);
     }}

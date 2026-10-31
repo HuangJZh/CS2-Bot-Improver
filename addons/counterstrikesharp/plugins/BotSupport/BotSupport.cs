@@ -10,10 +10,14 @@ namespace BotSupport;
 public sealed class BotSupport : BasePlugin
 {
     public override string ModuleName => "BotSupport";
-    public override string ModuleVersion => "1.0.4";
+    public override string ModuleVersion => "1.0.5";
     public override string ModuleAuthor => "HuangJZh fork";
     public override string ModuleDescription => "Wheel weapon requests and probabilistic post-shot stops";
     private readonly Dictionary<int, float> _requests = new();
+    private readonly Dictionary<int, (uint Pawn, string Request, float At)> _pending = new();
+    private float _roundStartedAt;
+    private int _buyRound;
+    private bool _roundEnded;
     private string _difficulty = "Medium";
     private static readonly HashSet<string> Firearms = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -29,9 +33,16 @@ public sealed class BotSupport : BasePlugin
         AddCommandListener("needrop", (p,c) => Request(p,"auto"), HookMode.Pre);
         AddCommand("css_bot_request", "Request auto/awp/ak/m4a1/m4a4 from one bot", (p,c) => Request(p,c.ArgCount > 1 ? c.GetArg(1) : "auto"));
         RegisterEventHandler<EventWeaponFire>(OnFire, HookMode.Post);
-        RegisterEventHandler<EventRoundStart>((e,i) => { _requests.Clear(); ReadDifficulty(); return HookResult.Continue; });
-        RegisterListener<Listeners.OnMapStart>(map => { _requests.Clear(); ReadDifficulty(); });
-        RegisterListener<Listeners.OnClientDisconnect>(slot => _requests.Remove(slot));
+        RegisterEventHandler<EventRoundStart>((e,i) => { ResetPurchases(); ReadDifficulty(); return HookResult.Continue; });
+        RegisterEventHandler<EventRoundEnd>((e,i) => { _roundEnded=true; _pending.Clear(); _buyRound++; return HookResult.Continue; });
+        RegisterListener<Listeners.OnMapStart>(map => { ResetPurchases(); ReadDifficulty(); });
+        RegisterListener<Listeners.OnClientDisconnect>(slot => { _requests.Remove(slot); _pending.Remove(slot); });
+    }
+    private void ResetPurchases()
+    {
+        _requests.Clear(); _pending.Clear(); _buyRound++;
+        _roundEnded=false;
+        _roundStartedAt=Server.CurrentTime;
     }
     private void ReadDifficulty()
     {
@@ -88,7 +99,7 @@ public sealed class BotSupport : BasePlugin
             return HookResult.Handled;
         }
         var rules=Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault()?.GameRules;
-        if(rules == null || rules.BuyTimeEnded || !pawn.InBuyZone)
+        if(rules == null || _roundEnded || rules.BuyTimeEnded || !pawn.InBuyZone)
         {
             Logger.LogInformation("Weapon request rejected: slot={Slot} rules={HasRules} buyEnded={BuyEnded} inBuyZone={InZone}",
                 caller.Slot,rules!=null,rules?.BuyTimeEnded,pawn.InBuyZone);
@@ -100,11 +111,31 @@ public sealed class BotSupport : BasePlugin
             Logger.LogInformation("Weapon request rate-limited: slot={Slot}",caller.Slot);
             return HookResult.Handled;
         }
-        var bots=Utilities.GetPlayers().Where(b => b.IsValid && b.IsBot && b.PawnIsAlive && !b.ControllingBot && !b.HasBeenControlledByPlayerThisRound
+        // Let BotBuy finish equipping donors first. Recheck the caller, round,
+        // inventory, buy zone, and balance when the queued request is executed.
+        if(Server.CurrentTime-_roundStartedAt < 4f)
+        {
+            int slot=caller.Slot, round=_buyRound;
+            if(_pending.ContainsKey(slot)) return HookResult.Handled;
+            var queued=(caller.PlayerPawn.Raw,request,Server.CurrentTime);
+            _pending[slot]=queued;
+            AddTimer(Math.Max(0.05f,4.05f-(Server.CurrentTime-_roundStartedAt)),() =>
+            {
+                if(round!=_buyRound || !_pending.TryGetValue(slot,out var current) || current!=queued) return;
+                _pending.Remove(slot);
+                var player=Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller")
+                    .FirstOrDefault(p => p.IsValid && p.Slot==slot && p.PlayerPawn.Raw==queued.Raw);
+                if(player!=null) Request(player,request);
+            });
+            Reply(caller,"已收到要枪请求，等队友买好自己的枪后给你发枪。");
+            return HookResult.Handled;
+        }
+        var controllers=Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller").ToArray();
+        var bots=controllers.Where(b => b.IsValid && b.IsBot && b.PawnIsAlive && !b.ControllingBot && !b.HasBeenControlledByPlayerThisRound
             && b.TeamNum==caller.TeamNum && b.PlayerPawn.Value is { IsValid:true, InBuyZone:true } bp
             && bp.Bot != null && !bp.Bot.IsAttacking && !bp.Bot.IsEnemyVisible && HasPrimary(b)
             && b.InGameMoneyServices != null).ToArray();
-        var teamBots=Utilities.GetPlayers().Count(b => b is { IsValid:true, IsBot:true } && b.TeamNum==caller.TeamNum);
+        var teamBots=controllers.Count(b => b is { IsValid:true, IsBot:true } && b.TeamNum==caller.TeamNum);
         Logger.LogInformation("Weapon request slot={Slot}: teammate bots={TeamBots} eligible donors={Donors}",
             caller.Slot,teamBots,bots.Length);
         var choice=SupportPolicy.Select(bots.Select(b => new Donor(b.Slot,b.InGameMoneyServices!.Account,Distance(b,caller))),caller.TeamNum,request);
