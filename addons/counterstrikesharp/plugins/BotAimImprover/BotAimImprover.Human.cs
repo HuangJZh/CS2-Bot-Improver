@@ -52,7 +52,19 @@ public partial class BotAimImprover
     private readonly Dictionary<int,HumanState> _humanStates=new();
     private readonly Dictionary<string,long> _humanPhases=new();
     private readonly Dictionary<nint,Vec> _modelSpots=new();
-    private readonly Dictionary<int,(float Yaw,float Pitch,float Until)> _soundPreaim=new();
+    private sealed class SoundCue
+    {
+        public float Yaw; public float Pitch; public float Start; public float Until; public float Distance; public string Source="";
+    }
+    private readonly Dictionary<int,SoundCue> _soundPreaim=new();
+    private void QueueSoundCue(CCSPlayerController listener,float yaw,float pitch,float distance,float now,float delay,string source,float errorScale)
+    {
+        float error=(1f+HumanAimProfile.For(_humanDifficulty).PerceptionError*12f)*errorScale;
+        yaw+=(Random.Shared.NextSingle()*2f-1f)*error;
+        pitch+=(Random.Shared.NextSingle()*2f-1f)*error*.6f;
+        _soundPreaim[listener.Slot]=new SoundCue{Yaw=yaw,Pitch=pitch,Start=now+delay,Until=now+.95f,Distance=distance,Source=source};
+        WriteTelemetry(new {kind="sound_preaim",tick=Server.TickCount,time=now,slot=listener.Slot,source,distance,error_deg=error,start_delay=delay});
+    }
     private MemoryFunctionVoid<nint>? _updateLook;
     private IBotControllerApi? _humanController;
     private string _humanDifficulty="Medium";
@@ -138,26 +150,46 @@ public partial class BotAimImprover
             {
                 foreach(var listener in Utilities.GetPlayers().Where(p=>p.IsValid && p.IsBot && p.PawnIsAlive && p.TeamNum!=soundShooter.TeamNum))
                 {
-                    if(_humanStates.ContainsKey(listener.Slot))continue;
+                    if(_humanStates.TryGetValue(listener.Slot,out var listenerState) && listenerState.LastSight)continue;
                     var listenerPawn=listener.PlayerPawn.Value;
                     if(listenerPawn?.AbsOrigin is not {} listenerOrigin)continue;
                     float dx=soundOrigin.X-listenerOrigin.X,dy=soundOrigin.Y-listenerOrigin.Y;
                     float dz=(soundOrigin.Z+(soundPawn.ViewOffset?.Z ?? 64f))-(listenerOrigin.Z+(listenerPawn.ViewOffset?.Z ?? 64f));
                     float distance=MathF.Sqrt(dx*dx+dy*dy);
-                    if(distance>1600f)continue;
+                    if(distance>2200f)continue;
                     float yaw=MathF.Atan2(dy,dx)*180f/MathF.PI;
                     float pitch=-MathF.Atan2(dz,MathF.Max(1f,distance))*180f/MathF.PI;
                     float error=1f+HumanAimProfile.For(_humanDifficulty).PerceptionError*12f;
                     yaw+=(Random.Shared.NextSingle()*2f-1f)*error;
                     pitch+=(Random.Shared.NextSingle()*2f-1f)*error*.6f;
-                    _soundPreaim[listener.Slot]=(yaw,pitch,Server.CurrentTime+.85f);
-                    WriteTelemetry(new {kind="sound_preaim",tick=Server.TickCount,time=Server.CurrentTime,
-                        slot=listener.Slot,shooter_slot=soundShooter.Slot,distance=distance,error_deg=error});
+                    QueueSoundCue(listener,yaw,pitch,distance,Server.CurrentTime,Random.Shared.NextSingle()*.12f,"gunfire",1f);
                 }
             }
             return HookResult.Continue;
         });
-        RegisterEventHandler<EventPlayerHurt>((e,i) => {
+        RegisterEventHandler<EventPlayerFootstep>((e,i) => {
+            if(!HumanActive || e.Userid is not {IsValid:true} walker || walker.TeamNum is not (2 or 3))return HookResult.Continue;
+            var walkerPawn=walker.PlayerPawn.Value;
+            if(walkerPawn?.AbsOrigin is not {} stepOrigin)return HookResult.Continue;
+            var velocity=walkerPawn.AbsVelocity;
+            float speed=velocity==null?0f:MathF.Sqrt(velocity.X*velocity.X+velocity.Y*velocity.Y);
+            bool quiet=speed<170f;
+            float range=quiet?900f:1500f;
+            foreach(var listener in Utilities.GetPlayers().Where(p=>p.IsValid && p.IsBot && p.PawnIsAlive && p.TeamNum!=walker.TeamNum))
+            {
+                if(_humanStates.TryGetValue(listener.Slot,out var listenerState) && listenerState.LastSight)continue;
+                var listenerPawn=listener.PlayerPawn.Value;
+                if(listenerPawn?.AbsOrigin is not {} listenerOrigin)continue;
+                float dx=stepOrigin.X-listenerOrigin.X,dy=stepOrigin.Y-listenerOrigin.Y;
+                float dz=(stepOrigin.Z+(walkerPawn.ViewOffset?.Z ?? 64f))-(listenerOrigin.Z+(listenerPawn.ViewOffset?.Z ?? 64f));
+                float distance=MathF.Sqrt(dx*dx+dy*dy);
+                if(distance>range)continue;
+                float yaw=MathF.Atan2(dy,dx)*180f/MathF.PI;
+                float pitch=-MathF.Atan2(dz,MathF.Max(1f,distance))*180f/MathF.PI;
+                QueueSoundCue(listener,yaw,pitch,distance,Server.CurrentTime,.15f+Random.Shared.NextSingle()*.20f,quiet?"footstep-quiet":"footstep",quiet?1.7f:1.25f);
+            }
+            return HookResult.Continue;
+        });        RegisterEventHandler<EventPlayerHurt>((e,i) => {
             if(e.Userid is {IsValid:true,IsBot:true} victim && e.Attacker is {IsValid:true} attacker && attacker.TeamNum!=victim.TeamNum
                 && _humanStates.TryGetValue(victim.Slot,out var state) && state.Pawn==victim.PlayerPawn.Raw)
                 state.UnderFireUntil=Server.CurrentTime+.6f;
@@ -240,6 +272,7 @@ public partial class BotAimImprover
     private bool TryApplySoundPreaim(CCSPlayerController controller,CCSBot bot,nint pointer,CCSPlayerPawn pawn,Vec eyeVec,float now)
     {
         if(!_soundPreaim.TryGetValue(controller.Slot,out var aim))return false;
+        if(now<aim.Start)return false;
         if(now>aim.Until){_soundPreaim.Remove(controller.Slot);return false;}
         var current=new Angles(pawn.EyeAngles.X,pawn.EyeAngles.Y);
         var delta=AimMath.Delta(new Angles(aim.Pitch,aim.Yaw),current);
@@ -366,6 +399,7 @@ public partial class BotAimImprover
                 RefreshFireGuard(controller);
                 return HookResult.Continue;
             }
+            if(!visible && TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
             var fireContext=new HumanFireContext(HumanFireContext.Classify(pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName),now<state.UnderFireUntil);
             state.PlannedWeapon=pawn.WeaponServices?.ActiveWeapon.Raw ?? uint.MaxValue;
             state.Output=state.Model.Step(now,eyeVec,visible,fireContext,new(pawn.EyeAngles.X,pawn.EyeAngles.Y));
