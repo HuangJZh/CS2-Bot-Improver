@@ -516,3 +516,11 @@ A局未采样比例从8.5同口径的30.8%降到3.9%；扇形回退在这两局�
 - 枪声：普通枪约6000单位；AWP/SCAR/G3SG1约7000单位；消音武器（名称含silencer）约1800单位。仍加档位听觉误差与反应延迟。
 - 这些都是近似值，CS2声音还受遮挡/地形/音量设置影响；下一步可用`player_footstep`/武器事件和soundevent定义校准。
 安装`B4758DBC…`→`8.23`构建；用户游戏仍运行，需重启加载。编译0警告0错误；运行验证待下次对局。
+### 2026-11-01 实际听力值（human.8.24，来自游戏soundevent文件）
+
+用 Source2Viewer CLI 从 `game/csgo/pak01_dir.vpk` 提取并解析实际 soundevent 衰减曲线（`distance_volume_mapping_curve`，取音量衰减到0的距离）：
+
+- `soundevents/game_sounds_footsteps.vsndevts`：`Base.Footstep` 截止 **1100 单位**；`Heavy.Step` **1310**；`CT_Silent.StepLeft` / `T_Silent.StepLeft` 继承 Base.Footstep，同为 **1100**。
+- `soundevents/game_sounds_weapons.vsndevts`：`Weapon_AK47.Single` **2500**、`Weapon_M4A1.Single` **2500**、`Weapon_DEagle.Single` **2500**、`Weapon_Glock.Single` **2500**、`Weapon_FAMAS/GalilAR/SSG08.Single` 2500、`Weapon_AWP.Single` **2800**；消音武器 `Weapon_M4A1.Silenced` **1400**、`Weapon_USP.SilencedShot` **1400**。`SingleDistant`（约800）是远程附加音层，不是最大可听距离。
+
+8.24据此把Bot听力改为：脚步 **1100**；普通枪声 **2500**（AWP **2800**）；消音枪 **1400**。之前用“正常玩家感觉”估的6000/7000/1800是错的，已替换为上述实际值。静步脚步声音事件的最大衰减距离同样是1100，但混音音量更低，因此仍保留更大的听觉误差和反应延迟。编译0警告0错误；安装哈希`19F34D99…`；运行验证待下次对局。

@@ -150,7 +150,7 @@ public partial class BotAimImprover
             {
                 string gunEventWeapon=e.Weapon ?? "";
                 bool suppressedWeapon=gunEventWeapon.Contains("silencer");
-                float gunRange=suppressedWeapon?1800f:(gunEventWeapon.Contains("awp")||gunEventWeapon.Contains("scar")||gunEventWeapon.Contains("g3sg1")?7000f:6000f);
+                float gunRange=suppressedWeapon?1400f:(gunEventWeapon.Contains("awp")?2800f:2500f);
                 foreach(var listener in Utilities.GetPlayers().Where(p=>p.IsValid && p.IsBot && p.PawnIsAlive && p.TeamNum!=soundShooter.TeamNum))
                 {
                     if(_humanStates.TryGetValue(listener.Slot,out var listenerState) && listenerState.LastSight)continue;
@@ -177,7 +177,9 @@ public partial class BotAimImprover
             var velocity=walkerPawn.AbsVelocity;
             float speed=velocity==null?0f:MathF.Sqrt(velocity.X*velocity.X+velocity.Y*velocity.Y);
             bool quiet=speed<170f;
-            float range=quiet?850f:1800f;
+            // game_sounds_footsteps.vsndevts Base.Footstep: volume reaches 0 at 1100 u;
+            // Heavy.Step 1310. Silent footstep events inherit the same 1100 u cutoff.
+            float range=1100f;
             foreach(var listener in Utilities.GetPlayers().Where(p=>p.IsValid && p.IsBot && p.PawnIsAlive && p.TeamNum!=walker.TeamNum))
             {
                 if(_humanStates.TryGetValue(listener.Slot,out var listenerState) && listenerState.LastSight)continue;
