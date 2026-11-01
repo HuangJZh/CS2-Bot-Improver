@@ -124,7 +124,7 @@ public partial class BotAimImprover
             }
             MaintainFireGuards();
         });
-        RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);ResetSilentMovement(p.Slot);}return HookResult.Continue; });
+        RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);ResetSilentMovement(p.Slot);ResetPreAimStrafe(p.Slot);ResetFireEscape(p.Slot);}return HookResult.Continue; });
         // Track bursts so the aim output can model human recoil control after the
         // first few rounds instead of holding a perfectly steady target point.
         RegisterEventHandler<EventWeaponFire>((e,i) => {
@@ -200,7 +200,7 @@ public partial class BotAimImprover
                 state.UnderFireUntil=Server.CurrentTime+.6f;
             return HookResult.Continue;
         });
-        RegisterEventHandler<EventPlayerDisconnect>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);ResetSilentMovement(p.Slot);}return HookResult.Continue; });
+        RegisterEventHandler<EventPlayerDisconnect>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);ResetSilentMovement(p.Slot);ResetPreAimStrafe(p.Slot);ResetFireEscape(p.Slot);}return HookResult.Continue; });
         RegisterEventHandler<EventItemEquip>((e,i) => {
             if(e.Userid is {IsValid:true} player)
             {
@@ -264,7 +264,7 @@ public partial class BotAimImprover
         _testGateUntil=float.NegativeInfinity;
         foreach(var slot in _humanStates.Keys.ToArray())ReleaseHuman(slot);
         foreach(var slot in _fireGuards.Keys.ToArray())ReleaseFireGuard(slot);
-        _modelSpots.Clear();_humanPhases.Clear();_soundPreaim.Clear();ResetAllSilentMovement();ReadHumanDifficulty();
+        _modelSpots.Clear();_humanPhases.Clear();_soundPreaim.Clear();ResetAllSilentMovement();ResetMovementControl();ReadHumanDifficulty();
     }
     private static bool IsGun(CCSPlayerPawn pawn)
         => pawn.WeaponServices?.ActiveWeapon.Value?.As<CCSWeaponBase>().VData?.GearSlot is gear_slot_t.GEAR_SLOT_RIFLE or gear_slot_t.GEAR_SLOT_PISTOL;
@@ -306,10 +306,11 @@ public partial class BotAimImprover
             float now=Server.CurrentTime;
             var bot=new CCSBot(pointer);
             TickSilentMovement(controller,pawn,bot,now);
+            TickFireAvoidance(controller,pawn,now);
             if(bot.Enemy.Value is not {IsValid:true} enemy || enemy.LifeState!=0 || enemy.TeamNum==controller.TeamNum)
             {
                 if(TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
-                if(TryApplyMapPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
+                if(TryApplyMapPreaim(controller,bot,pointer,pawn,eyeVec,now)){TickPreAimStrafe(controller,now);return HookResult.Continue;}
                 // The native enemy handle can flicker between peeks. Keep the memory
                 // based plan for a short grace period instead of resetting every
                 // model (reset means a fresh sensor delay and reaction before the
@@ -327,6 +328,7 @@ public partial class BotAimImprover
             }
             _soundPreaim.Remove(controller.Slot);
             _preaimTargets.Remove(controller.Slot);
+            ResetPreAimStrafe(controller.Slot);
             if(!_humanStates.TryGetValue(controller.Slot,out var state) || state.Pawn!=controller.PlayerPawn.Raw || state.Enemy!=enemy.EntityHandle.Raw)
             {
                 ReleaseHuman(controller.Slot);

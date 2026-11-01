@@ -15,7 +15,7 @@ namespace BotAimImprover;
 public partial class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8-human.8.24-experimental";
+    public override string ModuleVersion => "2.1.8-human.8.25-experimental";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 
@@ -56,6 +56,9 @@ public partial class BotAimImprover : BasePlugin
         new("LEFT_SHIN",      0.15f, -5f),   // 14
         new("RIGHT_SHIN",     0.15f,  5f),   // 15
         new("FEET",           5.0f,   0f, true), // 16  // absolute z + 5
+        new("HEAD_TOP",       1.04f,  0f),   // 17  // top of skull, visible when only the head peeks
+        new("HEAD_LEFT",      1.00f, -4f),   // 18
+        new("HEAD_RIGHT",     1.00f,  4f),   // 19
     };
     // Priority orders (values are indices into _aimPoints), highest priority first.
     // Tiers: core > centerline > side > shoulder > limb > feet.
@@ -63,7 +66,7 @@ public partial class BotAimImprover : BasePlugin
 
     private static readonly int[] _priorityHead =
     {
-        0, 1, 2,         // HEAD, NECK, JAW
+        0, 17, 18, 19, 1, 2, // HEAD, HEAD_TOP/L/R, NECK, JAW
         3, 4, 5,         // CHEST, GUT, PELVIS
         6, 7, 10, 11,    // L_CHEST, R_CHEST, L_GUT, R_GUT
         8, 9,            // L_SHOULDER, R_SHOULDER
@@ -96,7 +99,7 @@ public partial class BotAimImprover : BasePlugin
         4, 5, 10, 11,    // GUT, PELVIS, L_GUT, R_GUT
         3, 6, 7,         // CHEST, L_CHEST, R_CHEST
         8, 9,            // L_SHOULDER, R_SHOULDER
-        2, 1, 0,         // JAW, NECK, HEAD        
+        2, 17, 18, 19, 1, 0, // JAW, HEAD_TOP/L/R, NECK, HEAD        
         12, 13, 14, 15,  // L_THIGH, R_THIGH, L_SHIN, R_SHIN
         16               // FEET
     };

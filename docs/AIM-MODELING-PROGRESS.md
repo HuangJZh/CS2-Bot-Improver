@@ -537,3 +537,19 @@ A局未采样比例从8.5同口径的30.8%降到3.9%；扇形回退在这两局�
 ### 2026-11-01 补充：只开启炸弹全局听觉
 
 按用户要求“炸弹全局听觉启动”，从 `CombatPatchPolicy.Disabled` 中移除 `BombBeep_CT_GlobalHearRange`、`BombPickup_CT_GlobalHearRange`，重新编译安装 BotAI。专用服日志：`Applied 17/17 patches`，`BombBeep_CT_GlobalHearRange`、`BombPickup_CT_GlobalHearRange` 已应用；`OnAudibleEvent_GlobalHearRange`、`InvestigateNoise_SkipSelfDefenseCheck` 仍未应用——即**普通脚步/枪声保持原生正常人听觉范围**，只让 CT 全局感知炸弹 beep/捡包（原生炸弹 beep 1500、pickup 1000 的限制被取消）。安装 BotAI 哈希`30D61F1C…`；gameinfo已恢复（3B18F0CA…），无CS2进程。需重启游戏加载。
+## 第三十轮：只露头/打墙、预瞄移动、火中反复踩（human.8.25）
+
+针对用户反馈的三个问题：
+
+1. **只露头却锁身体打墙**：
+   - 新增瞄准候选点 `HEAD_TOP`（眼睛高度×1.04）、`HEAD_LEFT/RIGHT`（±4单位），在所有优先级里紧跟HEAD，只在头部露出掩体时也能选到真实可见的头部点；
+   - FireGuard增加“子弹路径遮挡”检查：开火前从Bot眼睛到当前计划瞄准点做 world trace，若被墙体挡住（fraction<0.985）则`wall-blocked`保持扳机，不在重新获得可见样本前打墙。
+2. **预瞄不移动/搜点不左右移动**：
+   - 地图预瞄/搜点期间短按注入`Left/Right`（每次260ms，间隔约1.1–1.8秒），让Bot在搜索时左右小步调整，同时仍由原生导航负责路线；看到敌人或退出预瞄时取消。
+   - 注意：这不是完整“预瞄路线+peek”移动系统，不接管整段路径，只做短促横移。
+3. **火中反复踩**：
+   - 每0.25秒扫描`inferno`实体位置；Bot进入火焰230单位内时用`StartUsercmdMovement`接管移动0.65秒，沿远离火源方向走开；离开火焰后释放；若仍在火里会再次尝试走出。避免“踩→受伤→退出→再踩”的循环。
+
+验证：编译0警告0错误，64项模型检查通过；8.25已安装（哈希`5F9E0BBD…`）。本轮专用服采集出现测试脚本Bot未正常生成（采集只有session行），因此横移/避火的运行证据待用户下次对局；代码路径已编译进插件，需重启加载。
+
+边界：只露头场景仍受命中判定/模型误差影响，可能打中掩体边缘；横移是按钮注入，不保证理想peek；避火只处理“已进入火焰附近”，未做路径级火焰避让。下一步可按用户反馈调整头部候选点与避火时间。
