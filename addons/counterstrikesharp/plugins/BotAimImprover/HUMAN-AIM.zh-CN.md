@@ -174,3 +174,8 @@ Mixed的非身体优先武器原来按JAW→NECK→HEAD，JAW常打颈/胸导致
 ## 2026-11-01：仅AWP身体优先（human.8.29）
 
 Mixed模式`_bodyFirstWeapons`只保留weapon_awp；SSG08/P90/Bizon/霰弹/左轮等全部改回HEAD优先。Head模式保持AWP例外。安装01E07191，编译/64项测试通过。
+
+
+## 2026-11-01：PickNewAimSpot后置hook也改为头优先（human.8.30）
+
+此前只改Human look的Mixed优先级，OnPickNewAimSpotPost（覆盖原生m_targetSpot）仍用JAW→NECK→HEAD，可能压过Human写点，导致重启后爆头率仍0。现两套路径Mixed都优先HEAD/HEAD_TOP/L/R→NECK→JAW；仅AWP身体优先。安装04A1E29B，编译/64项测试通过，需重启。

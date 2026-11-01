@@ -595,3 +595,8 @@ A局未采样比例从8.5同口径的30.8%降到3.9%；扇形回退在这两局�
 ### 2026-11-01 其他武器全部头优先，仅保留AWP身体优先（human.8.29）
 
 按用户要求调整Mixed模式：`_bodyFirstWeapons` 由 `awp/ssg08/p90/bizon/nova/xm1014/sawedoff/mag7/revolver` 缩减为仅 `weapon_awp`。现在Mixed下除AWP外，所有武器（含SSG08、P90/Bizon、霰弹枪、左轮）都使用 `_priorityHead`：HEAD→HEAD_TOP/L/R→NECK→JAW→胸腹；AWP仍按身体优先。Head模式本来就仅AWP例外（AWP走trunk），无需改。安装8.29哈希`01E07191…`；编译0警告0错误、64项测试通过；当前无CS2进程。
+### 2026-11-01 爆头率仍0：原生PickNewAimSpot后置覆盖仍在用JAW（human.8.30）
+
+继续排查发现：8.28/8.29只改了Human look模型里的Mixed优先级，但 `OnPickNewAimSpotPost` 这个**后置hook**（会覆盖原生 `m_targetSpot`）里的Mixed分支仍写着 `_priorityJaw`（JAW→NECK→HEAD）。该hook在原生PickNewAimSpot之后写目标点，时机上可能压过Human look写点，导致用户重启后看到的仍是JAW/身体目标，爆头率0。
+
+修复：`OnPickNewAimSpotPost` 的Mixed分支也改为 `_priorityHead`（HEAD→HEAD_TOP/L/R→NECK→JAW→胸腹），只有AWP走trunk。现在两套写目标点路径（Human look 与 native post hook）对Mixed/Head都是头优先，Body模式仍可显式身体优先。安装8.30哈希`04A1E29B…`；编译0警告0错误、64项测试通过；用户游戏运行中，需重启加载。运行验证待重启后用event_hitgroup统计。
