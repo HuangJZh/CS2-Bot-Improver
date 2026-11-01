@@ -81,6 +81,7 @@ public partial class BotAimImprover
     // in-front marker with the same bounded turn used for sound preaim.
     private bool TryApplyMapPreaim(CCSPlayerController controller, CCSBot bot, nint pointer, CCSPlayerPawn pawn, Vec eyeVec, float now)
     {
+        if(!MovementContext(controller,pawn,bot,now).Peek)return false;
         var points = CurrentPreAimPoints();
         if (points == null || points.Count == 0) return false;
         var origin = pawn.AbsOrigin;
@@ -128,6 +129,7 @@ public partial class BotAimImprover
         var spot = AimMath.Ray(eyeVec,next);
         _modelSpots[pointer] = spot;
         WriteModelSpot(bot, spot);
+        TryCoverPeek(controller,pawn,bot,target.Point,now);
         RefreshFireGuard(controller);
         return true;
     }

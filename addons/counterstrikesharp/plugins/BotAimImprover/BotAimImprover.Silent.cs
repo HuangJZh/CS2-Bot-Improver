@@ -43,7 +43,7 @@ public partial class BotAimImprover
     }
     private void TickSilentMovement(CCSPlayerController controller, CCSPlayerPawn pawn, CCSBot bot, float now)
     {
-        if (!HumanActive || bot.IsEnemyVisible)
+        if (!HumanActive || !MovementContext(controller,pawn,bot,now).Quiet || _coverPeeks.ContainsKey(controller.Slot))
         {
             ResetSilentMovement(controller.Slot);
             return;
@@ -97,6 +97,7 @@ public partial class BotAimImprover
             : -1;
         if (walkToken <= 0)
         {
+            if(duckToken>0)_humanController?.CancelUsercmdInjection(controller.Slot,duckToken);
             _silentNextDecision[controller.Slot] = now + 2f;
             return;
         }

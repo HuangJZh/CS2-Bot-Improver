@@ -24,6 +24,8 @@ public partial class BotAimImprover
         }
     }
     private readonly record struct FireGateDecision(bool Allow,bool Hold,string Reason);
+    private static bool FirstShotPending(HumanState state,float now)=>state.SprayShots==0
+        ||now-state.LastShotAt>.35f||float.IsFinite(state.Cadence.PauseUntil)&&now>=state.Cadence.PauseUntil;
     private bool TryCancelFireGuard(int slot,long token,out bool cancelled)
     {
         cancelled=false;
@@ -92,7 +94,7 @@ public partial class BotAimImprover
             // survives until the model actually aligns or the plan is rebuilt.
             if(decision.Reason!="hold-timeout" && _humanStates.TryGetValue(slot,out var released)
                 && released.Pawn==player.PlayerPawn.Raw)
-            {released.PlanHoldSince=null;released.PlanHoldTimedOut=false;}
+            {released.PlanHoldSince=null;released.PlanHoldTimedOut=false;released.Execution.ResetReadiness();}
             ReleaseFireGuard(slot,decision.Reason);return;
         }
         if(_fireGuards.TryGetValue(slot,out var current) && current.Token>0)return;
@@ -132,11 +134,18 @@ public partial class BotAimImprover
         // Human burst discipline: after the planned number of rounds, release the
         // trigger for a short human-like pause instead of holding a perfect spray.
         if(now<state.BurstCooldownUntil)return new(false,true,"burst-pause");
-        if(now<state.AllowLatchUntil)return new(true,false,"allow-latch");
-        if(state.Output.AllowFire)
+        if(state.Output.AllowFire||now<state.AllowLatchUntil)
         {
             if(advanceTimers){state.PlanHoldSince=null;state.PlanHoldTimedOut=false;}
-            return new(true,false,"planned-shot");
+            var weapon=HumanFireContext.Classify(pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName);
+            float floor=weapon switch {AimWeaponClass.Sniper=>.30f,AimWeaponClass.PrecisePistol=>.40f,
+                AimWeaponClass.Smg or AimWeaponClass.Shotgun=>1f,_=>.65f};
+            float tolerance=Math.Clamp(MathF.Max(floor,(state.Model.LastFireDecision.ToleranceDegrees??.5f)+state.Model.Profile.MotorError*.5f),floor,3f);
+            float error=AimMath.Delta(state.Output.Angles,new(pawn.EyeAngles.X,pawn.EyeAngles.Y)).Length();
+            var permission=state.Execution.FirstShot(now,FirstShotPending(state,now),error,tolerance,advanceTimers);
+            if(advanceTimers)state.ExecutionPermission=permission;
+            if(!permission.Allow)return new(false,true,permission.Reason);
+            return new(true,false,permission.Reason=="execution-settle-timeout"?permission.Reason:"planned-shot");
         }
         if(state.PlanHoldTimedOut)return new(false,false,"hold-timeout");
         if(state.PlanHoldSince is {} since && now-since>PlannedFireHoldLimit)

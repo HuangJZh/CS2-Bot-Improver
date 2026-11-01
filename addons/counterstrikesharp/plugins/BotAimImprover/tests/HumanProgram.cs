@@ -253,4 +253,65 @@ Check(SoundAttention.Merge(farGun,closeStep).SourcePawn==1,"near footstep can ou
 Check(MathF.Abs(AimMath.Angles(eye,firstCue.Position).Y)==180,"auditory direction retains sources behind the view cone");
 var freshCue=firstCue with {HeardAt=2,Start=2.25f,Until=2.95f};
 Check(SoundAttention.Merge(firstCue,freshCue).Start==2.25f,"expired sound memory starts a fresh reaction");
+var execution=new AimExecutionController();
+var request=execution.Update(0,new(0,10),Vector2.Zero,true);
+Check(request.Correction.Y>0&&request.Correction.Y<=1,"execution feedback requests a bounded correction toward the motor plan");
+Check(execution.Update(0,new(0,20),new(0,5),true)==request,"same-clock execution callbacks are idempotent");
+float physicalYaw=0,maxCorrection=0;
+var delayedCommands=new Queue<float>(Enumerable.Repeat(0f,4));
+for(int i=1;i<=256;i++)
+{
+ float now=i/64f;var command=execution.Update(now,new(0,10),new(0,physicalYaw),true);
+ maxCorrection=Math.Max(maxCorrection,Math.Abs(command.Correction.Y));
+ delayedCommands.Enqueue(command.Angles.Y);
+ physicalYaw+=(delayedCommands.Dequeue()-physicalYaw)*.18f;
+}
+Check(Math.Abs(physicalYaw-10)<.1f&&maxCorrection<=1.0001f,"bounded feedback converges through a delayed native-view plant");
+var corrected=execution.Update(4.1f,new(0,10),Vector2.Zero,true);
+var recoilOwnership=execution.Update(4.12f,new(0,10),Vector2.Zero,false);
+Check(recoilOwnership.Correction.Y<corrected.Correction.Y&&!recoilOwnership.FeedbackActive,
+ "feedback yields smoothly to native recoil during a burst");
+var readiness=new AimExecutionController();
+Check(!readiness.FirstShot(0,true,2,.65f).Allow,"first shot waits when the real view has not reached the motor plan");
+Check(readiness.FirstShot(.05f,true,.2f,.65f).Reason=="execution-aligned","real alignment permits first shot immediately");
+readiness.Shot();
+Check(!readiness.FirstShot(1,true,2,.65f).Allow&&readiness.FirstShot(1.25f,true,2,.65f).Reason=="execution-settle-timeout",
+ "nonconverging native execution has a bounded fallback instead of permanent silence");
+var diagnosticGate=new AimExecutionController();
+diagnosticGate.FirstShot(0,true,2,.65f,false);
+Check(!diagnosticGate.FirstShot(1,true,2,.65f).Allow,"diagnostic evaluation cannot start the execution-wait timer");
+Check(readiness.FirstShot(2,false,8,.65f).Allow,"live burst leaves recoil and continuing trigger to the native controller");
+readiness.FirstShot(3,true,2,.65f);
+readiness.ResetReadiness();
+Check(!readiness.FirstShot(4,true,2,.65f).Allow,"lost visual plan cannot reuse an old execution timeout after reacquisition");
+var ordinaryContext=new TacticalMovementContext(false,false,false,false,false,70,false,0,0,10);
+Check(TacticalMovementPolicy.Evaluate(ordinaryContext).Quiet,"ordinary approach permits context-dependent quiet movement");
+Check(!TacticalMovementPolicy.Evaluate(ordinaryContext with {BusyObjective=true}).Quiet,
+ "planting or defusing cancels extra quiet movement");
+Check(!TacticalMovementPolicy.Evaluate(ordinaryContext with {Frozen=true}).Peek,"freeze time cannot start a clearance peek");
+Check(!TacticalMovementPolicy.Evaluate(ordinaryContext with {Combat=true}).Peek,"combat cancels clearance movement");
+Check(TacticalMovementPolicy.Evaluate(ordinaryContext with {CarryingBomb=true,RoundSeconds=10}).Reason=="urgent-plant",
+ "late bomb carrier prioritizes reaching the plant");
+var retake=ordinaryContext with {CounterTerrorist=true,BombPlanted=true,BombSeconds=16,BombDistance=400};
+Check(!TacticalMovementPolicy.Evaluate(retake).Quiet&&TacticalMovementPolicy.Evaluate(retake with {DefuseSeconds=5}).Quiet,
+ "remaining travel and defuse-kit time change retake urgency");
+Check(!TacticalMovementPolicy.Evaluate(ordinaryContext with {BombPlanted=true,BombSeconds=6,BombDistance=600}).Quiet,
+ "nearby imminent bomb explosion prevents slow optional movement");
+Check(!TacticalMovementPolicy.Evaluate(ordinaryContext with {RoundSeconds=float.NaN}).Peek,
+ "unknown task timing fails closed for optional movement");
+var safePeek=new PeekCandidate(new(0,28,0),true,true,true);
+var localRoute=CoverPeekPolicy.Plan(3,Vector3.Zero,new(600,0,0),new(300,200,64),true,true,[safePeek]);
+Check(localRoute.HasValue,"covered angle and safe revealing step create a local clearance route");
+Check(CoverPeekPolicy.Plan(3,Vector3.Zero,new(600,0,0),new(300,200,64),false,true,[safePeek])==null,
+ "open angle does not trigger pointless strafing");
+Check(CoverPeekPolicy.Plan(3,Vector3.Zero,new(600,0,0),new(300,200,64),true,true,[safePeek with {GroundSafe=false}])==null,
+ "ledge or missing footing rejects a peek");
+Check(CoverPeekPolicy.Plan(3,Vector3.Zero,new(600,0,0),new(300,200,64),true,true,[safePeek with {PathClear=false}])==null,
+ "blocked body corridor rejects a peek");
+Check(CoverPeekPolicy.Plan(3,Vector3.Zero,new(600,0,0),new(300,200,64),true,true,[safePeek with {Destination=new(-24,28,0)}])==null,
+ "peek cannot backtrack against the native route");
+Check(CoverPeekPolicy.Cancel(localRoute!.Value,4,Vector3.Zero,new(600,0,0),true,.05f),"native route segment change cancels the old peek");
+Check(CoverPeekPolicy.Cancel(localRoute.Value,3,Vector3.Zero,new(600,0,0),false,.05f),"task priority can cancel an in-flight peek");
+Check(CoverPeekPolicy.Cancel(localRoute.Value,3,Vector3.Zero,new(600,0,0),true,.2f),"peek has a hard finite duration");
+Check(CoverPeekPolicy.Cancel(localRoute.Value,3,new(float.NaN,0,0),new(600,0,0),true,.05f),"invalid native position cancels optional movement");
 Console.WriteLine($"{count} checks passed");

@@ -47,6 +47,9 @@ public partial class BotAimImprover
         public float RecoilCompensation;
         public float BurstCooldownUntil;
         public BurstCadence Cadence=new();
+        public AimExecutionController Execution=new();
+        public ExecutionRequest ExecutionRequest;
+        public ExecutionPermission ExecutionPermission;
     }
     private HumanSettings _humanSettings=new();
     private readonly Dictionary<int,HumanState> _humanStates=new();
@@ -64,6 +67,7 @@ public partial class BotAimImprover
     {
         ReadHumanSettings();
         InitializeAimTelemetry();
+        InitializeTactics();
         var processArgs=Environment.GetCommandLineArgs();
         int testPort=Array.IndexOf(processArgs,"-port"),testIp=Array.IndexOf(processArgs,"-ip");
         if(processArgs.Contains("-dedicated") && testPort>=0 && testPort+1<processArgs.Length && processArgs[testPort+1]=="27025"
@@ -110,6 +114,7 @@ public partial class BotAimImprover
                     || p.PlayerPawn.Raw!=state.Pawn || Server.CurrentTime-state.LastUsed>.5f)ReleaseHuman(slot);
             }
             MaintainFireGuards();
+            MaintainTacticalMovement();
         });
         RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);_attentionTurnAt.Remove(p.Slot);ResetSilentMovement(p.Slot);}return HookResult.Continue; });
         // Track bursts so the aim output can model human recoil control after the
@@ -127,6 +132,7 @@ public partial class BotAimImprover
                 fireState.SprayShots=fireState.Cadence.Shots;
                 fireState.BurstCooldownUntil=fireState.Cadence.PauseUntil;
                 fireState.LastShotAt=fireNow;
+                fireState.Execution.Shot();
                 if(fireState.SprayShots==1 && shooter.PlayerPawn.Value is {} firePawn)
                     fireState.SprayBasePitchError=firePawn.EyeAngles.X-fireState.Model.LastDesiredAngles.X;
             }
@@ -220,6 +226,7 @@ public partial class BotAimImprover
         // Any movement override owned by this slot must die with the human-aim
         // state; otherwise a released bot can stay movement-locked (standstill /
         // no reaction) until the round ends.
+        CancelCoverPeek(slot,"visual-context-changed");
         if(!_humanStates.Remove(slot,out var state))return;
         _modelSpots.Remove(state.Pointer);
     }
@@ -230,6 +237,7 @@ public partial class BotAimImprover
         foreach(var slot in _fireGuards.Keys.ToArray())ReleaseFireGuard(slot);
         _modelSpots.Clear();_humanPhases.Clear();_soundPreaim.Clear();_lastFootstep.Clear();_attentionTurnAt.Clear();
         _preaimTargets.Clear();_preaimVisited.Clear();ResetAllSilentMovement();ReadHumanDifficulty();
+        ResetTactics();
     }
     private static bool IsGun(CCSPlayerPawn pawn)
         => pawn.WeaponServices?.ActiveWeapon.Value?.As<CCSWeaponBase>().VData?.GearSlot is gear_slot_t.GEAR_SLOT_RIFLE or gear_slot_t.GEAR_SLOT_PISTOL;
@@ -271,6 +279,8 @@ public partial class BotAimImprover
             var eyeVec=new Vec(eye.X,eye.Y,eye.Z);
             float now=Server.CurrentTime;
             var bot=new CCSBot(pointer);
+            if(pawn.IsDefusing||(_plantingUntil.TryGetValue(controller.Slot,out var plantingUntil)&&now<plantingUntil))
+            {ResetSilentMovement(controller.Slot);ReleaseHuman(controller.Slot);ReleaseFireGuard(controller.Slot);return HookResult.Continue;}
             TickSilentMovement(controller,pawn,bot,now);
             if(bot.Enemy.Value is not {IsValid:true} enemy || enemy.LifeState!=0 || enemy.TeamNum==controller.TeamNum)
             {
@@ -292,7 +302,9 @@ public partial class BotAimImprover
                 ReleaseHuman(controller.Slot);_modelSpots.Remove(pointer);RefreshFireGuard(controller);return HookResult.Continue;
             }
             _preaimTargets.Remove(controller.Slot);
-            if(!_humanStates.TryGetValue(controller.Slot,out var state) || state.Pawn!=controller.PlayerPawn.Raw || state.Enemy!=enemy.EntityHandle.Raw)
+            CancelCoverPeek(controller.Slot,"enemy-context");
+            if(!_humanStates.TryGetValue(controller.Slot,out var state) || state.Pawn!=controller.PlayerPawn.Raw || state.Enemy!=enemy.EntityHandle.Raw
+                ||state.PlannedWeapon!=(pawn.WeaponServices?.ActiveWeapon.Raw??uint.MaxValue))
             {
                 ReleaseHuman(controller.Slot);
                 state=new HumanState{Pointer=pointer,Pawn=controller.PlayerPawn.Raw,Enemy=enemy.EntityHandle.Raw,
@@ -377,9 +389,8 @@ public partial class BotAimImprover
             state.PlannedWeapon=pawn.WeaponServices?.ActiveWeapon.Raw ?? uint.MaxValue;
             state.Output=state.Model.Step(now,eyeVec,visible,fireContext,new(pawn.EyeAngles.X,pawn.EyeAngles.Y));
             _humanPhases[state.Output.Phase]=_humanPhases.GetValueOrDefault(state.Output.Phase)+1;
-            // Execution feedback is measured for calibration but not injected: natural
-            // captures show the engine view lags the plan by several degrees and a
-            // naive correction of the target spot worsened planned-vs-actual error.
+            // Close the native execution gap before the first shot. During a live
+            // spray native recoil owns the view and this bounded correction fades.
             var actualView=new Angles(pawn.EyeAngles.X,pawn.EyeAngles.Y);
             var viewDelta=AimMath.Delta(state.Model.LastDesiredAngles,actualView);
             state.LastAimFeedbackCorrection=viewDelta.Length();
@@ -389,8 +400,11 @@ public partial class BotAimImprover
             // correcting the observed climb over-rotated the crosshair upward.
             // Do not inject a correction until bullet-direction truth is measured.
             state.RecoilCompensation=0f;
-            // Native recoil remains the sole recoil controller; no extra camera curve.
-            var spot=AimMath.Ray(eyeVec,state.Output.Angles);
+            bool settle=visible && FirstShotPending(state,now) && now-state.LastShotAt>.35f
+                &&state.Output.Phase is "flick" or "tracking" or "correction";
+            float gain=_humanDifficulty switch {"Low"=>.6f,"High"=>1f,_=>.8f};
+            state.ExecutionRequest=state.Execution.Update(now,state.Output.Angles,actualView,settle,gain);
+            var spot=AimMath.Ray(eyeVec,state.ExecutionRequest.Angles);
             _modelSpots[pointer]=spot;
             WriteModelSpot(bot,spot);
             RefreshFireGuard(controller);
