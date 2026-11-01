@@ -46,25 +46,12 @@ public partial class BotAimImprover
         public float SprayBasePitchError;
         public float RecoilCompensation;
         public float BurstCooldownUntil;
-        public float SpraySway;
+        public BurstCadence Cadence=new();
     }
     private HumanSettings _humanSettings=new();
     private readonly Dictionary<int,HumanState> _humanStates=new();
     private readonly Dictionary<string,long> _humanPhases=new();
     private readonly Dictionary<nint,Vec> _modelSpots=new();
-    private sealed class SoundCue
-    {
-        public float Yaw; public float Pitch; public float Start; public float Until; public float Distance; public string Source="";
-    }
-    private readonly Dictionary<int,SoundCue> _soundPreaim=new();
-    private void QueueSoundCue(CCSPlayerController listener,float yaw,float pitch,float distance,float now,float delay,string source,float errorScale)
-    {
-        float error=(1f+HumanAimProfile.For(_humanDifficulty).PerceptionError*12f)*errorScale;
-        yaw+=(Random.Shared.NextSingle()*2f-1f)*error;
-        pitch+=(Random.Shared.NextSingle()*2f-1f)*error*.6f;
-        _soundPreaim[listener.Slot]=new SoundCue{Yaw=yaw,Pitch=pitch,Start=now+delay,Until=now+.95f,Distance=distance,Source=source};
-        WriteTelemetry(new {kind="sound_preaim",tick=Server.TickCount,time=now,slot=listener.Slot,source,distance,error_deg=error,start_delay=delay});
-    }
     private MemoryFunctionVoid<nint>? _updateLook;
     private IBotControllerApi? _humanController;
     private string _humanDifficulty="Medium";
@@ -124,83 +111,57 @@ public partial class BotAimImprover
             }
             MaintainFireGuards();
         });
-        RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);ResetSilentMovement(p.Slot);ResetPreAimStrafe(p.Slot);}return HookResult.Continue; });
+        RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);_attentionTurnAt.Remove(p.Slot);ResetSilentMovement(p.Slot);}return HookResult.Continue; });
         // Track bursts so the aim output can model human recoil control after the
         // first few rounds instead of holding a perfectly steady target point.
         RegisterEventHandler<EventWeaponFire>((e,i) => {
+            string eventItem=e.Weapon ?? "";
+            if(!eventItem.StartsWith("weapon_"))eventItem="weapon_"+eventItem;
+            if(HumanFireContext.Classify(eventItem)==AimWeaponClass.Other)return HookResult.Continue;
             if(e.Userid is {IsValid:true} shooter && _humanStates.TryGetValue(shooter.Slot,out var fireState)
                 && fireState.Pawn==shooter.PlayerPawn.Raw)
             {
                 float fireNow=Server.CurrentTime;
-                if(fireNow-fireState.LastShotAt<.25f)fireState.SprayShots++;
-                else {fireState.SprayShots=1;fireState.SprayBasePitchError=0f;}
+                float pause=fireState.Model.Profile.BurstPause*(.8f+Random.Shared.NextSingle()*.4f);
+                fireState.Cadence.Shot(fireNow,fireState.Model.Profile.BurstLength,pause);
+                fireState.SprayShots=fireState.Cadence.Shots;
+                fireState.BurstCooldownUntil=fireState.Cadence.PauseUntil;
                 fireState.LastShotAt=fireNow;
-                if(fireState.SprayShots>=fireState.Model.Profile.BurstLength)
-                {
-                    float pause=fireState.Model.Profile.BurstPause*(.8f+Random.Shared.NextSingle()*.4f);
-                    fireState.BurstCooldownUntil=fireNow+pause;
-                }
                 if(fireState.SprayShots==1 && shooter.PlayerPawn.Value is {} firePawn)
                     fireState.SprayBasePitchError=firePawn.EyeAngles.X-fireState.Model.LastDesiredAngles.X;
             }
-            // Sound cue for other bots without a live visual target: remember the
-            // shooter direction for about a second and let them preaim toward it.
-            if(HumanActive && e.Userid is {IsValid:true} soundShooter && soundShooter.TeamNum is 2 or 3
-                && soundShooter.PlayerPawn.Value is {} soundPawn && soundPawn.AbsOrigin is {} soundOrigin)
+            if(HumanActive && e.Userid is {IsValid:true} soundShooter)
             {
-                string gunEventWeapon=e.Weapon ?? "";
-                bool suppressedWeapon=gunEventWeapon.Contains("silencer");
-                float gunRange=suppressedWeapon?1400f:(gunEventWeapon.Contains("awp")?2800f:2500f);
-                foreach(var listener in Utilities.GetPlayers().Where(p=>p.IsValid && p.IsBot && p.PawnIsAlive && p.TeamNum!=soundShooter.TeamNum))
-                {
-                    if(_humanStates.TryGetValue(listener.Slot,out var listenerState) && listenerState.LastSight)continue;
-                    var listenerPawn=listener.PlayerPawn.Value;
-                    if(listenerPawn?.AbsOrigin is not {} listenerOrigin)continue;
-                    float dx=soundOrigin.X-listenerOrigin.X,dy=soundOrigin.Y-listenerOrigin.Y;
-                    float dz=(soundOrigin.Z+(soundPawn.ViewOffset?.Z ?? 64f))-(listenerOrigin.Z+(listenerPawn.ViewOffset?.Z ?? 64f));
-                    float distance=MathF.Sqrt(dx*dx+dy*dy);
-                    if(distance>gunRange)continue;
-                    float yaw=MathF.Atan2(dy,dx)*180f/MathF.PI;
-                    float pitch=-MathF.Atan2(dz,MathF.Max(1f,distance))*180f/MathF.PI;
-                    float error=1f+HumanAimProfile.For(_humanDifficulty).PerceptionError*12f;
-                    yaw+=(Random.Shared.NextSingle()*2f-1f)*error;
-                    pitch+=(Random.Shared.NextSingle()*2f-1f)*error*.6f;
-                    QueueSoundCue(listener,yaw,pitch,distance,Server.CurrentTime,Random.Shared.NextSingle()*.12f,"gunfire",1f);
-                }
+                string weapon=eventItem;
+                float range=weapon.Contains("silencer") ? 1400f : weapon.Contains("awp") ? 2800f : 2500f;
+                HearSound(soundShooter,range,.95f,"gunfire",Random.Shared.NextSingle()*.12f,1f);
             }
             return HookResult.Continue;
         });
+        RegisterEventHandler<EventPlayerSound>((e,i) => {
+            if(e.Step && e.Userid is {IsValid:true} walker && e.Radius>0 && e.Duration>0)
+                HearFootstep(walker,e.Radius,e.Duration,"player_sound");
+            return HookResult.Continue;
+        });
         RegisterEventHandler<EventPlayerFootstep>((e,i) => {
-            if(!HumanActive || e.Userid is not {IsValid:true} walker || walker.TeamNum is not (2 or 3))return HookResult.Continue;
-            var walkerPawn=walker.PlayerPawn.Value;
-            if(walkerPawn?.AbsOrigin is not {} stepOrigin)return HookResult.Continue;
-            var velocity=walkerPawn.AbsVelocity;
-            float speed=velocity==null?0f:MathF.Sqrt(velocity.X*velocity.X+velocity.Y*velocity.Y);
-            bool quiet=speed<170f;
-            // game_sounds_footsteps.vsndevts Base.Footstep: volume reaches 0 at 1100 u;
-            // Heavy.Step 1310. Silent footstep events inherit the same 1100 u cutoff.
-            float range=1100f;
-            foreach(var listener in Utilities.GetPlayers().Where(p=>p.IsValid && p.IsBot && p.PawnIsAlive && p.TeamNum!=walker.TeamNum))
+            // Defer the compatibility event so a same-frame modern event supplies
+            // the authoritative radius, and deduplicate both event paths.
+            if(e.Userid is {IsValid:true} walker)
             {
-                if(_humanStates.TryGetValue(listener.Slot,out var listenerState) && listenerState.LastSight)continue;
-                var listenerPawn=listener.PlayerPawn.Value;
-                if(listenerPawn?.AbsOrigin is not {} listenerOrigin)continue;
-                float dx=stepOrigin.X-listenerOrigin.X,dy=stepOrigin.Y-listenerOrigin.Y;
-                float dz=(stepOrigin.Z+(walkerPawn.ViewOffset?.Z ?? 64f))-(listenerOrigin.Z+(listenerPawn.ViewOffset?.Z ?? 64f));
-                float distance=MathF.Sqrt(dx*dx+dy*dy);
-                if(distance>range)continue;
-                float yaw=MathF.Atan2(dy,dx)*180f/MathF.PI;
-                float pitch=-MathF.Atan2(dz,MathF.Max(1f,distance))*180f/MathF.PI;
-                QueueSoundCue(listener,yaw,pitch,distance,Server.CurrentTime,.15f+Random.Shared.NextSingle()*.20f,quiet?"footstep-quiet":"footstep",quiet?1.7f:1.25f);
+                uint pawn=walker.PlayerPawn.Raw;
+                Server.NextFrame(() => {
+                    if(walker.IsValid && walker.PlayerPawn.Raw==pawn)HearFootstep(walker,1100f,.5f,"legacy-footstep");
+                });
             }
             return HookResult.Continue;
-        });        RegisterEventHandler<EventPlayerHurt>((e,i) => {
+        });
+        RegisterEventHandler<EventPlayerHurt>((e,i) => {
             if(e.Userid is {IsValid:true,IsBot:true} victim && e.Attacker is {IsValid:true} attacker && attacker.TeamNum!=victim.TeamNum
                 && _humanStates.TryGetValue(victim.Slot,out var state) && state.Pawn==victim.PlayerPawn.Raw)
                 state.UnderFireUntil=Server.CurrentTime+.6f;
             return HookResult.Continue;
         });
-        RegisterEventHandler<EventPlayerDisconnect>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);ResetSilentMovement(p.Slot);ResetPreAimStrafe(p.Slot);}return HookResult.Continue; });
+        RegisterEventHandler<EventPlayerDisconnect>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);_attentionTurnAt.Remove(p.Slot);ResetSilentMovement(p.Slot);}return HookResult.Continue; });
         RegisterEventHandler<EventItemEquip>((e,i) => {
             if(e.Userid is {IsValid:true} player)
             {
@@ -259,7 +220,6 @@ public partial class BotAimImprover
         // Any movement override owned by this slot must die with the human-aim
         // state; otherwise a released bot can stay movement-locked (standstill /
         // no reaction) until the round ends.
-        ResetPreAimStrafe(slot);
         if(!_humanStates.Remove(slot,out var state))return;
         _modelSpots.Remove(state.Pointer);
     }
@@ -268,7 +228,8 @@ public partial class BotAimImprover
         _testGateUntil=float.NegativeInfinity;
         foreach(var slot in _humanStates.Keys.ToArray())ReleaseHuman(slot);
         foreach(var slot in _fireGuards.Keys.ToArray())ReleaseFireGuard(slot);
-        _modelSpots.Clear();_humanPhases.Clear();_soundPreaim.Clear();ResetAllSilentMovement();ResetMovementControl();ReadHumanDifficulty();
+        _modelSpots.Clear();_humanPhases.Clear();_soundPreaim.Clear();_lastFootstep.Clear();_attentionTurnAt.Clear();
+        _preaimTargets.Clear();_preaimVisited.Clear();ResetAllSilentMovement();ReadHumanDifficulty();
     }
     private static bool IsGun(CCSPlayerPawn pawn)
         => pawn.WeaponServices?.ActiveWeapon.Value?.As<CCSWeaponBase>().VData?.GearSlot is gear_slot_t.GEAR_SLOT_RIFLE or gear_slot_t.GEAR_SLOT_PISTOL;
@@ -284,9 +245,10 @@ public partial class BotAimImprover
         if(now<aim.Start)return false;
         if(now>aim.Until){_soundPreaim.Remove(controller.Slot);return false;}
         var current=new Angles(pawn.EyeAngles.X,pawn.EyeAngles.Y);
-        var delta=AimMath.Delta(new Angles(aim.Pitch,aim.Yaw),current);
-        var step=new Angles(Math.Clamp(delta.X,-12f,12f),Math.Clamp(delta.Y,-18f,18f));
-        var spot=AimMath.Ray(eyeVec,AimMath.Normalize(current+step));
+        var desired=AimMath.Angles(eyeVec,aim.Position);
+        var profile=HumanAimProfile.For(_humanDifficulty);
+        var next=AimMath.Advance(current,desired,AttentionDelta(controller.Slot,now),profile.TrackingTime,profile.MaxSpeed);
+        var spot=AimMath.Ray(eyeVec,next);
         _modelSpots[pointer]=spot;
         WriteModelSpot(bot,spot);
         RefreshFireGuard(controller);
@@ -313,7 +275,7 @@ public partial class BotAimImprover
             if(bot.Enemy.Value is not {IsValid:true} enemy || enemy.LifeState!=0 || enemy.TeamNum==controller.TeamNum)
             {
                 if(TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
-                if(TryApplyMapPreaim(controller,bot,pointer,pawn,eyeVec,now)){TickPreAimStrafe(controller,now);return HookResult.Continue;}
+                if(TryApplyMapPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
                 // The native enemy handle can flicker between peeks. Keep the memory
                 // based plan for a short grace period instead of resetting every
                 // model (reset means a fresh sensor delay and reaction before the
@@ -329,9 +291,7 @@ public partial class BotAimImprover
                 }
                 ReleaseHuman(controller.Slot);_modelSpots.Remove(pointer);RefreshFireGuard(controller);return HookResult.Continue;
             }
-            _soundPreaim.Remove(controller.Slot);
             _preaimTargets.Remove(controller.Slot);
-            ResetPreAimStrafe(controller.Slot);
             if(!_humanStates.TryGetValue(controller.Slot,out var state) || state.Pawn!=controller.PlayerPawn.Raw || state.Enemy!=enemy.EntityHandle.Raw)
             {
                 ReleaseHuman(controller.Slot);
@@ -394,10 +354,14 @@ public partial class BotAimImprover
                         WriteTelemetry(new {kind="model_lifecycle",tick=Server.TickCount,time=now,slot=controller.Slot,action="reacquire-keep",gap=visibleGap});
                     // The sample, not the live entity, enters the model's delay queue.
                     state.LastVisualEstimate=state.Model.ObserveVisual(now,eyeVec,sample,new(pawn.EyeAngles.X,pawn.EyeAngles.Y),sampleRadius,
-                        degradedSmoke ? .60f : 0f);
+                        degradedSmoke ? .60f : 0f,samplePoint);
                     if(state.LastVisualEstimate.HasValue)state.FirstVisualAt??=now;
                 }
             }
+            // A retained native enemy is not a live visual threat. Let a ready
+            // sound cue interrupt old visual memory before any early return.
+            if(visible)_soundPreaim.Remove(controller.Slot);
+            else if(TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
             // Preserve native search/navigation once visual memory is gone. While a
             // recent observation is still usable, keep the memory-based plan alive so
             // the model holds/predicts the last seen angle instead of snapping back to
@@ -409,7 +373,6 @@ public partial class BotAimImprover
                 RefreshFireGuard(controller);
                 return HookResult.Continue;
             }
-            if(!visible && TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
             var fireContext=new HumanFireContext(HumanFireContext.Classify(pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName),now<state.UnderFireUntil);
             state.PlannedWeapon=pawn.WeaponServices?.ActiveWeapon.Raw ?? uint.MaxValue;
             state.Output=state.Model.Step(now,eyeVec,visible,fireContext,new(pawn.EyeAngles.X,pawn.EyeAngles.Y));
@@ -426,30 +389,8 @@ public partial class BotAimImprover
             // correcting the observed climb over-rotated the crosshair upward.
             // Do not inject a correction until bullet-direction truth is measured.
             state.RecoilCompensation=0f;
-            // Spray shape: a real spray does not hold a laser line. Follow the
-            // pro-demo mean lateral drift once the burst is established, with a
-            // little per-tick noise and tier scaling; pitch is left to the engine
-            // because the native view already carries recoil motion.
-            float sway=0f;
-            if(state.SprayShots>=3 && now-state.LastShotAt<1.6f)
-            {
-                int idx=Math.Clamp(state.SprayShots-1,0,HumanAimProfile.ProSprayYaw.Length-1);
-                sway=HumanAimProfile.ProSprayYaw[idx]*state.Model.Profile.SpraySwayGain;
-                sway+=(Random.Shared.NextSingle()*2f-1f)*.35f;
-                sway=Math.Clamp(sway,-8f,8f);
-            }
-            // Pro hit rate falls with engagement distance (35% under 500 u, 26% at
-            // 500-1000, ~10% beyond 1000 in the demo sample); scale the lateral
-            // sway with distance instead of keeping the same spread at all ranges.
-            if(enemy.AbsOrigin is {} enemyOrigin)
-            {
-                float engagementDistance=Vec.Distance(eyeVec,new Vec(enemyOrigin.X,enemyOrigin.Y,enemyOrigin.Z));
-                float distanceScale=Math.Clamp(.75f+engagementDistance/1200f*.55f,.85f,1.5f);
-                sway*=distanceScale;
-            }
-            sway=Math.Clamp(sway,-9f,9f);
-            state.SpraySway=sway;
-            var spot=AimMath.Ray(eyeVec,AimMath.Normalize(state.Output.Angles+new Angles(0f,sway)));
+            // Native recoil remains the sole recoil controller; no extra camera curve.
+            var spot=AimMath.Ray(eyeVec,state.Output.Angles);
             _modelSpots[pointer]=spot;
             WriteModelSpot(bot,spot);
             RefreshFireGuard(controller);

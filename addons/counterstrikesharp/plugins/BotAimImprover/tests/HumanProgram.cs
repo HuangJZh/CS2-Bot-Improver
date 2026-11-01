@@ -21,7 +21,7 @@ foreach(var level in new[]{"Low","Medium","High"})
  float firstFire=-1;Vector2 previous=output.Angles;float maxTurn=0;
  for(int tick=1;tick<180;tick++)
  {
-  float now=.1f+tick/128f;
+  float now=.02f+profile.SensorDelay+.001f+tick/128f;
   if(model.NeedsObservation(now))model.Observe(now,target);
   output=model.Step(now,eye,true);
   float turn=AimMath.Delta(output.Angles,previous).Length();maxTurn=MathF.Max(maxTurn,turn);previous=output.Angles;
@@ -108,7 +108,7 @@ FireDecision FireAt(float error,float radius,AimWeaponClass weapon,bool underFir
 Check(FireAt(.4f,.5f,AimWeaponClass.Rifle).Allow && !FireAt(.4f,.5f,AimWeaponClass.Sniper).Allow,
  "sniper requests tighter expected alignment than rifle");
 var plannedOnly=FireAt(.3f,.5f,AimWeaponClass.Rifle);
-var withActual=HumanFireDecision.Evaluate(new(0,.3f),Vector2.Zero,.5f,0,true,.05f,false,new(AimWeaponClass.Rifle),.16f,2.0f,.5f);
+var withActual=HumanFireDecision.Evaluate(new(0,.3f),Vector2.Zero,.5f,0,true,.05f,false,new(AimWeaponClass.Rifle),.16f,2.0f);
 Check(plannedOnly.Allow && withActual.Allow && withActual.ActualErrorDegrees is >1.9f,
  "actual crosshair error is recorded without vetoing an intended-aligned shot");
 Check(plannedOnly.ActualErrorDegrees==null,"without actual-view input no crosshair error is reported");
@@ -208,4 +208,49 @@ Check(delayedSizeA.LastFireDecision==delayedSizeB.LastFireDecision,"future targe
 delayedSizeA.Step(.30f,eye,true);delayedSizeB.Step(.30f,eye,true);
 Check(delayedSizeA.LastFireDecision.ToleranceDegrees>delayedSizeB.LastFireDecision.ToleranceDegrees,
  "target-size metadata becomes available with its delayed position sample");
+foreach(var level in new[]{"Low","Medium","High"})
+{
+ var profile=HumanAimProfile.For(level);
+ var once=new HumanAimModel(profile,Vector2.Zero,0,17);
+ var repeated=new HumanAimModel(profile,Vector2.Zero,0,17);
+ float maximumDifference=0;
+ for(int i=0;i<512;i++)
+ {
+  float now=i/128f;var samplePosition=new Vector3(600,now*200,0);
+  once.ObserveVisual(now,eye,samplePosition,Vector2.Zero,4);
+  repeated.ObserveVisual(now,eye,samplePosition,Vector2.Zero,4);
+  var a=once.Step(now,eye,true);var b=repeated.Step(now,eye,true);
+  for(int extra=0;extra<3;extra++)b=repeated.Step(now,eye,true);
+  maximumDifference=Math.Max(maximumDifference,AimMath.Delta(a.Angles,b.Angles).Length());
+  if(a.AllowFire!=b.AllowFire)throw new Exception("duplicate calls changed fire permission");
+ }
+ Check(maximumDifference==0,level+" duplicate same-clock callbacks leave trajectory and firing unchanged");
+}
+var partProfile=profileHigh with {SensorDelay=0,SampleInterval=0,Prediction=1};
+var parts=new HumanAimModel(partProfile,Vector2.Zero,0,42);
+parts.Observe(.1f,new(600,0,64),4,part:"head");parts.Step(.1f,eye,true);
+parts.Observe(.2f,new(600,0,48),8,part:"chest");parts.Step(.2f,eye,true);
+parts.Step(.23f,eye,true);
+Check(AimMath.Delta(parts.LastDesiredAngles,AimMath.Angles(eye,new(600,0,48))).Length()<.0001f,
+ "head-to-chest selection does not become fictitious target velocity");
+var cadence=new BurstCadence();
+for(int shot=0;shot<4;shot++)cadence.Shot(shot*.08f,4,.32f);
+Check(cadence.Paused(.3f) && !cadence.Paused(.57f),"burst pause has a finite deadline");
+var pauseDeadline=cadence.PauseUntil;cadence.Shot(.32f,4,.32f);
+Check(cadence.PauseUntil==pauseDeadline,"queued shot cannot continually extend a burst pause");
+cadence.Shot(.57f,4,.32f);
+Check(cadence.Shots==1 && !cadence.Paused(.57f),"new burst resets shot count after a pause");
+var firstCue=new HeardSound(1,"footstep",new(-600,0,0),600,0,.25f,.95f,new(.2f,1));
+var repeatedCue=SoundAttention.Merge(firstCue,firstCue with {HeardAt=.2f,Start=.45f,Until=1.15f,Error=new(3,4)});
+Check(repeatedCue.Start==.25f,"continuous footsteps do not restart the pending reaction timer");
+Check(repeatedCue.Error==firstCue.Error,"same source keeps a coherent direction error");
+var closeGun=new HeardSound(2,"gunfire",new(300,0,0),300,0,.1f,.95f,Vector2.Zero);
+var farStep=firstCue with {SourcePawn=3,Distance=1100,HeardAt=.1f,Start=.3f};
+Check(ReferenceEquals(SoundAttention.Merge(closeGun,farStep),closeGun),"distant footstep does not replace a fresh close gunshot");
+var farGun=closeGun with {Distance=2500};
+var closeStep=firstCue with {Distance=100,HeardAt=.1f};
+Check(SoundAttention.Merge(farGun,closeStep).SourcePawn==1,"near footstep can outrank a distant gunshot");
+Check(MathF.Abs(AimMath.Angles(eye,firstCue.Position).Y)==180,"auditory direction retains sources behind the view cone");
+var freshCue=firstCue with {HeardAt=2,Start=2.25f,Until=2.95f};
+Check(SoundAttention.Merge(firstCue,freshCue).Start==2.25f,"expired sound memory starts a fresh reaction");
 Console.WriteLine($"{count} checks passed");

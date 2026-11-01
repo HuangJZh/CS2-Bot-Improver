@@ -129,10 +129,10 @@ public partial class BotAimImprover
         // A short permission latch keeps a burst going after the model has already
         // authorized fire, instead of re-holding for a single misaligned tick and
         // forcing another Attack release edge in the middle of the trigger.
-        if(now<state.AllowLatchUntil)return new(true,false,"allow-latch");
         // Human burst discipline: after the planned number of rounds, release the
         // trigger for a short human-like pause instead of holding a perfect spray.
-        if(now<state.BurstCooldownUntil)return new(false,false,"burst-pause");
+        if(now<state.BurstCooldownUntil)return new(false,true,"burst-pause");
+        if(now<state.AllowLatchUntil)return new(true,false,"allow-latch");
         if(state.Output.AllowFire)
         {
             if(advanceTimers){state.PlanHoldSince=null;state.PlanHoldTimedOut=false;}

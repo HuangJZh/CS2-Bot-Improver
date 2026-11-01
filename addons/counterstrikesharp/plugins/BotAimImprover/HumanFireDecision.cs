@@ -32,7 +32,7 @@ public static class HumanFireDecision
     // floor for less precise difficulty tiers.
     public static FireDecision Evaluate(Vector2 intendedAim,Vector2 estimatedBearing,float angularRadius,float uncertainty,
         bool visible,float observationAge,bool correctionPending,HumanFireContext context,float motorError=.16f,
-        float? actualErrorDegrees=null,float feedbackWeight=.50f)
+        float? actualErrorDegrees=null)
     {
         if(!visible)return new(false,"not-visible",null,null);
         if(!float.IsFinite(observationAge) || observationAge<0 || observationAge>=.20f)return new(false,"stale-observation",null,null);

@@ -54,7 +54,7 @@ public partial class BotAimImprover
         var origin = pawn.AbsOrigin;
         if (origin == null) return;
         var teammates = Utilities.GetPlayers()
-            .Where(p => p is { IsValid: true, IsBot: true, PawnIsAlive: true } && p.TeamNum == controller.TeamNum && p.Slot != controller.Slot)
+            .Where(p => p is { IsValid: true, PawnIsAlive: true } && p.TeamNum == controller.TeamNum && p.Slot != controller.Slot)
             .ToList();
         int alive = teammates.Count + 1;
         bool nearbyTeammate = false;
@@ -88,8 +88,8 @@ public partial class BotAimImprover
             _silentNextDecision[controller.Slot] = now + 1.6f;
             return;
         }
-        bool crouch = (alive <= 2 && Random.Shared.NextSingle() < .35f)
-            || (reason == "group-silent-push" && Random.Shared.NextSingle() < .20f);
+        bool crouch = (alive <= 2 && Random.Shared.NextSingle() < .15f)
+            || (reason == "group-silent-push" && Random.Shared.NextSingle() < .08f);
         int durationMs = (int)((minDuration + Random.Shared.NextSingle() * (maxDuration - minDuration)) * 1000f);
         long walkToken = _humanController?.InjectUsercmd(controller.Slot, (ulong)PlayerButtons.Walk, durationMs) ?? -1;
         long duckToken = crouch

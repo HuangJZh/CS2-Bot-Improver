@@ -9,7 +9,6 @@ namespace BotState;
 
 public partial class BotState
 {
-    private bool _isFreezeTime = false;
     //---------------------------------------------------------------------------------------
     // Registers game events and the per-tick bot behavior listener
     public override void Load(bool hotReload)
@@ -94,7 +93,6 @@ public partial class BotState
     [GameEventHandler]
     public HookResult OnRoundFreezeEnd(EventRoundFreezeEnd @event, GameEventInfo info)
     {
-        _isFreezeTime = false;
         foreach (var player in Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller"))
         {
             if (!player.IsValid || !player.IsBot) continue;
@@ -111,7 +109,6 @@ public partial class BotState
         StopDefuseReveal();
         ClearReveals();
         _eliminationHandled = false;
-        _isFreezeTime = true;
 
         ResetMovementRoundState();
         ResetCombatRoundState();

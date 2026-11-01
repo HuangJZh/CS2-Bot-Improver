@@ -19,8 +19,6 @@ public partial class BotAimImprover
         [JsonPropertyName("x")] public float X { get; set; }
         [JsonPropertyName("y")] public float Y { get; set; }
         [JsonPropertyName("z")] public float Z { get; set; }
-        [JsonPropertyName("yaw")] public float Yaw { get; set; }
-        [JsonPropertyName("route")] public string Route { get; set; } = "";
     }
     private sealed class PreAimMap
     {
@@ -41,6 +39,7 @@ public partial class BotAimImprover
     }
     private readonly Dictionary<string, List<PreAimPoint>> _preaimByMap = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<int, PreAimTarget> _preaimTargets = new();
+    private readonly Dictionary<(int Slot,int Point),float> _preaimVisited = new();
     private string? _preaimLoadedMap;
     private bool _preaimLoadAttempted;
 
@@ -73,6 +72,7 @@ public partial class BotAimImprover
         {
             _preaimLoadedMap = map;
             _preaimTargets.Clear();
+            _preaimVisited.Clear();
         }
         return _preaimByMap.TryGetValue(map, out var points) ? points : null;
     }
@@ -91,54 +91,41 @@ public partial class BotAimImprover
         {
             if (hasTarget && now < target!.NextScan) return false;
             float currentYaw = pawn.EyeAngles.Y;
-            Vec chosen = default;
             int nodeIndex = -1;
-            bool found = false;
-            var searchNodes = CurrentSearchNodes();
-            if (searchNodes is { Count: > 0 })
-                found = TrySelectSearchNode(controller, botPos, currentYaw, now, searchNodes, out nodeIndex, out chosen);
-            if (!found)
+            float bestScore = float.MaxValue;
+            for(int index=0;index<points.Count;index++)
             {
-                // Fallback when the clustered node file is unavailable: use the raw
-                // aim_target points with the same distance/FOV filter.
-                PreAimPoint? best = null;
-                float bestScore = float.MaxValue;
-                foreach (var p in points)
-                {
-                    float dx = p.X - botPos.X, dy = p.Y - botPos.Y;
-                    float distance = MathF.Sqrt(dx * dx + dy * dy);
-                    if (distance < 120f || distance > 3200f) continue;
-                    float targetYaw = MathF.Atan2(dy, dx) * 180f / MathF.PI;
-                    float yawDelta = MathF.Abs(((targetYaw - currentYaw + 540f) % 360f) - 180f);
-                    if (yawDelta > 100f) continue;
-                    float score = distance + yawDelta * 18f;
-                    if (score < bestScore) { bestScore = score; best = p; }
-                }
-                if (best != null)
-                {
-                    chosen = new Vec(best.X, best.Y, best.Z);
-                    found = true;
-                }
+                if(_preaimVisited.TryGetValue((controller.Slot,index),out var until) && now<until)continue;
+                var p=points[index];
+                float dx=p.X-botPos.X,dy=p.Y-botPos.Y;
+                float distance=MathF.Sqrt(dx*dx+dy*dy);
+                if(distance<120f || distance>3200f)continue;
+                float targetYaw=MathF.Atan2(dy,dx)*180f/MathF.PI;
+                float yawDelta=MathF.Abs(AimMath.Wrap(targetYaw-currentYaw));
+                if(yawDelta>100f)continue;
+                float score=distance+yawDelta*18f;
+                if(score<bestScore){bestScore=score;nodeIndex=index;}
             }
-            if (!found)
+            if (nodeIndex<0)
             {
                 _preaimTargets[controller.Slot] = new PreAimTarget { NextScan = now + .5f };
                 return false;
             }
             target = new PreAimTarget
             {
-                Point = chosen,
+                Point = new Vec(points[nodeIndex].X,points[nodeIndex].Y,points[nodeIndex].Z),
                 NodeIndex = nodeIndex,
                 Until = now + 1.1f,
                 NextScan = now + 1.1f,
             };
             _preaimTargets[controller.Slot] = target;
+            _preaimVisited[(controller.Slot,nodeIndex)]=now+6f;
         }
         var desired = AimMath.Angles(eyeVec, target.Point);
         var current = new Angles(pawn.EyeAngles.X, pawn.EyeAngles.Y);
-        var delta = AimMath.Delta(desired, current);
-        var step = new Angles(Math.Clamp(delta.X, -10f, 10f), Math.Clamp(delta.Y, -16f, 16f));
-        var spot = AimMath.Ray(eyeVec, AimMath.Normalize(current + step));
+        var profile=HumanAimProfile.For(_humanDifficulty);
+        var next=AimMath.Advance(current,desired,AttentionDelta(controller.Slot,now),profile.TrackingTime,profile.MaxSpeed);
+        var spot = AimMath.Ray(eyeVec,next);
         _modelSpots[pointer] = spot;
         WriteModelSpot(bot, spot);
         RefreshFireGuard(controller);
