@@ -6,6 +6,12 @@ using Microsoft.Extensions.Logging;
 namespace BotAimImprover;
 public partial class BotAimImprover
 {
+    // The first client of an interactive Windows listen server is its local
+    // host. Dedicated/remote clients must still use the server console.
+    private static bool IsLocalAimConsole(CCSPlayerController? caller) => caller == null
+        || (OperatingSystem.IsWindows() && Environment.GetCommandLineArgs().Contains("-steam")
+            && !Environment.GetCommandLineArgs().Contains("-dedicated")
+            && caller is {IsValid:true,IsBot:false,Slot:0});
     private StreamWriter? _telemetry;
     private CCSGameRules? _telemetryRules;
     private float _telemetryUntil,_telemetryFlush;
@@ -28,11 +34,28 @@ public partial class BotAimImprover
         });
         RegisterEventHandler<EventWeaponFire>((e,i) => { if(e.Userid is {} p)RecordAimTelemetry("weapon_fire_callback",p,e.Weapon);return HookResult.Continue; },HookMode.Post);
         RegisterEventHandler<EventPlayerHurt>((e,i) => { if(e.Attacker is {} p)RecordAimTelemetry("player_hurt_callback",p,e.Weapon,e.Userid?.PlayerPawn.Raw,e.DmgHealth,e.Hitgroup);return HookResult.Continue; },HookMode.Post);
-        RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p)RecordAimTelemetry("player_death_callback",p,null,e.Attacker?.PlayerPawn.Raw);return HookResult.Continue; },HookMode.Post);
+        RegisterEventHandler<EventPlayerDeath>((e,i) => {
+            if(e.Userid is {} p)RecordAimTelemetry("player_death_callback",p,null,e.Attacker?.PlayerPawn.Raw);
+            if(e.Attacker is {} attacker)
+            {
+                RecordAimTelemetry("player_kill_callback",attacker,e.Weapon,e.Userid?.PlayerPawn.Raw,eventHeadshot:e.Headshot);
+                if(_telemetry!=null && attacker.IsValid && attacker.IsBot)
+                {
+                    uint attackerPawn=attacker.PlayerPawn.Raw;
+                    Server.NextFrame(() => {
+                        if(_telemetry!=null && attacker.IsValid && attacker.PlayerPawn.Raw==attackerPawn)
+                            WriteTelemetry(new {kind="kill_scoreboard_next_frame",tick=Server.TickCount,time=Server.CurrentTime,
+                                slot=attacker.Slot,pawn=attackerPawn,kills=attacker.ActionTrackingServices?.MatchStats.Kills,
+                                headshot_kills=attacker.ActionTrackingServices?.MatchStats.HeadShotKills});
+                    });
+                }
+            }
+            return HookResult.Continue;
+        },HookMode.Post);
         RegisterEventHandler<EventRoundStart>((e,i) => { WriteTelemetry(new {kind="round_boundary",tick=Server.TickCount,time=Server.CurrentTime});return HookResult.Continue; });
         RegisterListener<Listeners.OnMapEnd>(StopAimTelemetry);
         AddCommand("bot_aim_capture","Local console: start [seconds=120], stop, status",(caller,c) => {
-            if(caller != null)return;
+            if(!IsLocalAimConsole(caller))return;
             var mode=c.ArgCount>1 ? c.GetArg(1).ToLowerInvariant() : "status";
             if(mode=="stop")StopAimTelemetry();
             if(mode=="start")
@@ -55,7 +78,7 @@ public partial class BotAimImprover
             Server.PrintToConsole($"[AimCapture] active={_telemetry!=null} path={_telemetryPath}");
         });
     }
-    private void RecordAimTelemetry(string kind,CCSPlayerController player,string? eventWeapon=null,uint? otherPawn=null,int? damage=null,int? eventHitgroup=null)
+    private void RecordAimTelemetry(string kind,CCSPlayerController player,string? eventWeapon=null,uint? otherPawn=null,int? damage=null,int? eventHitgroup=null,bool? eventHeadshot=null)
     {
         if(_telemetry == null || !player.IsValid || !player.IsBot || player.HasBeenControlledByPlayerThisRound)return;
         var pawn=player.PlayerPawn.Value;if(pawn is not {IsValid:true})return;
@@ -96,6 +119,7 @@ public partial class BotAimImprover
             native_look_at_x=bot?.LookAtSpot.X,native_look_at_y=bot?.LookAtSpot.Y,native_look_at_z=bot?.LookAtSpot.Z,native_look_at_attack=bot?.LookAtSpotAttack,
             native_target_x=bot?.TargetSpot.X,native_target_y=bot?.TargetSpot.Y,native_target_z=bot?.TargetSpot.Z,
             enemy_x=enemyOrigin?.X,enemy_y=enemyOrigin?.Y,enemy_z=enemyOrigin?.Z,
+            enemy_view_offset_z=enemyPawn is {IsValid:true} ep3 ? (float?)ep3.ViewOffset.Z : null,
             enemy_vx=enemyVelocity?.X,enemy_vy=enemyVelocity?.Y,enemy_vz=enemyVelocity?.Z,enemy_distance=enemyDistance,
             contact_gap_degrees=state!=null && float.IsFinite(state.Model.ContactGapDegrees) ? (float?)state.Model.ContactGapDegrees : null,
             contact_kind=state?.Model.ContactKind,sample_result=state?.LastSampleResult,
@@ -109,6 +133,7 @@ public partial class BotAimImprover
             model_first_visual_time=state?.FirstVisualAt,native_guard_reason=gate?.Reason,native_guard_hold=gate?.Hold,
             enemy=bot?.Enemy.Raw,native_visible=bot?.IsEnemyVisible,sensor_visible=state?.LastSight,
             planned_pitch=state?.Output.Angles.X,planned_yaw=state?.Output.Angles.Y,phase=state?.Output.Phase,allow_fire=state?.Output.AllowFire,
+            believed_target_pitch=state?.Model.LastDesiredAngles.X,believed_target_yaw=state?.Model.LastDesiredAngles.Y,
             observation_age=state!=null && float.IsFinite(state.Output.ObservationAge) ? (float?)state.Output.ObservationAge : null,
             visual_uncertainty_degrees=state?.LastVisualEstimate?.UncertaintyDegrees,
             visual_eccentricity_degrees=state?.LastVisualEstimate?.EccentricityDegrees,
@@ -142,7 +167,10 @@ public partial class BotAimImprover
             fire_guard_hold_since=state?.PlanHoldSince,fire_guard_hold_timed_out=state?.PlanHoldTimedOut,
             model_fire_suppression_owned=_fireGuards.TryGetValue(player.Slot,out var guard) && guard.Pawn==player.PlayerPawn.Raw && guard.Token>0,
             fire_guard_pending=guard!=null && guard.Pawn==player.PlayerPawn.Raw && guard.Token<=0,
-            event_weapon=eventWeapon,other_pawn=otherPawn,damage});
+            aim_mode=_aimMode.ToString(),
+            scoreboard_kills=player.ActionTrackingServices?.MatchStats.Kills,
+            scoreboard_headshot_kills=player.ActionTrackingServices?.MatchStats.HeadShotKills,
+            event_weapon=eventWeapon,other_pawn=otherPawn,damage,event_hitgroup=eventHitgroup,event_headshot=eventHeadshot});
     }
     private void WriteTelemetry<T>(T row)
     {

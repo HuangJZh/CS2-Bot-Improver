@@ -129,10 +129,8 @@ Check(!HumanFireDecision.Evaluate(Vector2.Zero,Vector2.Zero,.5f,0,true,.05f,true
  "pending corrective movement is not mistaken for readiness");
 Check(HumanFireContext.Classify("weapon_awp")==AimWeaponClass.Sniper && HumanFireContext.Classify("weapon_deagle")==AimWeaponClass.PrecisePistol
  && HumanFireContext.Classify("weapon_m4a1_silencer")==AimWeaponClass.Rifle,"weapon adapter distinguishes precise and automatic weapons");
-Check(HumanFireContext.BulletSpeedFor(AimWeaponClass.Sniper)>HumanFireContext.BulletSpeedFor(AimWeaponClass.Pistol),
- "projectile lead uses weapon-class speeds");
 var movingLead=new HumanAimModel(profileHigh,Vector2.Zero,0,91);
-bool leadFired=false;float leadDegrees=0;int leadAllows=0;
+bool leadFired=false;int leadAllows=0;
 for(int i=0;i<256;i++)
 {
  float now=i/128f;var movingPos=new Vector3(1000,now*250f,0);
@@ -140,11 +138,30 @@ for(int i=0;i<256;i++)
  var movingOutput=movingLead.Step(now,eye,true,new(AimWeaponClass.Rifle));
  if(movingOutput.AllowFire && !leadFired)
  {
-  leadFired=true;leadDegrees=AimMath.Delta(movingOutput.Angles,AimMath.Angles(eye,movingPos)).Y;
+  leadFired=true;
  }
  if(movingOutput.AllowFire)leadAllows++;
 }
-Check(leadFired && leadDegrees>.2f && leadAllows>32,"moving-target fire plan includes forward projectile lead");
+Check(leadFired && leadAllows>32,"moving-target tracking still permits fire without artificial projectile lead");
+foreach(float distance in new[]{600f,1200f,2400f})
+{
+ var beliefProfile=profileHigh with {Prediction=1f};
+ var rifleModel=new HumanAimModel(beliefProfile,Vector2.Zero,0,91);
+ var pistolModel=new HumanAimModel(beliefProfile,Vector2.Zero,0,91);
+ Vector3 current=default;
+ for(int i=0;i<256;i++)
+ {
+  float now=i/128f;current=new Vector3(distance,now*250f,0);
+  rifleModel.Observe(now,current);pistolModel.Observe(now,current);
+  rifleModel.Step(now,eye,true,new(AimWeaponClass.Rifle));
+  pistolModel.Step(now,eye,true,new(AimWeaponClass.Pistol));
+ }
+ float error=AimMath.Delta(rifleModel.LastDesiredAngles,AimMath.Angles(eye,current)).Length();
+ Console.WriteLine($"Moving belief at {distance}u: angular error {error:F4} degrees");
+ Check(error<.01f,$"{distance}u moving head belief compensates observation age without aiming into the future");
+ Check(AimMath.Delta(rifleModel.LastDesiredAngles,pistolModel.LastDesiredAngles).Length()<.0001f,
+  $"{distance}u hitscan weapon class does not change the believed target bearing");
+}
 var preparedPlan=new HumanAimModel(profileHigh,Vector2.Zero,0,7);
 preparedPlan.Observe(.02f,new Vector3(1000,100,0));
 preparedPlan.Step(.02f+profileHigh.SensorDelay+.001f,eye,true);

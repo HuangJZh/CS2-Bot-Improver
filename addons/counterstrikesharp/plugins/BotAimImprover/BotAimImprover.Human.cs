@@ -211,7 +211,7 @@ public partial class BotAimImprover
         });
         AddCommand("bot_human_aim","Human aim: status/on/off/reload",(caller,c) =>
         {
-            if(caller != null)return; // Local server console only.
+            if(!IsLocalAimConsole(caller))return;
             var action=c.ArgCount>1 ? c.GetArg(1).ToLowerInvariant() : "status";
             if(action is "on" or "off") { _humanSettings.Enabled=action=="on";ResetHuman(); }
             if(action=="reload") { ResetHuman();ReadHumanSettings(); }
@@ -484,8 +484,7 @@ public partial class BotAimImprover
         {
             AimMode.HEAD => weapon=="weapon_awp" ? _priorityTrunk : _priorityHead,
             AimMode.BODY => _priorityBody,
-            // Mixed: rifles/pistols (and SMGs) aim head-first; only snipers/shotguns/
-            // spread weapons keep the body-first trunk order.
+            // Mixed: every weapon except AWP uses the head-first order.
             _ => weapon != null && _bodyFirstWeapons.Contains(weapon) ? _priorityTrunk : _priorityHead
         };
         var forward=new Angles(pawn.EyeAngles.X,pawn.EyeAngles.Y);

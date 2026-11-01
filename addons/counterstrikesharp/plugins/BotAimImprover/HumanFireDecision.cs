@@ -18,16 +18,6 @@ public readonly record struct HumanFireContext(AimWeaponClass Weapon= AimWeaponC
             or "weapon_aug" or "weapon_sg556"=>AimWeaponClass.Rifle,
         _=>AimWeaponClass.Other
     };
-    // Approximate projectile speed in world units per second, used only for lead
-    // planning. Values are gameplay hypotheses to calibrate, not measured ballistics.
-    public static float BulletSpeedFor(AimWeaponClass weapon)=>weapon switch
-    {
-        AimWeaponClass.Sniper=>3500f,AimWeaponClass.PrecisePistol=>2600f,
-        AimWeaponClass.Rifle=>3000f,AimWeaponClass.Smg=>2300f,
-        AimWeaponClass.Pistol=>2100f,AimWeaponClass.Shotgun=>1500f,
-        AimWeaponClass.MachineGun=>3000f,_=>2500f
-    };
-    public float BulletSpeed=>BulletSpeedFor(Weapon);
 }
 public readonly record struct FireDecision(bool Allow,string Reason,float? ExpectedErrorDegrees,float? ToleranceDegrees,float? ActualErrorDegrees=null);
 

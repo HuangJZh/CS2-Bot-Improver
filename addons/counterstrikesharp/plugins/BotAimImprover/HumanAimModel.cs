@@ -124,12 +124,11 @@ public sealed class HumanAimModel
         if(_latest is not {} latest){LastFireDecision=new(false,"no-observation",null,null);return new(_view,false,"perception",float.PositiveInfinity);}
         float age=now-latest.Time;
         if(!visible && now-_lastVisible>.20f){LastFireDecision=new(false,"memory-expired",null,null);return new(_view,false,"memory-expired",age);}
-        // Aim at the believed future position: delayed observation age plus an
-        // approximate projectile flight time. Humans learn to lead moving targets;
-        // without this the planned view systematically lags the target.
+        // Extrapolate a delayed observation toward the present. Firearms use a
+        // hit-scan shot; adding distance / an invented projectile speed creates
+        // an extra lead that places the aim ahead of a moving head.
         float targetDistance=Vector3.Distance(eye,latest.Position);
-        float flightTime=Math.Clamp(targetDistance/MathF.Max(1,context.BulletSpeed),0,.35f);
-        float leadSeconds=Math.Clamp(age+flightTime,0,.45f);
+        float leadSeconds=Math.Clamp(age,0,.45f);
         var predicted=latest.Position+_velocity*leadSeconds*Profile.Prediction;
         var desired=AimMath.Angles(eye,predicted);
         float? actualError=actualView is {} observedView && float.IsFinite(observedView.X+observedView.Y)
