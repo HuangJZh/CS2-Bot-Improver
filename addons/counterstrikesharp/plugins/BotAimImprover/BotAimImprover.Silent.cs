@@ -43,7 +43,8 @@ public partial class BotAimImprover
     }
     private void TickSilentMovement(CCSPlayerController controller, CCSPlayerPawn pawn, CCSBot bot, float now)
     {
-        if (!HumanActive || !MovementContext(controller,pawn,bot,now).Quiet || _coverPeeks.ContainsKey(controller.Slot))
+        if (!HumanActive || !MovementContext(controller,pawn,bot,now).Quiet || _coverPeeks.ContainsKey(controller.Slot)
+            ||_navigationPlans.ContainsKey(controller.Slot))
         {
             ResetSilentMovement(controller.Slot);
             return;

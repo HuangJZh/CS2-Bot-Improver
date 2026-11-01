@@ -20,5 +20,6 @@
   <ItemGroup>
     <None Include="preaim-points.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="preaim-nodes.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="navigation/*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

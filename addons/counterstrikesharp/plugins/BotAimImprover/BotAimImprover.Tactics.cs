@@ -7,7 +7,7 @@ public partial class BotAimImprover
 {
     private readonly Dictionary<int,float> _plantingUntil=new();
     private readonly Dictionary<int,string> _tacticalReasons=new();
-    private float _objectiveScanAt,_roundDeadline,_bombDeadline;
+    private float _objectiveScanAt,_roundDeadline,_bombDeadline,_roundStartedAt;
     private bool _roundLive,_bombPlanted;
     private Vector3 _bombPosition;
     private void InitializeTactics()
@@ -27,7 +27,7 @@ public partial class BotAimImprover
     {
         _plantingUntil.Clear();_tacticalReasons.Clear();_objectiveScanAt=0;_roundLive=false;
         _bombPlanted=false;_roundDeadline=_bombDeadline=0;
-        ResetCoverPeeks();
+        ResetCoverPeeks();ResetTeamNavigation();
     }
     private void ReadObjective(float now)
     {
@@ -36,6 +36,7 @@ public partial class BotAimImprover
         var rules=Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault(p=>p.IsValid)?.GameRules;
         _roundLive=rules!=null&&!rules.FreezePeriod&&!rules.WarmupPeriod;
         _roundDeadline=rules==null?now:rules.RoundStartTime+rules.RoundTime;
+        _roundStartedAt=rules?.RoundStartTime??now;
         _bombPlanted=rules?.BombPlanted==true;_bombDeadline=now;_bombPosition=Vector3.Zero;
         if(!_bombPlanted)return;
         var bomb=Utilities.FindAllEntitiesByDesignerName<CPlantedC4>("planted_c4")

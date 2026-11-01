@@ -55,7 +55,7 @@ public partial class BotAimImprover
     }
     private void TryCoverPeek(CCSPlayerController p,CCSPlayerPawn pawn,CCSBot bot,Vec checkPoint,float now)
     {
-        if(_coverPeeks.ContainsKey(p.Slot)||now<_peekNext.GetValueOrDefault(p.Slot))return;
+        if(_coverPeeks.ContainsKey(p.Slot)||_navigationPlans.ContainsKey(p.Slot)||now<_peekNext.GetValueOrDefault(p.Slot))return;
         _peekNext[p.Slot]=now+1.2f;
         if(!MovementContext(p,pawn,bot,now).Peek||(pawn.Flags&1)==0||pawn.MoveType==MoveType_t.MOVETYPE_LADDER
             ||MathF.Sqrt(pawn.AbsVelocity.X*pawn.AbsVelocity.X+pawn.AbsVelocity.Y*pawn.AbsVelocity.Y)>30

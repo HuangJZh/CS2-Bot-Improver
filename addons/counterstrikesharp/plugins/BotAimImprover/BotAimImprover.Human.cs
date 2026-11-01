@@ -20,6 +20,7 @@ public partial class BotAimImprover
         public bool DirectViewControl {get;set;}=false; // Experimental until recoil/weapon checks are validated.
         public float HorizontalFieldOfView {get;set;}=110;
         public float HumanAllyStrength {get;set;}=.95f;
+        public bool TeamNavigation {get;set;}=true;
     }
     private sealed class HumanState
     {
@@ -69,6 +70,7 @@ public partial class BotAimImprover
         ReadHumanSettings();
         InitializeAimTelemetry();
         InitializeTactics();
+        InitializeTeamNavigation();
         var processArgs=Environment.GetCommandLineArgs();
         int testPort=Array.IndexOf(processArgs,"-port"),testIp=Array.IndexOf(processArgs,"-ip");
         if(processArgs.Contains("-dedicated") && testPort>=0 && testPort+1<processArgs.Length && processArgs[testPort+1]=="27025"
@@ -116,6 +118,7 @@ public partial class BotAimImprover
             }
             MaintainFireGuards();
             MaintainTacticalMovement();
+            TickTeamNavigation();
         });
         RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);_attentionTurnAt.Remove(p.Slot);ResetSilentMovement(p.Slot);}return HookResult.Continue; });
         // Track bursts so the aim output can model human recoil control after the
