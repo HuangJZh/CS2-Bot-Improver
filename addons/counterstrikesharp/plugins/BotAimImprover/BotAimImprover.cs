@@ -15,7 +15,7 @@ namespace BotAimImprover;
 public partial class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8-human.8.35-experimental";
+    public override string ModuleVersion => "2.1.8-human.8.36-experimental";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 
@@ -94,6 +94,12 @@ public partial class BotAimImprover : BasePlugin
         16               // FEET
     };
 
+    private static readonly int[] _priorityUpperChest =
+    {
+        3,6,7,4,10,11,5,8,9, // Upper chest first, retaining exposed-head fallback.
+        0,17,18,19,1,2,12,13,14,15,16
+    };
+
     private static readonly int[] _priorityBody =
     {
         4, 5, 10, 11,    // GUT, PELVIS, L_GUT, R_GUT
@@ -118,17 +124,11 @@ public partial class BotAimImprover : BasePlugin
     private readonly ConcurrentDictionary<IntPtr, (uint Controller,int Index)> _botToController = new();
 
     // Aim mode controlled by the `bot_aim` console command:
-    //   Mixed / Head = head-first, with an AWP body-first exception
+    //   Mixed = stable per-engagement head/upper-chest choice; Head = head-first
     //   Body  = always body-first
     private enum AimMode { MIXED, HEAD, BODY }
     private AimMode _aimMode = AimMode.MIXED;
 
-    // Only the AWP keeps a body-first aim in Mixed mode; every other weapon
-    // (including SSG08, SMGs, shotguns and revolver) aims head-first.
-    private static readonly HashSet<string> _bodyFirstWeapons = new()
-    {
-        "weapon_awp"
-    };
 
     // One-shot flag so we log a single confirmation that overrides are actually firing.
     private bool _firstOverrideLogged = false;
@@ -276,18 +276,9 @@ public partial class BotAimImprover : BasePlugin
                 return HookResult.Continue;
             if (!bot.IsEnemyVisible) return HookResult.Continue;
 
-            string? wpn = botController.PlayerPawn?.Value?.WeaponServices?.ActiveWeapon?.Value?.DesignerName;
-
-            // 4) Select the priority order based on aim mode and weapon.
-            // head: awp -> others -> Head. body: all weapons -> Body.
-            // mixed: only body-first weapons (AWP) -> Body, every other weapon -> HEAD.
-            bool isBodyWeapon = wpn != null && _bodyFirstWeapons.Contains(wpn);
-            int[] order = _aimMode switch
-            {
-                AimMode.HEAD => wpn == "weapon_awp" ? _priorityTrunk : _priorityHead,
-                AimMode.BODY => _priorityBody,
-                _ => isBodyWeapon ? _priorityTrunk : _priorityHead, // MIXED
-            };
+            if(botController.PlayerPawn.Value is not {IsValid:true} ownPawn)return HookResult.Continue;
+            string? wpn=ownPawn.WeaponServices?.ActiveWeapon.Value?.DesignerName;
+            int[] order = AimOrder(botController,ownPawn,enemyPawn);
 
             // 5) Walk the priority order and raytrace each point from the bot's
             // eye; the first visible point wins.

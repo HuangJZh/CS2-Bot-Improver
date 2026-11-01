@@ -337,4 +337,34 @@ foreach(float gap in new[]{5f,25f,70f})
   Console.WriteLine($"TUNING {level} gap={gap} old_median_ms={oldMedian*1000:F1} new_median_ms={newMedian*1000:F1}");
  }
 }
+var allyProfile=CombatBalancePolicy.AllyProfile(HumanAimProfile.For("Medium"),.95f);
+Check(MathF.Abs(allyProfile.MaxSpeed/HumanAimProfile.For("Medium").MaxSpeed-.95f)<.00001f,
+ "human ally motor speed has the requested five percent parameter handicap");
+Check(allyProfile.Reaction>HumanAimProfile.For("Medium").Reaction&&allyProfile.MotorError>HumanAimProfile.For("Medium").MotorError,
+ "ally handicap slows response and slightly reduces precision");
+Check(CombatBalancePolicy.IsHumanAlly(3,1<<3)&&!CombatBalancePolicy.IsHumanAlly(2,1<<3),
+ "handicap follows the human team and never the opponent");
+Check(CombatBalancePolicy.IsHumanAlly(2,1<<2)&&!CombatBalancePolicy.IsHumanAlly(3,1<<2),
+ "team switch reverses the handicap without assuming CT is always friendly");
+Check(!CombatBalancePolicy.IsHumanAlly(3,0)&&!CombatBalancePolicy.IsHumanAlly(2,(1<<2)|(1<<3)),
+ "spectators and humans on both sides do not create one-sided handicaps");
+Check(CombatBalancePolicy.AllyProfile(profileHigh,1)==profileHigh,"unit ally strength disables the handicap");
+Check(CombatBalancePolicy.HeadIntentChance("Medium",AimWeaponClass.Rifle,"weapon_ak47")==.4f,
+ "mixed rifles no longer always select a head-first intent");
+Check(CombatBalancePolicy.HeadIntentChance("Medium",AimWeaponClass.Sniper,"weapon_awp")==0,
+ "AWP retains body-first intent");
+Check(CombatBalancePolicy.HeadIntentChance("Medium",AimWeaponClass.PrecisePistol,"weapon_deagle")>
+ CombatBalancePolicy.HeadIntentChance("Medium",AimWeaponClass.Smg,"weapon_mp9"),
+ "precision pistol and SMG do not share identical head preference");
+var intents=new EngagementAimIntents();var intentKey=new AimIntentKey(1,2,3,0);int draws=0;
+float IntentDraw(){draws++;return draws==1?.2f:.8f;}
+bool intent=intents.Resolve(4,intentKey,.4f,0,IntentDraw);
+for(int i=1;i<1000;i++)CheckIntent(intents.Resolve(4,intentKey,.4f,i/128f,IntentDraw)==intent);
+void CheckIntent(bool ok){if(!ok)throw new Exception("aim intent changed within continuous engagement");}
+Check(draws==1,"repeated native/model callbacks share one stable intent draw");
+Check(!intents.Resolve(4,intentKey with{Target=5},.4f,8,IntentDraw)&&draws==2,
+ "new enemy gets a new intent instead of inheriting the previous target's head choice");
+intents.Resolve(4,intentKey with{Target=5},.4f,10,IntentDraw);
+Check(draws==3,"lost contact longer than one second starts a fresh intent");
+intents.Clear();Check(intents.Get(4)==null,"round reset clears engagement intents");
 Console.WriteLine($"{count} checks passed");

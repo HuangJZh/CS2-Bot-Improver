@@ -19,6 +19,7 @@ public partial class BotAimImprover
         public bool Diagnostics {get;set;}=false;
         public bool DirectViewControl {get;set;}=false; // Experimental until recoil/weapon checks are validated.
         public float HorizontalFieldOfView {get;set;}=110;
+        public float HumanAllyStrength {get;set;}=.95f;
     }
     private sealed class HumanState
     {
@@ -204,6 +205,7 @@ public partial class BotAimImprover
         {
             if(File.Exists(path))_humanSettings=JsonSerializer.Deserialize<HumanSettings>(File.ReadAllText(path)) ?? new();
             else File.WriteAllText(path,JsonSerializer.Serialize(_humanSettings,new JsonSerializerOptions{WriteIndented=true}));
+            _humanSettings.HumanAllyStrength=float.IsFinite(_humanSettings.HumanAllyStrength)?Math.Clamp(_humanSettings.HumanAllyStrength,.8f,1f):.95f;
             _humanSettings.HorizontalFieldOfView=float.IsFinite(_humanSettings.HorizontalFieldOfView) ? Math.Clamp(_humanSettings.HorizontalFieldOfView,70,140) : 110;
         }
         catch(Exception error) { Logger.LogWarning(error,"Cannot read human-aim settings; keeping defaults"); }
@@ -237,7 +239,7 @@ public partial class BotAimImprover
         foreach(var slot in _fireGuards.Keys.ToArray())ReleaseFireGuard(slot);
         _modelSpots.Clear();_humanPhases.Clear();_soundPreaim.Clear();_lastFootstep.Clear();_attentionTurnAt.Clear();
         _preaimTargets.Clear();_preaimVisited.Clear();ResetAllSilentMovement();ReadHumanDifficulty();
-        ResetTactics();
+        ResetTactics();_aimIntents.Clear();_humanTeamsScanAt=0;_humanTeams=0;
     }
     private static bool IsGun(CCSPlayerPawn pawn)
         => pawn.WeaponServices?.ActiveWeapon.Value?.As<CCSWeaponBase>().VData?.GearSlot is gear_slot_t.GEAR_SLOT_RIFLE or gear_slot_t.GEAR_SLOT_PISTOL;
@@ -303,13 +305,15 @@ public partial class BotAimImprover
             }
             _preaimTargets.Remove(controller.Slot);
             CancelCoverPeek(controller.Slot,"enemy-context");
+            var combatProfile=CombatProfile(controller,now);
             if(!_humanStates.TryGetValue(controller.Slot,out var state) || state.Pawn!=controller.PlayerPawn.Raw || state.Enemy!=enemy.EntityHandle.Raw
+                ||state.Model.Profile!=combatProfile
                 ||state.PlannedWeapon!=(pawn.WeaponServices?.ActiveWeapon.Raw??uint.MaxValue))
             {
                 ReleaseHuman(controller.Slot);
                 state=new HumanState{Pointer=pointer,Pawn=controller.PlayerPawn.Raw,Enemy=enemy.EntityHandle.Raw,
                     PlannedWeapon=pawn.WeaponServices?.ActiveWeapon.Raw ?? uint.MaxValue,
-                    Model=new(HumanAimProfile.For(_humanDifficulty),new(pawn.EyeAngles.X,pawn.EyeAngles.Y),now,Random.Shared.Next())};
+                    Model=new(combatProfile,new(pawn.EyeAngles.X,pawn.EyeAngles.Y),now,Random.Shared.Next())};
                 _humanStates[controller.Slot]=state;
             }
             state.LastUsed=now;
@@ -326,7 +330,7 @@ public partial class BotAimImprover
                 float sampleRayFraction=0f;
                 bool smokeBlocked=false;
                 bool degradedSmoke=false;
-                visible=sensorGate && TrySelectHumanPoint(bot,pawn,enemy,eye,out sample,out sampleRadius,out sampleResult,out sampleAttempts,out samplePoint,out sampleRayFraction,out smokeBlocked);
+                visible=sensorGate && TrySelectHumanPoint(controller,bot,pawn,enemy,eye,out sample,out sampleRadius,out sampleResult,out sampleAttempts,out samplePoint,out sampleRayFraction,out smokeBlocked);
                 if(!visible && sensorGate && smokeBlocked && TryBuildSmokeSample(eyeVec,enemy,out sample,out sampleRadius))
                 {
                     // The target is natively visible but smoke blocks every precise
@@ -357,8 +361,8 @@ public partial class BotAimImprover
                         ReleaseHuman(controller.Slot);
                         state=new HumanState{Pointer=pointer,Pawn=controller.PlayerPawn.Raw,Enemy=enemy.EntityHandle.Raw,
                             PlannedWeapon=pawn.WeaponServices?.ActiveWeapon.Raw ?? uint.MaxValue,
-                            Model=new(HumanAimProfile.For(_humanDifficulty),new(pawn.EyeAngles.X,pawn.EyeAngles.Y),now,Random.Shared.Next()),
-                            LastUsed=now,LastSight=true,NextSensorCheck=now+HumanAimProfile.For(_humanDifficulty).SampleInterval,
+                            Model=new(combatProfile,new(pawn.EyeAngles.X,pawn.EyeAngles.Y),now,Random.Shared.Next()),
+                            LastUsed=now,LastSight=true,NextSensorCheck=now+combatProfile.SampleInterval,
                             UnderFireUntil=state.UnderFireUntil};
                         _humanStates[controller.Slot]=state;
                     }
@@ -431,17 +435,10 @@ public partial class BotAimImprover
     // Long enough to absorb a normal peek/cover flicker, short enough that a
     // genuinely new engagement still starts a fresh perception/motor plan.
     private const float ReacquireResetSeconds=1.0f;
-    private bool TrySelectHumanPoint(CCSBot bot,CCSPlayerPawn pawn,CCSPlayerPawn enemy,Vector eye,out Vec point,out float radius,out string result,out int attempts,out string pointLabel,out float rayFraction,out bool smokeBlocked)
+    private bool TrySelectHumanPoint(CCSPlayerController controller,CCSBot bot,CCSPlayerPawn pawn,CCSPlayerPawn enemy,Vector eye,out Vec point,out float radius,out string result,out int attempts,out string pointLabel,out float rayFraction,out bool smokeBlocked)
     {
         point=default;radius=4;result="no-point";attempts=0;pointLabel="none";rayFraction=0f;smokeBlocked=false;
-        var weapon=pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName;
-        var order=_aimMode switch
-        {
-            AimMode.HEAD => weapon=="weapon_awp" ? _priorityTrunk : _priorityHead,
-            AimMode.BODY => _priorityBody,
-            // Mixed: every weapon except AWP uses the head-first order.
-            _ => weapon != null && _bodyFirstWeapons.Contains(weapon) ? _priorityTrunk : _priorityHead
-        };
+        var order=AimOrder(controller,pawn,enemy);
         var forward=new Angles(pawn.EyeAngles.X,pawn.EyeAngles.Y);
         float fovHalf=_humanSettings.HorizontalFieldOfView*.5f;
         int attemptsLocal=0,fovFail=0,rayFail=0,smokeFail=0;
