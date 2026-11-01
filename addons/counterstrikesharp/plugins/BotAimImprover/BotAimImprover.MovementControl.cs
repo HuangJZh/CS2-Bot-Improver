@@ -123,7 +123,7 @@ public partial class BotAimImprover
             return;
         }
         RefreshFirePositions(now);
-        var fire = NearestFire(origin, 230f, _firePositions);
+        var fire = NearestFire(origin, 180f, _firePositions);
         if (fire == null)
         {
             ResetFireEscape(controller.Slot);
@@ -147,7 +147,15 @@ public partial class BotAimImprover
         float left = (awayX * leftX + awayY * leftY) * 450f;
         long token = _humanController.StartUsercmdMovement(slot, forward, left);
         if (token <= 0) return;
-        _fireEscape[slot] = new FireEscapeState { Token = token, Until = now + .65f };
+        _fireEscape[slot] = new FireEscapeState { Token = token, Until = now + .55f };
+        // Safety expiry: if the bot stops being processed by this plugin
+        // (state released, other view owner, round edge), a persistent analog
+        // override must still be cancelled instead of leaving the bot frozen.
+        AddTimer(.65f, () =>
+        {
+            if (_fireEscape.TryGetValue(slot, out var activeEscape) && activeEscape.Token == token)
+                ResetFireEscape(slot);
+        });
         WriteTelemetry(new
         {
             kind = "fire_avoid",
@@ -158,7 +166,7 @@ public partial class BotAimImprover
             fire_y = fire.Y,
             forward,
             left,
-            duration_ms = 650,
+            duration_ms = 550,
         });
     }
 }

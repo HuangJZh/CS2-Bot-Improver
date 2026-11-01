@@ -154,3 +154,8 @@
 ## 2026-11-01：只露头/预瞄横移/避火（human.8.25）
 
 新增HEAD_TOP/HEAD_L/R候选点，FireGuard开火前检查子弹路径遮挡（wall-blocked）。地图预瞄时注入短促Left/Right横移（260ms）。每0.25s扫描inferno，Bot在火焰230单位内时用StartUsercmdMovement沿远离火源方向走0.65s，避免反复踩火。编译/64项测试通过；专用服采集因测试Bot未生成而无运行数据，需重启实战验证。
+
+
+## 2026-11-01：移动覆盖泄漏修复（human.8.26）
+
+避火用StartUsercmdMovement持久覆盖，但ReleaseHuman未取消token，导致Bot被释放后可能永久移动锁死（愣住/不反应）。修复：ReleaseHuman取消横移/避火覆盖；避火0.65s安全定时器强制取消；触发半径230→180、时长650→550ms。编译/64项测试通过，需重启加载。

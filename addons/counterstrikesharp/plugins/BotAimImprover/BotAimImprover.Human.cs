@@ -256,6 +256,10 @@ public partial class BotAimImprover
     }
     private void ReleaseHuman(int slot)
     {
+        // Any movement override owned by this slot must die with the human-aim
+        // state; otherwise a released bot can stay movement-locked (standstill /
+        // no reaction) until the round ends.
+        ResetPreAimStrafe(slot);ResetFireEscape(slot);
         if(!_humanStates.Remove(slot,out var state))return;
         _modelSpots.Remove(state.Pointer);
     }
