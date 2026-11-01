@@ -124,7 +124,7 @@ public partial class BotAimImprover
             }
             MaintainFireGuards();
         });
-        RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);ResetSilentMovement(p.Slot);ResetPreAimStrafe(p.Slot);ResetFireEscape(p.Slot);}return HookResult.Continue; });
+        RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);ResetSilentMovement(p.Slot);ResetPreAimStrafe(p.Slot);}return HookResult.Continue; });
         // Track bursts so the aim output can model human recoil control after the
         // first few rounds instead of holding a perfectly steady target point.
         RegisterEventHandler<EventWeaponFire>((e,i) => {
@@ -200,7 +200,7 @@ public partial class BotAimImprover
                 state.UnderFireUntil=Server.CurrentTime+.6f;
             return HookResult.Continue;
         });
-        RegisterEventHandler<EventPlayerDisconnect>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);ResetSilentMovement(p.Slot);ResetPreAimStrafe(p.Slot);ResetFireEscape(p.Slot);}return HookResult.Continue; });
+        RegisterEventHandler<EventPlayerDisconnect>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);ResetSilentMovement(p.Slot);ResetPreAimStrafe(p.Slot);}return HookResult.Continue; });
         RegisterEventHandler<EventItemEquip>((e,i) => {
             if(e.Userid is {IsValid:true} player)
             {
@@ -259,7 +259,7 @@ public partial class BotAimImprover
         // Any movement override owned by this slot must die with the human-aim
         // state; otherwise a released bot can stay movement-locked (standstill /
         // no reaction) until the round ends.
-        ResetPreAimStrafe(slot);ResetFireEscape(slot);
+        ResetPreAimStrafe(slot);
         if(!_humanStates.Remove(slot,out var state))return;
         _modelSpots.Remove(state.Pointer);
     }
@@ -310,7 +310,6 @@ public partial class BotAimImprover
             float now=Server.CurrentTime;
             var bot=new CCSBot(pointer);
             TickSilentMovement(controller,pawn,bot,now);
-            TickFireAvoidance(controller,pawn,now);
             if(bot.Enemy.Value is not {IsValid:true} enemy || enemy.LifeState!=0 || enemy.TeamNum==controller.TeamNum)
             {
                 if(TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
