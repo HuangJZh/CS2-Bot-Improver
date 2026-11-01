@@ -23,7 +23,7 @@ public partial class BotAimImprover
             if(_telemetry == null || _telemetryTick==Server.TickCount)return;
             _telemetryTick=Server.TickCount;
             if(Server.CurrentTime>=_telemetryUntil || _telemetry.BaseStream.Position>100_000_000) { StopAimTelemetry();return; }
-            foreach(var player in Utilities.GetPlayers())
+            foreach(var player in EntityPlayers())
                 if(player is {IsValid:true,IsBot:true,PawnIsAlive:true} && !player.HasBeenControlledByPlayerThisRound)
                     RecordAimTelemetry("server_tick_observation",player);
             if(Server.CurrentTime>=_telemetryFlush)
@@ -71,7 +71,10 @@ public partial class BotAimImprover
                     _telemetryRules=Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault(p=>p.IsValid)?.GameRules;
                     _telemetryUntil=Server.CurrentTime+seconds;_telemetryTick=-1;
                     WriteTelemetry(new {kind="session",schema="bot-aim-telemetry-v1",map=Server.MapName,difficulty=_humanDifficulty,model_active=HumanActive,module_version=ModuleVersion,direct_view_requested=_humanSettings.DirectViewControl,direct_view_available=_setEyeAngles!=null,tick_interval=Server.TickInterval,
-                        native_phase_ready=_nativePhasesReady,note="Tick observations and event-callback angles; not raw usercmd or exact subtick shot angles. Captures bots only. No network upload."});
+                        native_phase_ready=_nativePhasesReady,entity_players=EntityPlayers().Length,
+                        entity_bots=EntityPlayers().Count(p=>p.IsBot),legacy_roster_players=Utilities.GetPlayers().Count,
+                        legacy_roster_bots=Utilities.GetPlayers().Count(p=>p.IsBot),
+                        note="Tick observations and event-callback angles; not raw usercmd or exact subtick shot angles. Captures bots only. No network upload."});
                 }
                 catch(Exception error) { StopAimTelemetry();Logger.LogError(error,"Cannot start aim capture"); }
             }

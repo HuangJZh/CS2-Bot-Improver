@@ -180,11 +180,11 @@ public partial class BotAimImprover
             }
             foreach(int slot in _fireGuards.Keys.ToArray())
             {
-                var player=Utilities.GetPlayerFromSlot(slot);
+                var player=EntityPlayerAtSlot(slot);
                 if(player is not {IsValid:true,IsBot:true,PawnIsAlive:true} || player.HasBeenControlledByPlayerThisRound
                     || player.PlayerPawn.Raw!=_fireGuards[slot].Pawn)ReleaseFireGuard(slot);
             }
-            foreach(var player in Utilities.GetPlayers())
+            foreach(var player in EntityPlayers())
                 if(player is {IsValid:true,IsBot:true})RefreshFireGuard(player);
         }
         catch(Exception error)

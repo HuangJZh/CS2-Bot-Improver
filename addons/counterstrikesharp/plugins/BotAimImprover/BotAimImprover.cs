@@ -15,7 +15,7 @@ namespace BotAimImprover;
 public partial class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8-human.8.32-experimental";
+    public override string ModuleVersion => "2.1.8-human.8.33-experimental";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 
@@ -113,9 +113,9 @@ public partial class BotAimImprover : BasePlugin
         "48 8B C4 55 57 48 8D 68 ? 48 81 EC ? ? ? ? 48 8B F9 0F 29 70 ? 8B 89 ? ? ? ? 83 F9 FF";
 
     private MemoryFunctionVoid<IntPtr>? _pickNewAimSpot;
-    // Cache: CCSBot* -> bot's UserId .
+    // Cache: CCSBot* -> controller entity serial + index, independent of client roster/UserId.
     // Cleared on round_start and per-bot on disconnect.
-    private readonly ConcurrentDictionary<IntPtr, int> _botToControllerUserId = new();
+    private readonly ConcurrentDictionary<IntPtr, (uint Controller,int Index)> _botToController = new();
 
     // Aim mode controlled by the `bot_aim` console command:
     //   Mixed / Head = head-first, with an AWP body-first exception
@@ -169,7 +169,7 @@ public partial class BotAimImprover : BasePlugin
 
         RegisterEventHandler<EventRoundStart>((_, _) =>
         {
-            _botToControllerUserId.Clear();
+            _botToController.Clear();
             ClearSmokeError();
             ResetHuman();
             return HookResult.Continue;
@@ -180,19 +180,19 @@ public partial class BotAimImprover : BasePlugin
             try
             {
                 var disconnecter = ev.Userid;
-                if (disconnecter != null && disconnecter.UserId.HasValue)
+                if (disconnecter is {IsValid:true})
                 {
-                    int leavingUserId = disconnecter.UserId.Value;
-                    foreach (var kv in _botToControllerUserId)
-                        if (kv.Value == leavingUserId)
-                            _botToControllerUserId.TryRemove(kv.Key, out int _);
+                    uint leavingController=disconnecter.EntityHandle.Raw;
+                    foreach (var kv in _botToController)
+                        if (kv.Value.Controller == leavingController)
+                            _botToController.TryRemove(kv.Key,out var removed);
                 }
             }
             catch { /* non-fatal */ }
             return HookResult.Continue;
         });
 
-        RegisterListener<Listeners.OnMapStart>(_ => { ClearSmokeError();ResetHuman(); });
+        RegisterListener<Listeners.OnMapStart>(_ => { _botToController.Clear();ClearSmokeError();ResetHuman(); });
         InitializeHumanAim();
         AddCommand("bot_aim", "Set bot aim mode: head, body, mixed", (caller, info) =>
         {
@@ -328,40 +328,32 @@ public partial class BotAimImprover : BasePlugin
     }
 
     /// Find the CCSPlayerController whose pawn's m_pBot field equals pCCSBot.
-    /// Cache key: CCSBot pointer. Cache value: bot UserId.
-    private CCSPlayerController? ResolveBotController(IntPtr pCCSBot)
+    /// Cache identity follows native controller handles, not the connection roster.
+    private static CCSPlayerController[] EntityPlayers() => Utilities
+        .FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller")
+        .Where(p=>p.IsValid).ToArray();
+    private static CCSPlayerController? EntityPlayerAtIndex(int index)
     {
-        // Cache hit -> look up by UserId.
-        if (_botToControllerUserId.TryGetValue(pCCSBot, out int cachedUserId))
+        var p=Utilities.GetEntityFromIndex<CCSPlayerController>(index);
+        return p is {IsValid:true} && p.DesignerName=="cs_player_controller" ? p : null;
+    }
+    private static CCSPlayerController? EntityPlayerAtSlot(int slot)
+        => slot<0 ? null : EntityPlayerAtIndex(slot+1);
+    private CCSPlayerController? ResolveBotController(IntPtr pointer)
+    {
+        if(_botToController.TryGetValue(pointer,out var cached))
         {
-            foreach (var ctrl in Utilities.GetPlayers())
-                if (ctrl != null && ctrl.IsValid && ctrl.IsBot && ctrl.UserId.HasValue && ctrl.UserId.Value == cachedUserId)
-                {
-                    var currentPawn=ctrl.PlayerPawn?.Value;
-                    if(currentPawn is {IsValid:true} && currentPawn.Bot?.Handle==pCCSBot)return ctrl;
-                }
-            _botToControllerUserId.TryRemove(pCCSBot, out int _); // stale
+            var player=EntityPlayerAtIndex(cached.Index);
+            if(player is {IsBot:true} && player.EntityHandle.Raw==cached.Controller
+                && player.PlayerPawn.Value is {IsValid:true} pawn && pawn.Bot?.Handle==pointer)return player;
+            _botToController.TryRemove(pointer,out _);
         }
-
-        // Slow path: find which bot pawn's m_pBot points to pCCSBot.
-        foreach (var ctrl in Utilities.GetPlayers())
+        foreach(var player in EntityPlayers())
         {
-            if (ctrl == null || !ctrl.IsValid || !ctrl.IsBot || !ctrl.UserId.HasValue)
-                continue;
-
-            var pawn = ctrl.PlayerPawn?.Value;
-            if (pawn == null || !pawn.IsValid || pawn.Handle == IntPtr.Zero)
-                continue;
-
-            IntPtr pBotPtr;
-            try { pBotPtr = pawn.Bot?.Handle ?? IntPtr.Zero; }
-            catch { continue; }
-
-            if (pBotPtr == pCCSBot)
-            {
-                _botToControllerUserId[pCCSBot] = ctrl.UserId.Value;
-                return ctrl;
-            }
+            if(!player.IsBot || player.PlayerPawn.Value is not {IsValid:true} pawn
+                || pawn.Bot?.Handle!=pointer)continue;
+            _botToController[pointer]=(player.EntityHandle.Raw,(int)player.Index);
+            return player;
         }
         return null;
     }

@@ -53,7 +53,7 @@ public partial class BotAimImprover
         if (_silentNextDecision.TryGetValue(controller.Slot, out float next) && now < next) return;
         var origin = pawn.AbsOrigin;
         if (origin == null) return;
-        var teammates = Utilities.GetPlayers()
+        var teammates = EntityPlayers()
             .Where(p => p is { IsValid: true, PawnIsAlive: true } && p.TeamNum == controller.TeamNum && p.Slot != controller.Slot)
             .ToList();
         int alive = teammates.Count + 1;

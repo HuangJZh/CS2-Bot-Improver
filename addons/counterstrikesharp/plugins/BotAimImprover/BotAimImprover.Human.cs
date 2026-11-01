@@ -105,7 +105,7 @@ public partial class BotAimImprover
         {
             foreach(var (slot,state) in _humanStates.ToArray())
             {
-                var p=Utilities.GetPlayerFromSlot(slot);
+                var p=EntityPlayerAtSlot(slot);
                 if(p is not {IsValid:true,IsBot:true,PawnIsAlive:true} || p.HasBeenControlledByPlayerThisRound
                     || p.PlayerPawn.Raw!=state.Pawn || Server.CurrentTime-state.LastUsed>.5f)ReleaseHuman(slot);
             }
@@ -177,7 +177,7 @@ public partial class BotAimImprover
             if(action is "on" or "off") { _humanSettings.Enabled=action=="on";ResetHuman(); }
             if(action=="reload") { ResetHuman();ReadHumanSettings(); }
             if(action is "on" or "off" or "reload")WriteTelemetry(new {kind="model_control",tick=Server.TickCount,time=Server.CurrentTime,action,enabled=_humanSettings.Enabled,active=HumanActive});
-            Server.PrintToConsole($"[HumanAim] active={HumanActive} difficulty={_humanDifficulty} direct_requested={_humanSettings.DirectViewControl} direct_available={_setEyeAngles!=null} native_ready={_nativePhasesReady} guards={_fireGuards.Count} pending={_fireGuards.Values.Count(g=>g.Token<=0)} calls={_humanLookCalls} bots={Utilities.GetPlayers().Count(p=>p.IsBot)} alive={Utilities.GetPlayers().Count(p=>p.PawnIsAlive)} states={_humanStates.Count} phases={JsonSerializer.Serialize(_humanPhases)}");
+            Server.PrintToConsole($"[HumanAim] active={HumanActive} difficulty={_humanDifficulty} direct_requested={_humanSettings.DirectViewControl} direct_available={_setEyeAngles!=null} native_ready={_nativePhasesReady} guards={_fireGuards.Count} pending={_fireGuards.Values.Count(g=>g.Token<=0)} calls={_humanLookCalls} bots={EntityPlayers().Count(p=>p.IsBot)} alive={EntityPlayers().Count(p=>p.PawnIsAlive)} states={_humanStates.Count} phases={JsonSerializer.Serialize(_humanPhases)}");
         });
         AddTimer(10f,() => {
             if(_humanSettings.Diagnostics && HumanActive)
