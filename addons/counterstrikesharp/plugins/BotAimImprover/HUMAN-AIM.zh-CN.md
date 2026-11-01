@@ -164,3 +164,8 @@
 ## 2026-11-01：撤回避火移动接管（human.8.27）
 
 完全移除8.25的避火 StartUsercmdMovement/Inferno扫描/安全定时器；避免持久移动覆盖导致Bot被锁死。预瞄横移保留（有限260ms InjectUsercmd）。火中反复踩问题回到原生行为；如需处理应改用非移动接管方式。安装9F19F753，编译/64项测试通过。
+
+
+## 2026-11-01：Mixed爆头率修复（human.8.28）
+
+Mixed的非身体优先武器原来按JAW→NECK→HEAD，JAW常打颈/胸导致爆头率低。现改为HEAD→HEAD_TOP/L/R→NECK→JAW→胸腹；狙/霰弹/左轮/P90/Bizon仍身体优先。UI Mixed语义不变；要全武器头优先选head模式。遥测新增event_hitgroup。安装EBF5C732，编译/64项测试通过，需重启。

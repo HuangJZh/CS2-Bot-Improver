@@ -484,7 +484,9 @@ public partial class BotAimImprover
         {
             AimMode.HEAD => weapon=="weapon_awp" ? _priorityTrunk : _priorityHead,
             AimMode.BODY => _priorityBody,
-            _ => weapon != null && _bodyFirstWeapons.Contains(weapon) ? _priorityTrunk : _priorityJaw
+            // Mixed: rifles/pistols (and SMGs) aim head-first; only snipers/shotguns/
+            // spread weapons keep the body-first trunk order.
+            _ => weapon != null && _bodyFirstWeapons.Contains(weapon) ? _priorityTrunk : _priorityHead
         };
         var forward=new Angles(pawn.EyeAngles.X,pawn.EyeAngles.Y);
         float fovHalf=_humanSettings.HorizontalFieldOfView*.5f;

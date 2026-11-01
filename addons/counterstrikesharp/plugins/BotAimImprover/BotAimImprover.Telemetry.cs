@@ -27,7 +27,7 @@ public partial class BotAimImprover
             }
         });
         RegisterEventHandler<EventWeaponFire>((e,i) => { if(e.Userid is {} p)RecordAimTelemetry("weapon_fire_callback",p,e.Weapon);return HookResult.Continue; },HookMode.Post);
-        RegisterEventHandler<EventPlayerHurt>((e,i) => { if(e.Attacker is {} p)RecordAimTelemetry("player_hurt_callback",p,e.Weapon,e.Userid?.PlayerPawn.Raw,e.DmgHealth);return HookResult.Continue; },HookMode.Post);
+        RegisterEventHandler<EventPlayerHurt>((e,i) => { if(e.Attacker is {} p)RecordAimTelemetry("player_hurt_callback",p,e.Weapon,e.Userid?.PlayerPawn.Raw,e.DmgHealth,e.Hitgroup);return HookResult.Continue; },HookMode.Post);
         RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p)RecordAimTelemetry("player_death_callback",p,null,e.Attacker?.PlayerPawn.Raw);return HookResult.Continue; },HookMode.Post);
         RegisterEventHandler<EventRoundStart>((e,i) => { WriteTelemetry(new {kind="round_boundary",tick=Server.TickCount,time=Server.CurrentTime});return HookResult.Continue; });
         RegisterListener<Listeners.OnMapEnd>(StopAimTelemetry);
@@ -55,7 +55,7 @@ public partial class BotAimImprover
             Server.PrintToConsole($"[AimCapture] active={_telemetry!=null} path={_telemetryPath}");
         });
     }
-    private void RecordAimTelemetry(string kind,CCSPlayerController player,string? eventWeapon=null,uint? otherPawn=null,int? damage=null)
+    private void RecordAimTelemetry(string kind,CCSPlayerController player,string? eventWeapon=null,uint? otherPawn=null,int? damage=null,int? eventHitgroup=null)
     {
         if(_telemetry == null || !player.IsValid || !player.IsBot || player.HasBeenControlledByPlayerThisRound)return;
         var pawn=player.PlayerPawn.Value;if(pawn is not {IsValid:true})return;
