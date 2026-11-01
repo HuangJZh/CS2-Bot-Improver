@@ -6,16 +6,15 @@ public sealed record HumanAimProfile(float Reaction, float SensorDelay, float Sa
     float FlickTime, float MotorError, float AmplitudeError, float TrackingTime, float MaxSpeed, float Prediction)
 {
     public float PerceptionError {get;init;}=.07f;
-    // Burst discipline and spray shape, derived from the Aurora vs Falcons pro
-    // demos: median rifle burst six rounds, human spray yaw sweeps left then right
-    // rather than holding a laser-straight line. Values are calibration hypotheses.
+    // Gameplay burst cadence; native AI retains recoil control. These presets
+    // are tuning hypotheses, not fitted rank or professional-player measurements.
     public int BurstLength {get;init;}=6;
     public float BurstPause {get;init;}=.28f;
     public static HumanAimProfile For(string level) => level switch
     {
-        "Low" => new(.200f,.090f,.050f,.155f,.32f,.020f,.105f,480,.60f){PerceptionError=.12f,BurstLength=4,BurstPause=.32f},
-        "High" => new(.130f,.045f,.025f,.095f,.07f,.006f,.045f,850,.92f){PerceptionError=.035f,BurstLength=8,BurstPause=.24f},
-        _ => new(.170f,.065f,.035f,.125f,.16f,.011f,.070f,650,.80f)
+        "Low" => new(.180f,.075f,.040f,.125f,.24f,.015f,.085f,550,.72f){PerceptionError=.095f,BurstLength=5,BurstPause=.26f},
+        "High" => new(.110f,.030f,.016f,.065f,.045f,.0035f,.030f,950,.97f){PerceptionError=.025f,BurstLength=10,BurstPause=.14f},
+        _ => new(.140f,.045f,.025f,.085f,.10f,.0075f,.045f,780,.90f){PerceptionError=.05f,BurstLength=8,BurstPause=.18f}
     };
 }
 public readonly record struct AimObservation(float Time, Vector3 Position,float Radius=8,float Uncertainty=0,string Part="point");

@@ -197,15 +197,17 @@ for(int seed=0;seed<32;seed++)
 Check(imperfectFire,"intended alignment does not secretly reject every motor-error miss");
 var delayedSizeA=new HumanAimModel(profileHigh,Vector2.Zero,0,25);
 var delayedSizeB=new HumanAimModel(profileHigh,Vector2.Zero,0,25);
+var metadataTarget=new Vector3(1000,0,0);
 for(int i=0;i<=25;i++)
 {
- float now=i/128f;delayedSizeA.Observe(now,target,4);delayedSizeB.Observe(now,target,4);
+ float now=i/128f;delayedSizeA.Observe(now,metadataTarget,4);delayedSizeB.Observe(now,metadataTarget,4);
  delayedSizeA.Step(now,eye,true);delayedSizeB.Step(now,eye,true);
 }
-delayedSizeA.Observe(.25f,target,100);delayedSizeB.Observe(.25f,target,4);
-delayedSizeA.Step(.294f,eye,true);delayedSizeB.Step(.294f,eye,true);
+delayedSizeA.Observe(.25f,metadataTarget,100);delayedSizeB.Observe(.25f,metadataTarget,4);
+float beforeSize=.25f+profileHigh.SensorDelay-.001f,afterSize=.25f+profileHigh.SensorDelay+.001f;
+delayedSizeA.Step(beforeSize,eye,true);delayedSizeB.Step(beforeSize,eye,true);
 Check(delayedSizeA.LastFireDecision==delayedSizeB.LastFireDecision,"future target-size metadata cannot bypass sensory delay");
-delayedSizeA.Step(.30f,eye,true);delayedSizeB.Step(.30f,eye,true);
+delayedSizeA.Step(afterSize,eye,true);delayedSizeB.Step(afterSize,eye,true);
 Check(delayedSizeA.LastFireDecision.ToleranceDegrees>delayedSizeB.LastFireDecision.ToleranceDegrees,
  "target-size metadata becomes available with its delayed position sample");
 foreach(var level in new[]{"Low","Medium","High"})
@@ -314,4 +316,25 @@ Check(CoverPeekPolicy.Cancel(localRoute!.Value,4,Vector3.Zero,new(600,0,0),true,
 Check(CoverPeekPolicy.Cancel(localRoute.Value,3,Vector3.Zero,new(600,0,0),false,.05f),"task priority can cancel an in-flight peek");
 Check(CoverPeekPolicy.Cancel(localRoute.Value,3,Vector3.Zero,new(600,0,0),true,.2f),"peek has a hard finite duration");
 Check(CoverPeekPolicy.Cancel(localRoute.Value,3,new(float.NaN,0,0),new(600,0,0),true,.05f),"invalid native position cancels optional movement");
+var previousProfiles=new Dictionary<string,HumanAimProfile>{
+ ["Low"]=new(.200f,.090f,.050f,.155f,.32f,.020f,.105f,480,.60f){PerceptionError=.12f,BurstLength=4,BurstPause=.32f},
+ ["Medium"]=new(.170f,.065f,.035f,.125f,.16f,.011f,.070f,650,.80f),
+ ["High"]=new(.130f,.045f,.025f,.095f,.07f,.006f,.045f,850,.92f){PerceptionError=.035f,BurstLength=8,BurstPause=.24f}
+};
+foreach(float gap in new[]{5f,25f,70f})
+{
+ float lastMedian=float.PositiveInfinity;
+ var point=new Vector3(1000*MathF.Cos(gap*MathF.PI/180),1000*MathF.Sin(gap*MathF.PI/180),0);
+ foreach(string level in new[]{"Low","Medium","High"})
+ {
+  var profile=HumanAimProfile.For(level);
+  var oldTimes=Enumerable.Range(0,128).Select(seed=>FirstFire(previousProfiles[level],point,AimWeaponClass.Rifle,seed).Time).Order().ToArray();
+  var newTimes=Enumerable.Range(0,128).Select(seed=>FirstFire(profile,point,AimWeaponClass.Rifle,seed).Time).Order().ToArray();
+  float oldMedian=oldTimes[64],newMedian=newTimes[64];
+  Check(newMedian<oldMedian,$"{level} {gap}deg contact reaches first planned shot faster than 8.34");
+  Check(newMedian<lastMedian,$"{level} {gap}deg contact preserves difficulty ordering");
+  lastMedian=newMedian;
+  Console.WriteLine($"TUNING {level} gap={gap} old_median_ms={oldMedian*1000:F1} new_median_ms={newMedian*1000:F1}");
+ }
+}
 Console.WriteLine($"{count} checks passed");
