@@ -6,15 +6,17 @@ public sealed record HumanAimProfile(float Reaction, float SensorDelay, float Sa
     float FlickTime, float MotorError, float AmplitudeError, float TrackingTime, float MaxSpeed, float Prediction)
 {
     public float PerceptionError {get;init;}=.07f;
+    public float FlickAmplitudeTime {get;init;}=.018f;
+    public float FirstShotSettleLimit {get;init;}=.24f;
     // Gameplay burst cadence; native AI retains recoil control. These presets
     // are tuning hypotheses, not fitted rank or professional-player measurements.
     public int BurstLength {get;init;}=6;
     public float BurstPause {get;init;}=.28f;
     public static HumanAimProfile For(string level) => level switch
     {
-        "Low" => new(.180f,.075f,.040f,.125f,.24f,.015f,.085f,550,.72f){PerceptionError=.095f,BurstLength=5,BurstPause=.26f},
-        "High" => new(.110f,.030f,.016f,.065f,.045f,.0035f,.030f,950,.97f){PerceptionError=.025f,BurstLength=10,BurstPause=.14f},
-        _ => new(.140f,.045f,.025f,.085f,.10f,.0075f,.045f,780,.90f){PerceptionError=.05f,BurstLength=8,BurstPause=.18f}
+        "Low" => new(.180f,.075f,.040f,.105f,.24f,.015f,.085f,550,.72f){PerceptionError=.095f,FlickAmplitudeTime=.011f,FirstShotSettleLimit=.16f,BurstLength=5,BurstPause=.26f},
+        "High" => new(.110f,.030f,.016f,.045f,.045f,.0035f,.030f,950,.97f){PerceptionError=.025f,FlickAmplitudeTime=.006f,FirstShotSettleLimit=.08f,BurstLength=10,BurstPause=.14f},
+        _ => new(.140f,.045f,.025f,.060f,.10f,.0075f,.045f,780,.90f){PerceptionError=.05f,FlickAmplitudeTime=.008f,FirstShotSettleLimit=.10f,BurstLength=8,BurstPause=.18f}
     };
 }
 public readonly record struct AimObservation(float Time, Vector3 Position,float Radius=8,float Uncertainty=0,string Part="point");
@@ -156,7 +158,11 @@ public sealed class HumanAimModel
             ContactKind=amplitude<10f ? "prepared" : amplitude>45f ? "unexpected" : "neutral";
             _startView=_view;
             float angularWidth=MathF.Max(.12f,MathF.Atan2(8,targetDistance)*180/MathF.PI);
-            _duration=amplitude<angularWidth*.5f ? .015f : Profile.FlickTime+.018f*MathF.Log2(1+amplitude/angularWidth);
+            _duration=amplitude<angularWidth*.5f ? .015f : Profile.FlickTime+Profile.FlickAmplitudeTime*MathF.Log2(1+amplitude/angularWidth);
+            // Quintic easing peaks at 1.875 times average speed. A shorter plan
+            // hits the motor speed cap, ends before the view arrives and creates
+            // an unnecessary second correction/pause on large turns.
+            _duration=MathF.Max(_duration,1.875f*amplitude/Profile.MaxSpeed);
             // Endpoint error persists for this movement instead of per-frame random jitter.
             _bias=Noise(Profile.MotorError+amplitude*Profile.AmplitudeError);
             _endView=AimMath.Normalize(desired+_bias);

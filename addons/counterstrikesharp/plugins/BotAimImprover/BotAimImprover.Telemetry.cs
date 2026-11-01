@@ -139,6 +139,7 @@ public partial class BotAimImprover
             believed_target_pitch=state?.Model.LastDesiredAngles.X,believed_target_yaw=state?.Model.LastDesiredAngles.Y,
             mixed_head_intent=_aimIntents.Get(player.Slot),human_team_mask=_humanTeams,
             model_reaction_ms=state?.Model.Profile.Reaction*1000,
+            execution_settle_limit_ms=state?.Model.Profile.FirstShotSettleLimit*1000,
             human_ally_handicap=CombatBalancePolicy.IsHumanAlly(player.TeamNum,_humanTeams),
             execution_requested_pitch=state?.ExecutionRequest.Angles.X,execution_requested_yaw=state?.ExecutionRequest.Angles.Y,
             execution_correction_pitch=state?.ExecutionRequest.Correction.X,execution_correction_yaw=state?.ExecutionRequest.Correction.Y,

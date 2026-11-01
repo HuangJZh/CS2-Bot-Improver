@@ -142,7 +142,7 @@ public partial class BotAimImprover
                 AimWeaponClass.Smg or AimWeaponClass.Shotgun=>1f,_=>.65f};
             float tolerance=Math.Clamp(MathF.Max(floor,(state.Model.LastFireDecision.ToleranceDegrees??.5f)+state.Model.Profile.MotorError*.5f),floor,3f);
             float error=AimMath.Delta(state.Output.Angles,new(pawn.EyeAngles.X,pawn.EyeAngles.Y)).Length();
-            var permission=state.Execution.FirstShot(now,FirstShotPending(state,now),error,tolerance,advanceTimers);
+            var permission=state.Execution.FirstShot(now,FirstShotPending(state,now),error,tolerance,advanceTimers,state.Model.Profile.FirstShotSettleLimit);
             if(advanceTimers)state.ExecutionPermission=permission;
             if(!permission.Allow)return new(false,true,permission.Reason);
             return new(true,false,permission.Reason=="execution-settle-timeout"?permission.Reason:"planned-shot");

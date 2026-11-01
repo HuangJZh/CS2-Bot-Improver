@@ -7,6 +7,7 @@ public static class CombatBalancePolicy
     {
         Reaction=p.Reaction/strength,SensorDelay=p.SensorDelay/strength,
         FlickTime=p.FlickTime/strength,TrackingTime=p.TrackingTime/strength,
+        FlickAmplitudeTime=p.FlickAmplitudeTime/strength,FirstShotSettleLimit=p.FirstShotSettleLimit/strength,
         MaxSpeed=p.MaxSpeed*strength,MotorError=p.MotorError/strength,
         AmplitudeError=p.AmplitudeError/strength,PerceptionError=p.PerceptionError/strength,
         BurstPause=p.BurstPause/strength

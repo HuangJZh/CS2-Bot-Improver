@@ -27,15 +27,15 @@ public sealed class AimExecutionController
         _request=new(AimMath.Normalize(requested+_correction),_correction,error.Length(),feedbackAllowed);
         return _request;
     }
-    public ExecutionPermission FirstShot(float now,bool firstShot,float error,float tolerance,bool advance=true)
+    public ExecutionPermission FirstShot(float now,bool firstShot,float error,float tolerance,bool advance=true,float settleLimit=.24f)
     {
-        if(!float.IsFinite(now+error+tolerance)||error<0||tolerance<=0)return new(false,"invalid-execution",error,tolerance);
+        if(!float.IsFinite(now+error+tolerance+settleLimit)||error<0||tolerance<=0||settleLimit<=0)return new(false,"invalid-execution",error,tolerance);
         if(!firstShot){if(advance)_waitStarted=null;return new(true,"burst-continuation",error,tolerance);}
         if(error<=tolerance){if(advance)_waitStarted=null;return new(true,"execution-aligned",error,tolerance);}
         if(advance)_waitStarted??=now;
         // A bounded settling attempt cannot leave a bot mute when native motion
         // or recoil prevents convergence. This is a degraded shot, never alignment.
-        return now-(_waitStarted??now)>=.24f
+        return now-(_waitStarted??now)>=settleLimit
             ? new(true,"execution-settle-timeout",error,tolerance)
             : new(false,"waiting-for-execution",error,tolerance);
     }

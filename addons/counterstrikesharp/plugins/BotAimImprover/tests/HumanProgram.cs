@@ -367,4 +367,28 @@ Check(!intents.Resolve(4,intentKey with{Target=5},.4f,8,IntentDraw)&&draws==2,
 intents.Resolve(4,intentKey with{Target=5},.4f,10,IntentDraw);
 Check(draws==3,"lost contact longer than one second starts a fresh intent");
 intents.Clear();Check(intents.Get(4)==null,"round reset clears engagement intents");
+foreach(float gap in new[]{5f,25f,70f})
+{
+ var point=new Vector3(1000*MathF.Cos(gap*MathF.PI/180),1000*MathF.Sin(gap*MathF.PI/180),0);
+ foreach(string level in new[]{"Low","Medium","High"})
+ {
+  var current=HumanAimProfile.For(level);
+  var prior=current with{FlickTime=level switch{"Low"=>.125f,"High"=>.065f,_=>.085f},FlickAmplitudeTime=.018f,FirstShotSettleLimit=.24f};
+  var beforeTimes=Enumerable.Range(0,128).Select(seed=>FirstFire(prior,point,AimWeaponClass.Rifle,seed).Time).Order().ToArray();
+  var afterTimes=Enumerable.Range(0,128).Select(seed=>FirstFire(current,point,AimWeaponClass.Rifle,seed).Time).Order().ToArray();
+  Check(afterTimes[64]<beforeTimes[64],$"{level} {gap}deg faster initial movement advances planned fire without reducing reaction");
+  Console.WriteLine($"FLICK-TUNING {level} gap={gap} old_median_ms={beforeTimes[64]*1000:F1} new_median_ms={afterTimes[64]*1000:F1}");
+ }
+}
+foreach(string level in new[]{"Low","Medium","High"})
+{
+ var profile=HumanAimProfile.For(level);var gate=new AimExecutionController();
+ Check(gate.FirstShot(0,true,.1f,.65f,true,profile.FirstShotSettleLimit).Allow,
+  level+" aligned shot never pays the maximum execution settling time");
+ gate.FirstShot(1,true,2,.65f,true,profile.FirstShotSettleLimit);
+ Check(!gate.FirstShot(1+profile.FirstShotSettleLimit-.005f,true,2,.65f,true,profile.FirstShotSettleLimit).Allow,
+  level+" unaligned native execution still receives its bounded settling attempt");
+ Check(gate.FirstShot(1+profile.FirstShotSettleLimit+.005f,true,2,.65f,true,profile.FirstShotSettleLimit).Reason=="execution-settle-timeout",
+  level+" failed native alignment yields by the new per-difficulty deadline");
+}
 Console.WriteLine($"{count} checks passed");
