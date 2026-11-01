@@ -592,3 +592,6 @@ A局未采样比例从8.5同口径的30.8%降到3.9%；扇形回退在这两局�
 - 如果用户希望**所有武器都头优先**（包括狙/霰弹），UI选 `head` 模式即可；Mixed仍保留身体优先武器。
 
 注意：如果用户实际玩的是scout模式（SSG08）或大量P90/Bizon，Mixed会给它们身体优先，爆头率低是设计使然；需切normal或head模式。安装8.28哈希`EBF5C732…`；用户游戏运行中，需重启加载；编译0警告0错误、64项测试通过。运行验证受游戏占用未做，待重启后用event_hitgroup统计。
+### 2026-11-01 其他武器全部头优先，仅保留AWP身体优先（human.8.29）
+
+按用户要求调整Mixed模式：`_bodyFirstWeapons` 由 `awp/ssg08/p90/bizon/nova/xm1014/sawedoff/mag7/revolver` 缩减为仅 `weapon_awp`。现在Mixed下除AWP外，所有武器（含SSG08、P90/Bizon、霰弹枪、左轮）都使用 `_priorityHead`：HEAD→HEAD_TOP/L/R→NECK→JAW→胸腹；AWP仍按身体优先。Head模式本来就仅AWP例外（AWP走trunk），无需改。安装8.29哈希`01E07191…`；编译0警告0错误、64项测试通过；当前无CS2进程。

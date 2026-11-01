@@ -15,7 +15,7 @@ namespace BotAimImprover;
 public partial class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8-human.8.28-experimental";
+    public override string ModuleVersion => "2.1.8-human.8.29-experimental";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 
@@ -124,11 +124,11 @@ public partial class BotAimImprover : BasePlugin
     private enum AimMode { MIXED, HEAD, BODY }
     private AimMode _aimMode = AimMode.MIXED;
 
-    // Weapons that aim body-first when in Mixed mode (snipers + high-spread / shotguns).
+    // Only the AWP keeps a body-first aim in Mixed mode; every other weapon
+    // (including SSG08, SMGs, shotguns and revolver) aims head-first.
     private static readonly HashSet<string> _bodyFirstWeapons = new()
     {
-        "weapon_awp", "weapon_ssg08", "weapon_p90", "weapon_bizon",
-        "weapon_nova", "weapon_xm1014", "weapon_sawedoff", "weapon_mag7", "weapon_revolver"
+        "weapon_awp"
     };
 
     // One-shot flag so we log a single confirmation that overrides are actually firing.

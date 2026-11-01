@@ -169,3 +169,8 @@
 ## 2026-11-01：Mixed爆头率修复（human.8.28）
 
 Mixed的非身体优先武器原来按JAW→NECK→HEAD，JAW常打颈/胸导致爆头率低。现改为HEAD→HEAD_TOP/L/R→NECK→JAW→胸腹；狙/霰弹/左轮/P90/Bizon仍身体优先。UI Mixed语义不变；要全武器头优先选head模式。遥测新增event_hitgroup。安装EBF5C732，编译/64项测试通过，需重启。
+
+
+## 2026-11-01：仅AWP身体优先（human.8.29）
+
+Mixed模式`_bodyFirstWeapons`只保留weapon_awp；SSG08/P90/Bizon/霰弹/左轮等全部改回HEAD优先。Head模式保持AWP例外。安装01E07191，编译/64项测试通过。
