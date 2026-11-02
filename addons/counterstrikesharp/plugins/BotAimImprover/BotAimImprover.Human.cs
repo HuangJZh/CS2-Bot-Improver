@@ -19,7 +19,8 @@ public partial class BotAimImprover
         public bool Diagnostics {get;set;}=false;
         public bool DirectViewControl {get;set;}=false; // Experimental until recoil/weapon checks are validated.
         public float HorizontalFieldOfView {get;set;}=110;
-        public float HumanAllyStrength {get;set;}=.95f;
+        public float HumanAllyStrength {get;set;}=.85f;
+        public bool EnemyElites {get;set;}=true;
         public bool TeamNavigation {get;set;}=true;
     }
     private sealed class HumanState
@@ -208,7 +209,7 @@ public partial class BotAimImprover
         {
             if(File.Exists(path))_humanSettings=JsonSerializer.Deserialize<HumanSettings>(File.ReadAllText(path)) ?? new();
             else File.WriteAllText(path,JsonSerializer.Serialize(_humanSettings,new JsonSerializerOptions{WriteIndented=true}));
-            _humanSettings.HumanAllyStrength=float.IsFinite(_humanSettings.HumanAllyStrength)?Math.Clamp(_humanSettings.HumanAllyStrength,.8f,1f):.95f;
+            _humanSettings.HumanAllyStrength=float.IsFinite(_humanSettings.HumanAllyStrength)?Math.Clamp(_humanSettings.HumanAllyStrength,.8f,1f):.85f;
             _humanSettings.HorizontalFieldOfView=float.IsFinite(_humanSettings.HorizontalFieldOfView) ? Math.Clamp(_humanSettings.HorizontalFieldOfView,70,140) : 110;
         }
         catch(Exception error) { Logger.LogWarning(error,"Cannot read human-aim settings; keeping defaults"); }
@@ -243,6 +244,7 @@ public partial class BotAimImprover
         _modelSpots.Clear();_humanPhases.Clear();_soundPreaim.Clear();_lastFootstep.Clear();_attentionTurnAt.Clear();
         _preaimTargets.Clear();_preaimVisited.Clear();ResetAllSilentMovement();ReadHumanDifficulty();
         ResetTactics();_aimIntents.Clear();_humanTeamsScanAt=0;_humanTeams=0;
+        _eliteProfiles.Clear();
     }
     private static bool IsGun(CCSPlayerPawn pawn)
         => pawn.WeaponServices?.ActiveWeapon.Value?.As<CCSWeaponBase>().VData?.GearSlot is gear_slot_t.GEAR_SLOT_RIFLE or gear_slot_t.GEAR_SLOT_PISTOL;

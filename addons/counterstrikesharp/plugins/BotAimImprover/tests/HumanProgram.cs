@@ -337,9 +337,9 @@ foreach(float gap in new[]{5f,25f,70f})
   Console.WriteLine($"TUNING {level} gap={gap} old_median_ms={oldMedian*1000:F1} new_median_ms={newMedian*1000:F1}");
  }
 }
-var allyProfile=CombatBalancePolicy.AllyProfile(HumanAimProfile.For("Medium"),.95f);
-Check(MathF.Abs(allyProfile.MaxSpeed/HumanAimProfile.For("Medium").MaxSpeed-.95f)<.00001f,
- "human ally motor speed has the requested five percent parameter handicap");
+var allyProfile=CombatBalancePolicy.AllyProfile(HumanAimProfile.For("Medium"),.85f);
+Check(MathF.Abs(allyProfile.MaxSpeed/HumanAimProfile.For("Medium").MaxSpeed-.85f)<.00001f,
+ "human ally motor speed has the requested fifteen percent parameter handicap");
 Check(allyProfile.Reaction>HumanAimProfile.For("Medium").Reaction&&allyProfile.MotorError>HumanAimProfile.For("Medium").MotorError,
  "ally handicap slows response and slightly reduces precision");
 Check(CombatBalancePolicy.IsHumanAlly(3,1<<3)&&!CombatBalancePolicy.IsHumanAlly(2,1<<3),
@@ -391,4 +391,23 @@ foreach(string level in new[]{"Low","Medium","High"})
  Check(gate.FirstShot(1+profile.FirstShotSettleLimit+.005f,true,2,.65f,true,profile.FirstShotSettleLimit).Reason=="execution-settle-timeout",
   level+" failed native alignment yields by the new per-difficulty deadline");
 }
+var balanceRoster=new[]{new BalanceBot(100,2),new BalanceBot(101,2),new BalanceBot(102,2),new BalanceBot(103,2),new BalanceBot(104,2),new BalanceBot(200,3)};
+var eliteRoster=new EnemyEliteRoster();
+Check(eliteRoster.Refresh(8,balanceRoster,new Random(42)),"single human team initializes the opposing elite roster");
+Check(eliteRoster.Strengths.Count is 1 or 2&&eliteRoster.Strengths.Keys.All(id=>id<200),"one or two distinct opponents are elites, never human teammates");
+Check(eliteRoster.Strengths.Values.All(s=>s>=1.20f&&s<=1.30f),"elite strengths stay within twenty to thirty percent");
+var selectedElites=eliteRoster.Strengths.ToDictionary(x=>x.Key,x=>x.Value);
+Check(!eliteRoster.Refresh(8,balanceRoster.Reverse(),new Random(99))&&selectedElites.SequenceEqual(eliteRoster.Strengths),"repeated combat updates and roster order do not reroll elites");
+Check(eliteRoster.Strength(999)==1,"a reused player slot with a new entity serial does not inherit elite strength");
+Check(eliteRoster.Refresh(4,balanceRoster,new Random(42))&&eliteRoster.Strengths.Count==1&&eliteRoster.Strength(200)>1,
+ "switching human team moves elites to the new enemy side");
+eliteRoster.Refresh(0,balanceRoster,new Random(1));Check(eliteRoster.Strengths.Count==0,"spectators do not leave enemy elites active");
+eliteRoster.Refresh(12,balanceRoster,new Random(1));Check(eliteRoster.Strengths.Count==0,"humans on both sides disable asymmetric elites");
+eliteRoster.Reset();Check(eliteRoster.Strengths.Count==0&&eliteRoster.Refresh(8,balanceRoster,new Random(2)),"new round can select a fresh fixed roster");
+bool sawOne=false,sawTwo=false;
+for(int seed=0;seed<32;seed++){var r=new EnemyEliteRoster();r.Refresh(8,balanceRoster,new Random(seed));sawOne|=r.Strengths.Count==1;sawTwo|=r.Strengths.Count==2;}
+Check(sawOne&&sawTwo,"round selection supports both one and two elite opponents");
+var eliteProfile=CombatBalancePolicy.AllyProfile(HumanAimProfile.For("Medium"),1.25f);
+Check(MathF.Abs(eliteProfile.Reaction-.112f)<.00001f&&eliteProfile.MotorError<HumanAimProfile.For("Medium").MotorError,
+ "elite boost accelerates response and improves precision without damage changes");
 Console.WriteLine($"{count} checks passed");

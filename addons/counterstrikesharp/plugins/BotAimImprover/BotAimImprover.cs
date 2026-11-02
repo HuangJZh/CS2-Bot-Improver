@@ -15,7 +15,7 @@ namespace BotAimImprover;
 public partial class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8-human.8.38-experimental";
+    public override string ModuleVersion => "2.1.8-human.8.39-experimental";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 
@@ -172,6 +172,7 @@ public partial class BotAimImprover : BasePlugin
             _botToController.Clear();
             ClearSmokeError();
             ResetHuman();
+            _enemyElites.Reset();
             return HookResult.Continue;
         });
 
@@ -192,7 +193,7 @@ public partial class BotAimImprover : BasePlugin
             return HookResult.Continue;
         });
 
-        RegisterListener<Listeners.OnMapStart>(_ => { _botToController.Clear();ClearSmokeError();ResetHuman(); });
+        RegisterListener<Listeners.OnMapStart>(_ => { _botToController.Clear();ClearSmokeError();ResetHuman();_enemyElites.Reset(); });
         InitializeHumanAim();
         AddCommand("bot_aim", "Set bot aim mode: head, body, mixed", (caller, info) =>
         {

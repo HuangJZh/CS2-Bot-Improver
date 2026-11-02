@@ -2,7 +2,7 @@ namespace BotAimImprover;
 
 public static class CombatBalancePolicy
 {
-    // A small parameter handicap, never a damage multiplier or a claimed win-rate.
+    // A combat-parameter scale, never a damage multiplier or a claimed win-rate.
     public static HumanAimProfile AllyProfile(HumanAimProfile p,float strength)=>p with
     {
         Reaction=p.Reaction/strength,SensorDelay=p.SensorDelay/strength,
@@ -21,6 +21,32 @@ public static class CombatBalancePolicy
         return Math.Clamp(chance+(weapon switch {AimWeaponClass.PrecisePistol=>.15f,
             AimWeaponClass.Smg or AimWeaponClass.MachineGun=>-.10f,_=>0f}),0,1);
     }
+}
+
+public readonly record struct BalanceBot(uint Controller,int Team);
+public sealed class EnemyEliteRoster
+{
+    private readonly Dictionary<uint,float> _strengths=new();
+    private int _humanTeams;
+    private bool _selected;
+    public IReadOnlyDictionary<uint,float> Strengths=>_strengths;
+    public bool Refresh(int humanTeams,IEnumerable<BalanceBot> bots,Random random)
+    {
+        if(humanTeams!=_humanTeams){Reset();_humanTeams=humanTeams;}
+        if(_selected||humanTeams is not (4 or 8))return false;
+        int enemy=humanTeams==4?3:2;
+        var candidates=bots.Where(b=>b.Team==enemy).Select(b=>b.Controller).Distinct().ToArray();
+        if(candidates.Length==0)return false;
+        int count=random.Next(1,Math.Min(2,candidates.Length)+1);
+        for(int i=0;i<count;i++)
+        {
+            int j=random.Next(i,candidates.Length);(candidates[i],candidates[j])=(candidates[j],candidates[i]);
+            _strengths[candidates[i]]=1.20f+random.NextSingle()*.10f;
+        }
+        _selected=true;return true;
+    }
+    public float Strength(uint controller)=>_strengths.GetValueOrDefault(controller,1f);
+    public void Reset(){_strengths.Clear();_selected=false;_humanTeams=0;}
 }
 
 public readonly record struct AimIntentKey(uint Pawn,uint Target,uint Weapon,int Mode);

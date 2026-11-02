@@ -141,6 +141,7 @@ public partial class BotAimImprover
             model_reaction_ms=state?.Model.Profile.Reaction*1000,
             execution_settle_limit_ms=state?.Model.Profile.FirstShotSettleLimit*1000,
             human_ally_handicap=CombatBalancePolicy.IsHumanAlly(player.TeamNum,_humanTeams),
+            enemy_elite_strength=_enemyElites.Strength(player.EntityHandle.Raw),
             execution_requested_pitch=state?.ExecutionRequest.Angles.X,execution_requested_yaw=state?.ExecutionRequest.Angles.Y,
             execution_correction_pitch=state?.ExecutionRequest.Correction.X,execution_correction_yaw=state?.ExecutionRequest.Correction.Y,
             execution_feedback_active=state?.ExecutionRequest.FeedbackActive,

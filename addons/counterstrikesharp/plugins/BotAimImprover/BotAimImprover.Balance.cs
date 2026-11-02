@@ -1,5 +1,6 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using Microsoft.Extensions.Logging;
 namespace BotAimImprover;
 
 public partial class BotAimImprover
@@ -10,6 +11,8 @@ public partial class BotAimImprover
     private HumanAimProfile? _baseCombatProfile,_allyCombatProfile;
     private string? _balanceDifficulty;
     private float _balanceStrength;
+    private readonly EnemyEliteRoster _enemyElites=new();
+    private readonly Dictionary<float,HumanAimProfile> _eliteProfiles=new();
     private HumanAimProfile CombatProfile(CCSPlayerController controller,float now)
     {
         if(_baseCombatProfile==null||_balanceDifficulty!=_humanDifficulty||_balanceStrength!=_humanSettings.HumanAllyStrength)
@@ -17,15 +20,33 @@ public partial class BotAimImprover
             _balanceDifficulty=_humanDifficulty;_balanceStrength=_humanSettings.HumanAllyStrength;
             _baseCombatProfile=HumanAimProfile.For(_humanDifficulty);
             _allyCombatProfile=CombatBalancePolicy.AllyProfile(_baseCombatProfile,_balanceStrength);
+            _eliteProfiles.Clear();
         }
         if(now>=_humanTeamsScanAt)
         {
             _humanTeamsScanAt=now+.5f;_humanTeams=0;
             // Keep the handicap when the human dies, and follow their team after a side switch.
-            foreach(var p in EntityPlayers())
+            var players=EntityPlayers();
+            foreach(var p in players)
                 if(p.IsValid&&!p.IsBot&&p.TeamNum is 2 or 3)_humanTeams|=1<<p.TeamNum;
+            if(_humanSettings.EnemyElites)
+            {
+                if(_enemyElites.Refresh(_humanTeams,players.Where(p=>p.IsValid&&p.IsBot&&!p.HasBeenControlledByPlayerThisRound)
+                    .Select(p=>new BalanceBot(p.EntityHandle.Raw,p.TeamNum)),Random.Shared))
+                {
+                    var selected=players.Where(p=>_enemyElites.Strengths.ContainsKey(p.EntityHandle.Raw))
+                        .Select(p=>$"{p.PlayerName}(slot={p.Slot},x{_enemyElites.Strength(p.EntityHandle.Raw):F3})");
+                    Logger.LogInformation("Enemy elites selected: humanTeams={Teams}, {Elites}",_humanTeams,string.Join(", ",selected));
+                }
+            }
+            else _enemyElites.Reset();
         }
-        return CombatBalancePolicy.IsHumanAlly(controller.TeamNum,_humanTeams)?_allyCombatProfile!:_baseCombatProfile;
+        if(CombatBalancePolicy.IsHumanAlly(controller.TeamNum,_humanTeams))return _allyCombatProfile!;
+        float strength=_humanSettings.EnemyElites?_enemyElites.Strength(controller.EntityHandle.Raw):1;
+        if(strength<=1)return _baseCombatProfile;
+        if(!_eliteProfiles.TryGetValue(strength,out var elite))
+            _eliteProfiles[strength]=elite=CombatBalancePolicy.AllyProfile(_baseCombatProfile,strength);
+        return elite;
     }
     private int[] AimOrder(CCSPlayerController controller,CCSPlayerPawn pawn,CCSPlayerPawn target)
     {
