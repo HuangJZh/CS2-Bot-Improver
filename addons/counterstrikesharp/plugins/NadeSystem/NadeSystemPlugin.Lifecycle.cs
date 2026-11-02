@@ -29,6 +29,7 @@ public partial class NadeSystemPlugin : BasePlugin
     {
         Directory.CreateDirectory(DataDir);
         LoadDb();
+        InitializeNadeLearning();
 
         RegisterEventHandler<EventRoundStart>(OnRoundStart);
         RegisterEventHandler<EventRoundFreezeEnd>(OnFreezeEnd);
@@ -44,6 +45,7 @@ public partial class NadeSystemPlugin : BasePlugin
         RegisterListener<Listeners.OnMapStart>(_ =>
         {
             _inventoryRound++;
+            _nadeLearning.Clear();
             _db.Clear();
             LoadDb();
             _cooldowns.Clear();
@@ -62,6 +64,10 @@ public partial class NadeSystemPlugin : BasePlugin
     private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
     {
         _inventoryRound++;
+        var anchor=Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller")
+            .Where(p=>p.IsValid&&p.TeamNum is 2 or 3).OrderBy(p=>p.Index).FirstOrDefault();
+        _nadeLearning.BeginRound(anchor?.EntityHandle.Raw??0,anchor?.TeamNum??0);
+        _nadeLearningExplore=Random.Shared.NextDouble()<.20;_nadeLearningPriorityLogged=false;
         _roundOver  = false;
         _freezeEndTime = 0f;
         _roundStartTime = Server.CurrentTime;
@@ -149,6 +155,7 @@ public partial class NadeSystemPlugin : BasePlugin
     private HookResult OnRoundEnd(EventRoundEnd @event, GameEventInfo info)
     {
         _roundOver = true;
+        CompleteNadeLearning(@event.Winner);
         return HookResult.Continue;
     }
 
@@ -157,6 +164,7 @@ public partial class NadeSystemPlugin : BasePlugin
     private HookResult OnPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
     {
         var player = @event.Userid;
+        RecordLearningDeath(@event);
         if (player != null && player.IsValid)
             _playerSounds.Remove((uint)player.Index);
         return HookResult.Continue;

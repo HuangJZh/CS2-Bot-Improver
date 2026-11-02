@@ -50,7 +50,7 @@ public sealed class TeamNavigationGraph
             .OrderBy(a=>Vector3.DistanceSquared(point,a.Point)).FirstOrDefault();
         return nearest!=null&&Vector3.Distance(point,nearest.Point)<=maxDistance?nearest.Id:null;
     }
-    public List<int>? Path(int start,int goal,IReadOnlyDictionary<int,int>? occupied=null)
+    public List<int>? Path(int start,int goal,IReadOnlyDictionary<int,int>? occupied=null,IReadOnlyDictionary<int,float>? learnedRisk=null)
     {
         if(!Areas.ContainsKey(start)||!Areas.ContainsKey(goal))return null;
         var queue=new PriorityQueue<int,float>();var costs=new Dictionary<int,float>{{start,0}};
@@ -68,7 +68,8 @@ public sealed class TeamNavigationGraph
             {
                 float distance=MathF.Max(1,Vector3.Distance(Areas[current].Point,Areas[next].Point));
                 // Avoid stacking every squad on one corridor; still require reachability.
-                float cost=costs[current]+distance*(1+1.5f*(occupied?.GetValueOrDefault(next)??0));
+                float risk=Math.Clamp(learnedRisk?.GetValueOrDefault(next)??0,0,1);
+                float cost=costs[current]+distance*(1+1.5f*(occupied?.GetValueOrDefault(next)??0)+2*risk);
                 if(cost>=costs.GetValueOrDefault(next,float.PositiveInfinity))continue;
                 costs[next]=cost;parents[next]=current;
                 queue.Enqueue(next,cost+Vector3.Distance(Areas[next].Point,Areas[goal].Point));
@@ -78,10 +79,10 @@ public sealed class TeamNavigationGraph
     }
     public float Length(IReadOnlyList<int> path)
     {float length=0;for(int i=1;i<path.Count;i++)length+=Vector3.Distance(Areas[path[i-1]].Point,Areas[path[i]].Point);return length;}
-    public List<int>? DiversifiedPath(int start,int goal,IReadOnlyDictionary<int,int> occupied)
+    public List<int>? DiversifiedPath(int start,int goal,IReadOnlyDictionary<int,int> occupied,IReadOnlyDictionary<int,float>? learnedRisk=null)
     {
         var shortest=Path(start,goal);if(shortest==null)return null;
-        var alternative=Path(start,goal,occupied);
+        var alternative=Path(start,goal,occupied,learnedRisk);
         return alternative!=null&&Length(alternative)<=Length(shortest)*1.4f+64?alternative:shortest;
     }
 }

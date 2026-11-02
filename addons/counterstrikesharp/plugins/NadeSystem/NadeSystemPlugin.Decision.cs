@@ -122,6 +122,7 @@ public partial class NadeSystemPlugin : BasePlugin
                 {
                     // No info: normal: flash 80%, more: flash 100%.
                     float prob = _botNadesMode == "more" ? 1.00f : 0.80f;
+                    prob=LearnedUtilityChance(bot.TeamNum,g,prob);
                     if (Random.Shared.NextDouble() >= prob)
                     {
                         RegisterProbFailCooldown(g.Id);
@@ -208,6 +209,7 @@ public partial class NadeSystemPlugin : BasePlugin
             // (nearbyFriend+yourself) / totalFriends + nearbyEnemy / totalEnemies
             float threshold = (float)nearbyFriend / totalFriends * 0.5f
                             + (float)nearbyEnemy  / totalEnemies * 0.5f;
+            threshold=LearnedUtilityChance(bot.TeamNum,g,threshold);
             if (threshold < 1f && Random.Shared.NextDouble() >= threshold) return false;
         }
 

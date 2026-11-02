@@ -69,7 +69,7 @@ public partial class NadeSystemPlugin : BasePlugin
                 ? indexedNades
                 : Array.Empty<GrenadeData>();
 
-            foreach (var g in nearbyNades)
+            foreach (var g in LearnedUtilityOrder(bot.TeamNum,nearbyNades))
             {
                 var gtype = g.GrenadeType; // lowercase since LoadDb
                 float viewOffsetZ = 64f;

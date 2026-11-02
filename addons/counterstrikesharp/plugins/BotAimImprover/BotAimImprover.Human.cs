@@ -22,6 +22,7 @@ public partial class BotAimImprover
         public float HumanAllyStrength {get;set;}=.85f;
         public bool EnemyElites {get;set;}=true;
         public bool TeamNavigation {get;set;}=true;
+        public bool RoundLearning {get;set;}=true;
     }
     private sealed class HumanState
     {
@@ -72,6 +73,7 @@ public partial class BotAimImprover
         InitializeAimTelemetry();
         InitializeTactics();
         InitializeTeamNavigation();
+        InitializeRoundLearning();
         var processArgs=Environment.GetCommandLineArgs();
         int testPort=Array.IndexOf(processArgs,"-port"),testIp=Array.IndexOf(processArgs,"-ip");
         if(processArgs.Contains("-dedicated") && testPort>=0 && testPort+1<processArgs.Length && processArgs[testPort+1]=="27025"

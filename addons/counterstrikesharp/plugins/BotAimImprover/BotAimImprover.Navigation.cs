@@ -102,20 +102,26 @@ public partial class BotAimImprover
                 if(human.PlayerPawn.Value is {IsValid:true} hp&&hp.AbsOrigin!=null)
                     siteCounts[Enumerable.Range(0,sites.Count).MinBy(i=>Vec.DistanceSquared(Position(hp),sites[i]))]++;
             int attackSite=Random.Shared.Next(sites.Count);
+            bool explore=Random.Shared.NextSingle()<.20f;
+            Dictionary<int,float>? learnedRisk=null;
+            if(team==2&&_humanSettings.RoundLearning&&!explore&&_routeLearning.HasTeam(team))
+                learnedRisk=_navigationGraph!.Areas.ToDictionary(a=>a.Key,a=>_routeLearning.Risk(team,a.Value.Point));
             foreach(var p in members)
             {
                 if(p.PlayerPawn.Value is not {IsValid:true} pawn||pawn.AbsOrigin==null)continue;
                 var origin=Position(pawn);
                 int site=TeamNavigationPolicy.ChooseSite(team,attackSite,origin,sites,siteCounts);
                 if(_navigationGraph!.Locate(origin) is not {} start||_navigationGraph.Locate(sites[site],700) is not {} goal)continue;
-                var path=_navigationGraph.DiversifiedPath(start,goal,occupancy);
+                var path=_navigationGraph.DiversifiedPath(start,goal,occupancy,learnedRisk);
                 if(path==null||path.Count<2){NavCount("unreachable-or-arrived");continue;}
                 siteCounts[site]++;
                 foreach(int id in path)occupancy[id]=occupancy.GetValueOrDefault(id)+1;
                 _navigationPlans[p.Slot]=new(){Pawn=p.PlayerPawn.Raw,Path=path,Goal=sites[site],Team=team,Started=now,LastProgress=now};
                 NavCount("assigned");
                 WriteTelemetry(new{kind="navigation_plan",time=now,slot=p.Slot,team,stage=_bombPlanted?"retake":"opening",
-                    areas=path.Count,path=path.ToArray(),length=_navigationGraph.Length(path),goal_x=sites[site].X,goal_y=sites[site].Y});
+                    areas=path.Count,path=path.ToArray(),length=_navigationGraph.Length(path),goal_x=sites[site].X,goal_y=sites[site].Y,
+                    learning_rounds=_routeLearning.LearnedRounds,learning_explore=explore,
+                    learned_path_risk=path.Average(id=>learnedRisk?.GetValueOrDefault(id)??0)});
             }
         }
     }
@@ -152,6 +158,7 @@ public partial class BotAimImprover
                     ||p.HasBeenControlledByPlayerThisRound||p.PlayerPawn.Value is not {IsValid:true} pawn||pawn.Bot is not {} bot||pawn.AbsOrigin==null)
                 {EndNavigation(slot,"ownership-ended");continue;}
                 var origin=Position(pawn);float distance=Vec.Distance(origin,plan.Goal);
+                if(_humanSettings.RoundLearning)_routeLearning.Transit(p.TeamNum,origin);
                 if(distance<(_bombPlanted?650:420)){EndNavigation(slot,"native-objective-handoff");continue;}
                 if(now-plan.Started>(_bombPlanted?20:35)){EndNavigation(slot,"lease-expired");continue;}
                 bool combat=bot.IsEnemyVisible||bot.IsAttacking||(_humanStates.TryGetValue(slot,out var state)&&now<state.UnderFireUntil);
