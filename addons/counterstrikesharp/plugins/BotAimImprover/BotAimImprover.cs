@@ -15,7 +15,7 @@ namespace BotAimImprover;
 public partial class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8-human.8.42-experimental";
+    public override string ModuleVersion => "2.1.8-human.8.43-experimental";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 
@@ -274,6 +274,7 @@ public partial class BotAimImprover : BasePlugin
             if (botController == null || !TryGetBotEyePosition(botController, out var botEye))
                 return HookResult.Continue;
 
+            if(HumanActive)PrepareHumanAim(pCCSBot);
             if (WriteCachedHumanSpot(bot,botController,botEye)) return HookResult.Continue;
             if (!botController.HasBeenControlledByPlayerThisRound && ApplySmokeError(bot, enemyPawn, botEye))
                 return HookResult.Continue;

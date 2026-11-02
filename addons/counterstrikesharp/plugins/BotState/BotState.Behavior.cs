@@ -102,20 +102,8 @@ public partial class BotState
 
         ref float surpriseTimescale = ref surpriseTimer.Timescale;
         surpriseTimescale = 1.0f;
-        // Always dodge
-        ref bool isEnemySniperVisible = ref bot.IsEnemySniperVisible;
-        isEnemySniperVisible = true;
-
-        CountdownTimer sawEnemySniperTimer = bot.SawEnemySniperTimer;
-
-        ref float sawEnemySniperduration = ref sawEnemySniperTimer.Duration;
-        sawEnemySniperduration = 600.0f;
-
-        ref float sawEnemySniperTimestamp = ref sawEnemySniperTimer.Timestamp;
-        sawEnemySniperTimestamp = now + sawEnemySniperduration;
-
-        ref float sawEnemySniperTimescale = ref sawEnemySniperTimer.Timescale;
-        sawEnemySniperTimescale = 1.0f;
+        // Native perception owns sniper threat state. Forcing it true for every
+        // opponent made rifle encounters look like permanent sniper encounters.
         // Teammate Stuck Fix
         ref bool IsWaitingBehindFriend = ref bot.IsWaitingBehindFriend;
         IsWaitingBehindFriend = false;

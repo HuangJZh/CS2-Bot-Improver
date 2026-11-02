@@ -30,12 +30,14 @@ def main(directory):
     metrics = collections.defaultdict(list)
     contacts = []
     early_shots = []
+    handoff_shots = []
     switches = 0
     sessions = []
     for path in sorted(directory.glob("aim-*.jsonl")):
         live = {}
         prior = {}
         early_in_file = []
+        handoff_in_file = []
         with path.open(encoding="utf-8-sig") as stream:
             for line in stream:
                 try:
@@ -57,6 +59,14 @@ def main(directory):
                     if early["slot"] == slot and early["pawn"] == row["pawn"] and 0 < now-early["time"] < .3:
                         if kind == "server_tick_observation" and row.get("native_guard_hold"):
                             early["later_hold"] = True
+                for early in handoff_in_file:
+                    if (early["slot"] == slot and early["pawn"] == row["pawn"] and early["enemy"] == row.get("enemy")
+                            and 0 < now-early["time"] < .3 and kind == "server_tick_observation"):
+                        early["later_reaction"] |= row.get("native_guard_reason") == "reaction" and bool(row.get("native_guard_hold"))
+                if kind == "weapon_fire_callback" and row.get("native_guard_reason") in ("no-plan", "no-observation"):
+                    early = dict(slot=slot, pawn=row["pawn"], enemy=row.get("enemy"), time=now, later_reaction=False)
+                    handoff_in_file.append(early)
+                    handoff_shots.append(early)
                 if kind == "weapon_fire_callback" and row.get("native_guard_reason") == "no-observation":
                     early = dict(slot=slot, pawn=row["pawn"], time=now, later_hold=False,
                                  marked_first=row.get("spray_shots") == 1)
@@ -142,6 +152,8 @@ def main(directory):
                   perception_phase_shots=len(early_shots),
                   perception_shots_marked_first=sum(e["marked_first"] for e in early_shots),
                   perception_shots_followed_by_hold_within_300ms=sum(e["later_hold"] for e in early_shots),
+                  no_plan_or_perception_shots=len(handoff_shots),
+                  handoff_shots_followed_by_same_target_reaction=sum(e["later_reaction"] for e in handoff_shots),
                   sustained_without_shot=sum(c["shot"] is None for c in sustained),
                   longest_unshot_contacts=sorted([dict(slot=c["slot"],duration=c["last"]-c["start"],gates=c["gates"])
                          for c in sustained if c["shot"] is None], key=lambda c:-c["duration"])[:10],

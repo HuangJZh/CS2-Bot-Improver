@@ -130,6 +130,8 @@ public partial class BotAimImprover
             sample_ray_fraction=state?.LastSampleRayFraction,
             model_plan_start_time=state is {} planState && planState.Model.ContactKind!="none" ? (float?)planState.Model.PlanStartedAt : null,
             model_plan_duration=state is {} durationState && durationState.Model.ContactKind!="none" ? (float?)durationState.Model.PlanDuration : null,
+            reaction_credit_ms=state?.Model.ReactionCredit*1000,
+            team_support_active=_supportPlans.ContainsKey(player.Slot),
             native_phase=bot!=null ? NativePhase(bot.Handle) : null,
             native_fire_weapon_timestamp=bot?.FireWeaponTimestamp,
             model_last_used_time=state?.LastUsed,

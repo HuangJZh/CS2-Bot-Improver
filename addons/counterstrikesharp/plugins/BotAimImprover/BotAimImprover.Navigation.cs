@@ -94,7 +94,7 @@ public partial class BotAimImprover
         foreach(int team in new[]{2,3})
         {
             if(_bombPlanted&&team==2)continue; // Keep native post-plant decisions.
-            var members=all.Where(p=>p.IsBot&&p.TeamNum==team&&!p.HasBeenControlledByPlayerThisRound).OrderBy(p=>p.Slot).ToList();
+            var members=all.Where(p=>p.IsBot&&p.TeamNum==team&&!p.HasBeenControlledByPlayerThisRound&&!_supportPlans.ContainsKey(p.Slot)).OrderBy(p=>p.Slot).ToList();
             // Carrier goes first, so the rest can choose supporting alternate routes.
             members=members.OrderByDescending(p=>p.PlayerPawn.Value?.WeaponServices?.MyWeapons.Any(w=>w.Value?.DesignerName=="weapon_c4")==true).ToList();
             var occupancy=new Dictionary<int,int>();var siteCounts=new int[sites.Count];

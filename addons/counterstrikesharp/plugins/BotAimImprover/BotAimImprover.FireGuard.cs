@@ -145,7 +145,8 @@ public partial class BotAimImprover
             var permission=state.Execution.FirstShot(now,FirstShotPending(state,now),error,tolerance,advanceTimers,state.Model.Profile.FirstShotSettleLimit);
             if(advanceTimers)state.ExecutionPermission=permission;
             if(!permission.Allow)return new(false,true,permission.Reason);
-            return new(true,false,permission.Reason=="execution-settle-timeout"?permission.Reason:"planned-shot");
+            return new(true,false,permission.Reason=="execution-settle-timeout"?permission.Reason:
+                state.Output.AllowFire?"planned-shot":"allow-latch");
         }
         if(state.PlanHoldTimedOut)return new(false,false,"hold-timeout");
         if(state.PlanHoldSince is {} since && now-since>PlannedFireHoldLimit)

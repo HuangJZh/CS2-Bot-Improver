@@ -439,4 +439,59 @@ foreach(var (level,prior) in before842)
  Check(Math.Abs(CombatBalancePolicy.AllyProfile(current,.85f).MaxSpeed/current.MaxSpeed-.85f)<.00001f,
   level+" overall boost preserves relative ally handicap");
 }
+var preparedProfile=HumanAimProfile.For("Medium") with{MotorError=0,AmplitudeError=0};
+var onset=new HumanAimModel(preparedProfile,Vector2.Zero,0,42);
+onset.Observe(0,new(600,0,0),4);onset.Step(.04f,Vector3.Zero,true);
+onset.Observe(.05f,new(600,25,0),4);
+var onsetOutput=onset.Step(.085f,Vector3.Zero,true);
+Check(onsetOutput.Phase=="reaction"&&onset.MovementEndpoint.Y>2,
+ "reaction updates the pending endpoint from arrived samples instead of freezing its first position");
+var committed=new HumanAimModel(HumanAimProfile.For("Medium"),Vector2.Zero,0,4);
+committed.Observe(0,new(600,0,0));committed.Step(.01f,Vector3.Zero,true);
+committed.CommitShot(.01f,Vector2.Zero);
+var afterCommit=committed.Step(.05f,Vector3.Zero,true);
+Check(afterCommit.Phase is not ("reaction" or "flick"),"an already-fired contact cannot restart initial reaction after perception delay");
+var hiddenCommit=new HumanAimModel(HumanAimProfile.For("Medium"),Vector2.Zero,0,4);
+hiddenCommit.CommitShot(0,Vector2.Zero);
+Check(!hiddenCommit.Step(.1f,Vector3.Zero,true).AllowFire,"shot continuity never invents an enemy observation");
+foreach(float gap in new[]{0f,10f})
+{
+ var movingFireTimes=new List<float>();
+ for(int seed=0;seed<32;seed++)
+ {
+  var linear=new HumanAimModel(HumanAimProfile.For("Medium"),Vector2.Zero,0,seed);
+  for(int tick=0;tick<128;tick++)
+  {
+   float t=tick/128f;linear.Observe(t,new(600,600*MathF.Tan(gap*MathF.PI/180)+250*t,0),4);
+   if(linear.Step(t,Vector3.Zero,true,new(AimWeaponClass.Rifle)).AllowFire){movingFireTimes.Add(t);break;}
+  }
+ }
+ movingFireTimes.Sort();
+ Check(movingFireTimes.Count==32&&movingFireTimes[16]<(gap==0?.18f:.24f),
+  $"Mid {gap}deg linear moving contact no longer requires the stale endpoint correction cycle");
+}
+var noticed=new VisibleTargetHistory();var cp=HumanAimProfile.For("Medium");
+noticed.Notice(42,1);noticed.Notice(42,1.1f);
+Check(noticed.ReactionCredit(42,1.12f,cp)>0&&noticed.ReactionCredit(42,1.12f,cp)<=cp.Reaction*.75f,
+ "continuously seen alternative receives bounded reaction credit");
+Check(noticed.ReactionCredit(43,1.12f,cp)==0&&noticed.ReactionCredit(42,1.4f,cp)==0,
+ "hidden or expired alternatives receive no reaction credit");
+noticed.Notice(42,1.5f);
+Check(noticed.ReactionCredit(42,1.5f,cp)==0,"a newly reappearing target has no accumulated stale visibility credit");
+var creditModel=new HumanAimModel(cp,Vector2.Zero,0,42,999);
+Check(creditModel.ReactionCredit<=cp.Reaction*.75f,"target transfer cannot bypass the entire reaction period");
+var shooterHistory=new CombatHistory();shooterHistory.Shot(1,42,2,.2f);shooterHistory.Shot(1.1f,43,2,.2f);
+Check(shooterHistory.SprayShots==2&&shooterHistory.LastTarget==43&&shooterHistory.BurstCooldownUntil>1.1f,
+ "switching enemy preserves the shooter's actual burst cadence and pause");
+Check(TeamSupportPolicy.Candidate(new(300,0,0),Vector3.Zero,true)
+ &&!TeamSupportPolicy.Candidate(new(300,0,150),Vector3.Zero,true)
+ &&!TeamSupportPolicy.Candidate(new(300,0,0),Vector3.Zero,false),"support excludes another floor and unavailable teammates");
+Check(!TeamSupportPolicy.Candidate(new(1000,0,0),Vector3.Zero,true)
+ &&!TeamSupportPolicy.Candidate(new(30,0,0),Vector3.Zero,true),"support neither crosses the map nor stacks an already adjacent teammate");
+Check(TeamSupportPolicy.Route(500,400)&&!TeamSupportPolicy.Route(1200,400)&&!TeamSupportPolicy.Route(900,200),
+ "support requires a bounded reachable route instead of a long detour");
+Check(TeamSupportPolicy.Continue(1.5f,1,1.4f,200,true)
+ &&!TeamSupportPolicy.Continue(4,1,4,200,true)&&!TeamSupportPolicy.Continue(2,1,1,200,true)
+ &&!TeamSupportPolicy.Continue(1.5f,1,1.4f,50,true)&&!TeamSupportPolicy.Continue(1.5f,1,1.4f,200,false),
+ "support ends on deadline, lack of progress, arrival or loss of availability");
 Console.WriteLine($"{count} checks passed");

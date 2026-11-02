@@ -23,6 +23,7 @@ public partial class BotAimImprover
         public bool EnemyElites {get;set;}=true;
         public bool TeamNavigation {get;set;}=true;
         public bool RoundLearning {get;set;}=true;
+        public bool TeamSupport {get;set;}=true;
     }
     private sealed class HumanState
     {
@@ -35,7 +36,8 @@ public partial class BotAimImprover
         public bool LastSight;
         public AimOutput Output;
         public VisualEstimate? LastVisualEstimate;
-        public float UnderFireUntil;
+        public CombatHistory Combat=new();
+        public float UnderFireUntil {get=>Combat.UnderFireUntil;set=>Combat.UnderFireUntil=value;}
         public float? FirstVisualAt;
         public float? PlanHoldSince;
         public bool PlanHoldTimedOut;
@@ -45,12 +47,12 @@ public partial class BotAimImprover
         public float? LastSampleRayFraction;
         public float AllowLatchUntil;
         public float LastAimFeedbackCorrection;
-        public float LastShotAt=-999f;
-        public int SprayShots;
-        public float SprayBasePitchError;
+        public float LastShotAt=>Combat.LastShotAt;
+        public int SprayShots=>Combat.SprayShots;
+        public float SprayBasePitchError {get=>Combat.SprayBasePitchError;set=>Combat.SprayBasePitchError=value;}
         public float RecoilCompensation;
-        public float BurstCooldownUntil;
-        public BurstCadence Cadence=new();
+        public float BurstCooldownUntil=>Combat.BurstCooldownUntil;
+        public BurstCadence Cadence=>Combat.Cadence;
         public AimExecutionController Execution=new();
         public ExecutionRequest ExecutionRequest;
         public ExecutionPermission ExecutionPermission;
@@ -74,6 +76,7 @@ public partial class BotAimImprover
         InitializeTactics();
         InitializeTeamNavigation();
         InitializeRoundLearning();
+        InitializeTeamSupport();
         var processArgs=Environment.GetCommandLineArgs();
         int testPort=Array.IndexOf(processArgs,"-port"),testIp=Array.IndexOf(processArgs,"-ip");
         if(processArgs.Contains("-dedicated") && testPort>=0 && testPort+1<processArgs.Length && processArgs[testPort+1]=="27025"
@@ -113,6 +116,7 @@ public partial class BotAimImprover
         }
         RegisterListener<Listeners.OnTick>(() =>
         {
+            CleanCombatHistories();
             foreach(var (slot,state) in _humanStates.ToArray())
             {
                 var p=EntityPlayerAtSlot(slot);
@@ -122,6 +126,7 @@ public partial class BotAimImprover
             MaintainFireGuards();
             MaintainTacticalMovement();
             TickTeamNavigation();
+            TickTeamSupport();
         });
         RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);_attentionTurnAt.Remove(p.Slot);ResetSilentMovement(p.Slot);}return HookResult.Continue; });
         // Track bursts so the aim output can model human recoil control after the
@@ -130,18 +135,23 @@ public partial class BotAimImprover
             string eventItem=e.Weapon ?? "";
             if(!eventItem.StartsWith("weapon_"))eventItem="weapon_"+eventItem;
             if(HumanFireContext.Classify(eventItem)==AimWeaponClass.Other)return HookResult.Continue;
-            if(e.Userid is {IsValid:true} shooter && _humanStates.TryGetValue(shooter.Slot,out var fireState)
-                && fireState.Pawn==shooter.PlayerPawn.Raw)
+            if(e.Userid is {IsValid:true,IsBot:true,PawnIsAlive:true} shooter
+                && !shooter.HasBeenControlledByPlayerThisRound && shooter.PlayerPawn.Value is {IsValid:true} firePawn)
             {
                 float fireNow=Server.CurrentTime;
-                float pause=fireState.Model.Profile.BurstPause*(.8f+Random.Shared.NextSingle()*.4f);
-                fireState.Cadence.Shot(fireNow,fireState.Model.Profile.BurstLength,pause);
-                fireState.SprayShots=fireState.Cadence.Shots;
-                fireState.BurstCooldownUntil=fireState.Cadence.PauseUntil;
-                fireState.LastShotAt=fireNow;
-                fireState.Execution.Shot();
-                if(fireState.SprayShots==1 && shooter.PlayerPawn.Value is {} firePawn)
-                    fireState.SprayBasePitchError=firePawn.EyeAngles.X-fireState.Model.LastDesiredAngles.X;
+                var history=HistoryFor(shooter,firePawn);
+                var profile=CombatProfile(shooter,fireNow);
+                history.Shot(fireNow,firePawn.Bot?.Enemy.Raw??uint.MaxValue,profile.BurstLength,
+                    profile.BurstPause*(.8f+Random.Shared.NextSingle()*.4f));
+                if(_humanStates.TryGetValue(shooter.Slot,out var fireState)&&fireState.Pawn==shooter.PlayerPawn.Raw
+                    &&fireState.PlannedWeapon==(firePawn.WeaponServices?.ActiveWeapon.Raw??uint.MaxValue)
+                    &&fireState.Enemy==history.LastTarget)
+                {
+                    fireState.Model.CommitShot(fireNow,new(firePawn.EyeAngles.X,firePawn.EyeAngles.Y));
+                    fireState.AllowLatchUntil=fireNow+.15f;
+                    fireState.Execution.Shot();
+                    if(fireState.SprayShots==1)fireState.SprayBasePitchError=firePawn.EyeAngles.X-fireState.Model.LastDesiredAngles.X;
+                }
             }
             if(HumanActive && e.Userid is {IsValid:true} soundShooter)
             {
@@ -247,6 +257,7 @@ public partial class BotAimImprover
         _preaimTargets.Clear();_preaimVisited.Clear();ResetAllSilentMovement();ReadHumanDifficulty();
         ResetTactics();_aimIntents.Clear();_humanTeamsScanAt=0;_humanTeams=0;
         _eliteProfiles.Clear();
+        _combatHistories.Clear();_noticedTargets.Clear();ResetTeamSupport();
     }
     private static bool IsGun(CCSPlayerPawn pawn)
         => pawn.WeaponServices?.ActiveWeapon.Value?.As<CCSWeaponBase>().VData?.GearSlot is gear_slot_t.GEAR_SLOT_RIFLE or gear_slot_t.GEAR_SLOT_PISTOL;
@@ -274,11 +285,17 @@ public partial class BotAimImprover
     private HookResult OnHumanLook(DynamicHook hook)
     {
         _humanLookCalls++;
+        PrepareHumanAim(hook.GetParam<nint>(0));
+        return HookResult.Continue;
+    }
+    // Also called at target-spot selection, before the native AI can submit its
+    // first attack. Idempotent model/execution clocks prevent double advancement.
+    private HookResult PrepareHumanAim(nint pointer)
+    {
         if(!HumanActive)return HookResult.Continue;
         CCSPlayerController? controller=null;
         try
         {
-            var pointer=hook.GetParam<nint>(0);
             controller=ResolveBotController(pointer);
             if(controller is not {IsValid:true,IsBot:true,PawnIsAlive:true} || controller.HasBeenControlledByPlayerThisRound)return HookResult.Continue;
             var pawn=controller.PlayerPawn.Value;
@@ -294,6 +311,7 @@ public partial class BotAimImprover
             if(bot.Enemy.Value is not {IsValid:true} enemy || enemy.LifeState!=0 || enemy.TeamNum==controller.TeamNum)
             {
                 if(TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
+                if(TryApplySupportPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
                 if(TryApplyMapPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
                 // The native enemy handle can flicker between peeks. Keep the memory
                 // based plan for a short grace period instead of resetting every
@@ -313,14 +331,13 @@ public partial class BotAimImprover
             _preaimTargets.Remove(controller.Slot);
             CancelCoverPeek(controller.Slot,"enemy-context");
             var combatProfile=CombatProfile(controller,now);
+            NoticeAlternativeTargets(controller,pawn,eye,now);
             if(!_humanStates.TryGetValue(controller.Slot,out var state) || state.Pawn!=controller.PlayerPawn.Raw || state.Enemy!=enemy.EntityHandle.Raw
                 ||state.Model.Profile!=combatProfile
                 ||state.PlannedWeapon!=(pawn.WeaponServices?.ActiveWeapon.Raw??uint.MaxValue))
             {
                 ReleaseHuman(controller.Slot);
-                state=new HumanState{Pointer=pointer,Pawn=controller.PlayerPawn.Raw,Enemy=enemy.EntityHandle.Raw,
-                    PlannedWeapon=pawn.WeaponServices?.ActiveWeapon.Raw ?? uint.MaxValue,
-                    Model=new(combatProfile,new(pawn.EyeAngles.X,pawn.EyeAngles.Y),now,Random.Shared.Next())};
+                state=CreateHumanState(controller,pawn,enemy,pointer,combatProfile,now);
                 _humanStates[controller.Slot]=state;
             }
             state.LastUsed=now;
@@ -366,11 +383,8 @@ public partial class BotAimImprover
                     {
                         WriteTelemetry(new {kind="model_lifecycle",tick=Server.TickCount,time=now,slot=controller.Slot,action="reacquire-reset",gap=visibleGap});
                         ReleaseHuman(controller.Slot);
-                        state=new HumanState{Pointer=pointer,Pawn=controller.PlayerPawn.Raw,Enemy=enemy.EntityHandle.Raw,
-                            PlannedWeapon=pawn.WeaponServices?.ActiveWeapon.Raw ?? uint.MaxValue,
-                            Model=new(combatProfile,new(pawn.EyeAngles.X,pawn.EyeAngles.Y),now,Random.Shared.Next()),
-                            LastUsed=now,LastSight=true,NextSensorCheck=now+combatProfile.SampleInterval,
-                            UnderFireUntil=state.UnderFireUntil};
+                        state=CreateHumanState(controller,pawn,enemy,pointer,combatProfile,now);
+                        state.LastUsed=now;state.LastSight=true;state.NextSensorCheck=now+combatProfile.SampleInterval;
                         _humanStates[controller.Slot]=state;
                     }
                     else if(state.Model.HasObservation && visibleGap>.35f)

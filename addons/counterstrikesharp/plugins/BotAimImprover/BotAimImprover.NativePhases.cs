@@ -42,6 +42,7 @@ public partial class BotAimImprover
     }
     private HookResult OnNativeUpdatePre(DynamicHook hook)
     {
+        if(HumanActive)PrepareHumanAim(hook.GetParam<nint>(0));
         RefreshNativeFireGuard(hook);
         return EnterNativePhase(hook,"update");
     }
