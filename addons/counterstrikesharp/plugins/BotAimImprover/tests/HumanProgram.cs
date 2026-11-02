@@ -408,7 +408,7 @@ bool sawOne=false,sawTwo=false;
 for(int seed=0;seed<32;seed++){var r=new EnemyEliteRoster();r.Refresh(8,balanceRoster,new Random(seed));sawOne|=r.Strengths.Count==1;sawTwo|=r.Strengths.Count==2;}
 Check(sawOne&&sawTwo,"round selection supports both one and two elite opponents");
 var eliteProfile=CombatBalancePolicy.AllyProfile(HumanAimProfile.For("Medium"),1.25f);
-Check(MathF.Abs(eliteProfile.Reaction-.096f)<.00001f&&eliteProfile.MotorError<HumanAimProfile.For("Medium").MotorError,
+Check(MathF.Abs(eliteProfile.Reaction-(.096f/1.10f))<.00001f&&eliteProfile.MotorError<HumanAimProfile.For("Medium").MotorError,
  "elite boost accelerates response and improves precision without damage changes");
 var midBefore840=new HumanAimProfile(.140f,.045f,.025f,.060f,.10f,.0075f,.045f,780,.90f)
  {PerceptionError=.05f,FlickAmplitudeTime=.008f,FirstShotSettleLimit=.10f,BurstLength=8,BurstPause=.18f};
@@ -420,6 +420,23 @@ foreach(float gap in new[]{5f,25f,70f})
  Check(newTimes[64]<oldTimes[64],$"8.40 Mid {gap}deg contact advances planned first fire relative to 8.39");
  Console.WriteLine($"MID-840 gap={gap} old_median_ms={oldTimes[64]*1000:F1} new_median_ms={newTimes[64]*1000:F1}");
 }
-Check(HumanAimProfile.For("Medium").MotorError==midBefore840.MotorError
- &&HumanAimProfile.For("Medium").PerceptionError==midBefore840.PerceptionError,"Mid speed tuning preserves motor and sensory error magnitudes");
+Check(MathF.Abs(HumanAimProfile.For("Medium").MotorError-midBefore840.MotorError/1.10f)<.00001f
+ &&MathF.Abs(HumanAimProfile.For("Medium").PerceptionError-midBefore840.PerceptionError/1.10f)<.00001f,"global combat scaling reduces Mid motor and sensory errors by the common factor");
+var before842=new Dictionary<string,HumanAimProfile>{
+ ["Low"]=new(.180f,.075f,.040f,.105f,.24f,.015f,.085f,550,.72f){PerceptionError=.095f,FlickAmplitudeTime=.011f,FirstShotSettleLimit=.16f,BurstLength=5,BurstPause=.26f},
+ ["Medium"]=new(.120f,.035f,.020f,.045f,.10f,.0075f,.032f,850,.90f){PerceptionError=.05f,FlickAmplitudeTime=.008f,FirstShotSettleLimit=.10f,BurstLength=8,BurstPause=.15f},
+ ["High"]=new(.110f,.030f,.016f,.045f,.045f,.0035f,.030f,950,.97f){PerceptionError=.025f,FlickAmplitudeTime=.006f,FirstShotSettleLimit=.08f,BurstLength=10,BurstPause=.14f}
+};
+foreach(var (level,prior) in before842)
+{
+ var current=HumanAimProfile.For(level);
+ Check(Math.Abs(current.MaxSpeed/prior.MaxSpeed-1.10f)<.00001f&&Math.Abs(current.Reaction*1.10f-prior.Reaction)<.00001f,
+  level+" global scale increases speed and reduces latency consistently");
+ Check(Math.Abs(current.MotorError*1.10f-prior.MotorError)<.00001f&&Math.Abs(current.PerceptionError*1.10f-prior.PerceptionError)<.00001f,
+  level+" global scale improves precision without changing target preference");
+ Check(Math.Abs(current.SampleInterval*1.10f-prior.SampleInterval)<.00001f&&current.BurstLength==prior.BurstLength,
+  level+" faster sampling keeps discrete burst lengths unchanged");
+ Check(Math.Abs(CombatBalancePolicy.AllyProfile(current,.85f).MaxSpeed/current.MaxSpeed-.85f)<.00001f,
+  level+" overall boost preserves relative ally handicap");
+}
 Console.WriteLine($"{count} checks passed");

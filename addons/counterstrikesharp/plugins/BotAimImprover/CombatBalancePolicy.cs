@@ -3,15 +3,7 @@ namespace BotAimImprover;
 public static class CombatBalancePolicy
 {
     // A combat-parameter scale, never a damage multiplier or a claimed win-rate.
-    public static HumanAimProfile AllyProfile(HumanAimProfile p,float strength)=>p with
-    {
-        Reaction=p.Reaction/strength,SensorDelay=p.SensorDelay/strength,
-        FlickTime=p.FlickTime/strength,TrackingTime=p.TrackingTime/strength,
-        FlickAmplitudeTime=p.FlickAmplitudeTime/strength,FirstShotSettleLimit=p.FirstShotSettleLimit/strength,
-        MaxSpeed=p.MaxSpeed*strength,MotorError=p.MotorError/strength,
-        AmplitudeError=p.AmplitudeError/strength,PerceptionError=p.PerceptionError/strength,
-        BurstPause=p.BurstPause/strength
-    };
+    public static HumanAimProfile AllyProfile(HumanAimProfile p,float strength)=>p.ScaleCombat(strength);
     public static bool IsHumanAlly(int team,int humanTeams)=>team is 2 or 3
         &&humanTeams==(1<<team); // Spectators and humans on both teams get no asymmetric handicap.
     public static float HeadIntentChance(string difficulty,AimWeaponClass weapon,string? item)

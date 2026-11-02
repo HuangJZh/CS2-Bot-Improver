@@ -12,7 +12,22 @@ public sealed record HumanAimProfile(float Reaction, float SensorDelay, float Sa
     // are tuning hypotheses, not fitted rank or professional-player measurements.
     public int BurstLength {get;init;}=6;
     public float BurstPause {get;init;}=.28f;
-    public static HumanAimProfile For(string level) => level switch
+    public const float OverallStrength=1.10f;
+    public HumanAimProfile ScaleCombat(float strength)=>this with
+    {
+        Reaction=Reaction/strength,SensorDelay=SensorDelay/strength,
+        FlickTime=FlickTime/strength,TrackingTime=TrackingTime/strength,
+        FlickAmplitudeTime=FlickAmplitudeTime/strength,FirstShotSettleLimit=FirstShotSettleLimit/strength,
+        MaxSpeed=MaxSpeed*strength,MotorError=MotorError/strength,
+        AmplitudeError=AmplitudeError/strength,PerceptionError=PerceptionError/strength,
+        BurstPause=BurstPause/strength
+    };
+    public static HumanAimProfile For(string level)
+    {
+        var baseline=Baseline(level);
+        return baseline.ScaleCombat(OverallStrength) with{SampleInterval=baseline.SampleInterval/OverallStrength};
+    }
+    private static HumanAimProfile Baseline(string level) => level switch
     {
         "Low" => new(.180f,.075f,.040f,.105f,.24f,.015f,.085f,550,.72f){PerceptionError=.095f,FlickAmplitudeTime=.011f,FirstShotSettleLimit=.16f,BurstLength=5,BurstPause=.26f},
         "High" => new(.110f,.030f,.016f,.045f,.045f,.0035f,.030f,950,.97f){PerceptionError=.025f,FlickAmplitudeTime=.006f,FirstShotSettleLimit=.08f,BurstLength=10,BurstPause=.14f},
