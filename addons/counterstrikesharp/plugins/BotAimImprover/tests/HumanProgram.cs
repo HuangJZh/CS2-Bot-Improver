@@ -408,6 +408,18 @@ bool sawOne=false,sawTwo=false;
 for(int seed=0;seed<32;seed++){var r=new EnemyEliteRoster();r.Refresh(8,balanceRoster,new Random(seed));sawOne|=r.Strengths.Count==1;sawTwo|=r.Strengths.Count==2;}
 Check(sawOne&&sawTwo,"round selection supports both one and two elite opponents");
 var eliteProfile=CombatBalancePolicy.AllyProfile(HumanAimProfile.For("Medium"),1.25f);
-Check(MathF.Abs(eliteProfile.Reaction-.112f)<.00001f&&eliteProfile.MotorError<HumanAimProfile.For("Medium").MotorError,
+Check(MathF.Abs(eliteProfile.Reaction-.096f)<.00001f&&eliteProfile.MotorError<HumanAimProfile.For("Medium").MotorError,
  "elite boost accelerates response and improves precision without damage changes");
+var midBefore840=new HumanAimProfile(.140f,.045f,.025f,.060f,.10f,.0075f,.045f,780,.90f)
+ {PerceptionError=.05f,FlickAmplitudeTime=.008f,FirstShotSettleLimit=.10f,BurstLength=8,BurstPause=.18f};
+foreach(float gap in new[]{5f,25f,70f})
+{
+ var point=new Vector3(1000*MathF.Cos(gap*MathF.PI/180),1000*MathF.Sin(gap*MathF.PI/180),0);
+ var oldTimes=Enumerable.Range(0,128).Select(seed=>FirstFire(midBefore840,point,AimWeaponClass.Rifle,seed).Time).Order().ToArray();
+ var newTimes=Enumerable.Range(0,128).Select(seed=>FirstFire(HumanAimProfile.For("Medium"),point,AimWeaponClass.Rifle,seed).Time).Order().ToArray();
+ Check(newTimes[64]<oldTimes[64],$"8.40 Mid {gap}deg contact advances planned first fire relative to 8.39");
+ Console.WriteLine($"MID-840 gap={gap} old_median_ms={oldTimes[64]*1000:F1} new_median_ms={newTimes[64]*1000:F1}");
+}
+Check(HumanAimProfile.For("Medium").MotorError==midBefore840.MotorError
+ &&HumanAimProfile.For("Medium").PerceptionError==midBefore840.PerceptionError,"Mid speed tuning preserves motor and sensory error magnitudes");
 Console.WriteLine($"{count} checks passed");
