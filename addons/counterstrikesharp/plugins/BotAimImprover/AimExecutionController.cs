@@ -3,6 +3,11 @@ namespace BotAimImprover;
 
 public readonly record struct ExecutionRequest(Vector2 Angles,Vector2 Correction,float ErrorDegrees,bool FeedbackActive);
 public readonly record struct ExecutionPermission(bool Allow,string Reason,float ErrorDegrees,float ToleranceDegrees);
+public static class FacingFirePolicy
+{
+    public static bool OutsideCone(float actualYaw,float targetYaw)
+        =>float.IsFinite(actualYaw+targetYaw)&&MathF.Abs(AimMath.Wrap(targetYaw-actualYaw))>8;
+}
 
 // Bounded negative feedback around the requested (already imperfect) motor aim.
 // It never reads enemy coordinates or writes the player's view directly.
@@ -27,9 +32,13 @@ public sealed class AimExecutionController
         _request=new(AimMath.Normalize(requested+_correction),_correction,error.Length(),feedbackAllowed);
         return _request;
     }
-    public ExecutionPermission FirstShot(float now,bool firstShot,float error,float tolerance,bool advance=true,float settleLimit=.24f)
+    public ExecutionPermission FirstShot(float now,bool firstShot,float error,float tolerance,bool advance=true,float settleLimit=.24f,float horizontalError=0)
     {
-        if(!float.IsFinite(now+error+tolerance+settleLimit)||error<0||tolerance<=0||settleLimit<=0)return new(false,"invalid-execution",error,tolerance);
+        if(!float.IsFinite(now+error+tolerance+settleLimit+horizontalError)||error<0||tolerance<=0||settleLimit<=0)return new(false,"invalid-execution",error,tolerance);
+        // A timeout is only a small-error fallback. A burst latch or a previous
+        // shot must never license shooting sideways while the real view lags.
+        if(MathF.Abs(horizontalError)>6 || firstShot&&error>8)
+        {if(advance)_waitStarted=null;return new(false,"turn-not-ready",error,tolerance);}
         if(!firstShot){if(advance)_waitStarted=null;return new(true,"burst-continuation",error,tolerance);}
         if(error<=tolerance){if(advance)_waitStarted=null;return new(true,"execution-aligned",error,tolerance);}
         if(advance)_waitStarted??=now;

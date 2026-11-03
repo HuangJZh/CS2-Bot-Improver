@@ -71,7 +71,7 @@ public sealed class HumanAimModel
     private float _nextSample=float.NegativeInfinity,_lastVisible=float.NegativeInfinity;
     private float _lastStep,_start,_duration,_nextBias,_nextCorrection;
     private bool _planned,_correcting,_motionStarted,_shotCommitted;
-    private readonly float _reactionCredit;
+    private float _reactionCredit;
     private Vector2 _view,_startView,_endView,_bias,_intendedView,_intendedEndView;
     private Vector2 _lastDesired;
     private Vector3 _lastEye,_eyeVelocity;
@@ -89,6 +89,7 @@ public sealed class HumanAimModel
     public float PlanDuration => _duration;
     public float ReactionCredit => _reactionCredit;
     public Vector2 MovementEndpoint => _endView;
+    private float _movementSpeed;
     // Latest believed target bearing (before any motor bias); used by the execution
     // feedback layer to push the target spot toward where the model wants to look.
     public Vector2 LastDesiredAngles => _lastDesired;
@@ -110,6 +111,11 @@ public sealed class HumanAimModel
     }
     private float Symmetric() => (float)(_random.NextDouble()+_random.NextDouble()-1);
     private Vector2 Noise(float magnitude) => new(Symmetric()*magnitude,Symmetric()*magnitude);
+    public void CreditAlertReaction(float seconds)
+    {
+        if(!_planned&&float.IsFinite(seconds))_reactionCredit=MathF.Max(_reactionCredit,Math.Clamp(seconds,0,Profile.Reaction*.75f));
+    }
+    public static float TurnSpeed(float speed,float gap)=>speed*(1+.65f*Math.Clamp((gap-25)/95,0,1));
     public bool NeedsObservation(float now) => now>=_nextSample;
     public VisualEstimate? ObserveVisual(float now,Vector3 eye,Vector3 visiblePoint,Vector2 actualView,float radius,float extraUncertainty=0,string part="point")
     {
@@ -156,6 +162,11 @@ public sealed class HumanAimModel
             }
             else _velocity=Vector3.Zero;
         }
+        // Native search/sound orientation may already have moved while visual
+        // perception or reaction is pending. Anchor the unstarted motor plan to
+        // that real view, rather than later dragging it back to its birth angle.
+        if(!_motionStarted&&actualView is {} current&&float.IsFinite(current.X+current.Y))
+            _view=_intendedView=AimMath.Normalize(current);
         if(_latest is not {} latest){LastFireDecision=new(false,"no-observation",null,null);return new(_view,false,"perception",float.PositiveInfinity);}
         float age=now-latest.Time;
         if(!visible && now-_lastVisible>.20f){LastFireDecision=new(false,"memory-expired",null,null);return new(_view,false,"memory-expired",age);}
@@ -194,7 +205,8 @@ public sealed class HumanAimModel
             // Quintic easing peaks at 1.875 times average speed. A shorter plan
             // hits the motor speed cap, ends before the view arrives and creates
             // an unnecessary second correction/pause on large turns.
-            _duration=MathF.Max(_duration,1.875f*amplitude/Profile.MaxSpeed);
+            _movementSpeed=TurnSpeed(Profile.MaxSpeed,amplitude);
+            _duration=MathF.Max(_duration,1.875f*amplitude/_movementSpeed);
             // Endpoint error persists for this movement instead of per-frame random jitter.
             _bias=Noise(Profile.MotorError+amplitude*Profile.AmplitudeError);
             _endView=AimMath.Normalize(desired+_bias);
@@ -211,7 +223,8 @@ public sealed class HumanAimModel
             float amplitude=AimMath.Delta(desired,_view).Length();
             float width=MathF.Max(.12f,MathF.Atan2(8,targetDistance)*180/MathF.PI);
             _duration=_shotCommitted?0:amplitude<width*.5f?.015f:Profile.FlickTime+Profile.FlickAmplitudeTime*MathF.Log2(1+amplitude/width);
-            if(!_shotCommitted)_duration=MathF.Max(_duration,1.875f*amplitude/Profile.MaxSpeed);
+            _movementSpeed=TurnSpeed(Profile.MaxSpeed,amplitude);
+            if(!_shotCommitted)_duration=MathF.Max(_duration,1.875f*amplitude/_movementSpeed);
             // Aim a moving target's motor endpoint at estimated movement completion,
             // rather than chase the position at movement onset. This uses only the
             // velocity inferred from already-arrived samples; reversals remain delayed.
@@ -223,13 +236,23 @@ public sealed class HumanAimModel
                     endpoint=AimMath.Angles(eye+_eyeVelocity*horizon,predicted+_velocity*horizon*Profile.Prediction);
                     float travel=AimMath.Delta(endpoint,_view).Length();
                     _duration=travel<width*.5f?.015f:Profile.FlickTime+Profile.FlickAmplitudeTime*MathF.Log2(1+travel/width);
-                    _duration=MathF.Max(_duration,1.875f*travel/Profile.MaxSpeed);
+                    _movementSpeed=TurnSpeed(Profile.MaxSpeed,travel);
+                    _duration=MathF.Max(_duration,1.875f*travel/_movementSpeed);
                 }
             _endView=AimMath.Normalize(endpoint+_bias);_intendedEndView=endpoint;
             _nextBias=_start+_duration+.25f;
             _motionStarted=now>=_start;
         }
         if(now<_start){LastFireDecision=new(false,"reaction",null,null);return new(_view,false,"reaction",age);}
+        // Execution can arrive before the nominal motor curve (native movement or
+        // bounded large-turn assistance). Do not make an already-aligned real view
+        // wait for a virtual cursor to catch up or steer it back along the old arc.
+        if(_motionStarted&&visible&&age<.2f&&now<_start+_duration&&actualView is {} executed
+            &&AimMath.Delta(desired,executed).Length()<=Math.Clamp(angularRadius*.9f+.45f+Profile.MotorError,.4f,2f))
+        {
+            _view=AimMath.Normalize(executed);_intendedView=AimMath.Normalize(executed-_bias);
+            _duration=MathF.Max(0,now-_start);_correcting=false;
+        }
         if(now<_start+_duration)
         {
             // Early smooth regulation uses delayed observations; it never snaps to the live target.
@@ -240,8 +263,8 @@ public sealed class HumanAimModel
             }
             var planned=_startView+AimMath.Delta(_endView,_startView)*AimMath.Ease((now-_start)/_duration);
             var intended=_startView+AimMath.Delta(_intendedEndView,_startView)*AimMath.Ease((now-_start)/_duration);
-            _view=AimMath.Advance(_view,planned,dt,.012f,Profile.MaxSpeed);
-            _intendedView=AimMath.Advance(_intendedView,intended,dt,.012f,Profile.MaxSpeed);
+            _view=AimMath.Advance(_view,planned,dt,.012f,_movementSpeed);
+            _intendedView=AimMath.Advance(_intendedView,intended,dt,.012f,_movementSpeed);
             LastFireDecision=HumanFireDecision.Evaluate(_intendedView,desired,angularRadius,latest.Uncertainty,visible,age,false,context,Profile.MotorError,actualError);
             return new(_view,LastFireDecision.Allow,"flick",age);
         }

@@ -494,4 +494,52 @@ Check(TeamSupportPolicy.Continue(1.5f,1,1.4f,200,true)
  &&!TeamSupportPolicy.Continue(4,1,4,200,true)&&!TeamSupportPolicy.Continue(2,1,1,200,true)
  &&!TeamSupportPolicy.Continue(1.5f,1,1.4f,50,true)&&!TeamSupportPolicy.Continue(1.5f,1,1.4f,200,false),
  "support ends on deadline, lack of progress, arrival or loss of availability");
+var grossGate=new AimExecutionController();
+var alertCredit=new HumanAimModel(HumanAimProfile.For("Medium"),Vector2.Zero,0,2);
+alertCredit.CreditAlertReaction(1);
+Check(alertCredit.ReactionCredit<=HumanAimProfile.For("Medium").Reaction*.75f&&alertCredit.ReactionCredit>0,
+ "already-ready sound attention grants bounded credit without skipping full perception");
+var physicalArrival=new HumanAimModel(HumanAimProfile.For("Medium"),Vector2.Zero,0,2);
+physicalArrival.Observe(0,new(0,600,0));
+var beforeArrival=physicalArrival.Step(.06f,Vector3.Zero,true,default,Vector2.Zero);
+Check(beforeArrival.Phase=="reaction"&&!beforeArrival.AllowFire,"large-turn assistance cannot skip the initial reaction deadline");
+for(int i=1;i<=24;i++)
+{
+ float t=.06f+i*.01f;physicalArrival.Observe(t,new(0,600,0));
+ beforeArrival=physicalArrival.Step(t,Vector3.Zero,true,default,new(0,t>.22f?90:0));
+ if(t>.22f)break;
+}
+Check(beforeArrival.Phase=="tracking"&&beforeArrival.AllowFire,
+ "actual aligned execution finishes the motor arc instead of waiting for the old virtual cursor");
+var anchorModel=new HumanAimModel(HumanAimProfile.For("Medium"),new(0,120),0,7);
+anchorModel.Observe(0,new(600,0,0));
+Check(anchorModel.Step(.01f,Vector3.Zero,true,default,new(0,60)).Angles.Y==60,
+ "pending perception follows actual sound-driven orientation instead of preserving an obsolete birth yaw");
+Check(anchorModel.Step(.05f,Vector3.Zero,true,default,new(0,40)).Angles.Y==40,
+ "reaction cannot pull native orientation back after an acoustic turn");
+Check(!grossGate.FirstShot(0,true,90,.65f,true,.1f,90).Allow
+ &&!grossGate.FirstShot(2,true,90,.65f,true,.1f,90).Allow,
+ "large real turn error never becomes a timeout-authorized sideways first shot");
+Check(!grossGate.FirstShot(3,false,90,.65f,true,.1f,90).Allow,
+ "a burst continuation cannot bypass a large horizontal execution error");
+Check(grossGate.FirstShot(3.1f,true,.1f,.65f,true,.1f,.1f).Allow,
+ "turn safety releases immediately after actual view alignment");
+Check(FacingFirePolicy.OutsideCone(0,90)&&FacingFirePolicy.OutsideCone(0,180)
+ &&!FacingFirePolicy.OutsideCone(179,-179)&&!FacingFirePolicy.OutsideCone(0,8),
+ "native fallback fire cone blocks rear and side targets with correct yaw wrapping");
+foreach(var level in new[]{"Low","Medium","High"})
+{
+ var p=HumanAimProfile.For(level);
+ Check(HumanAimModel.TurnSpeed(p.MaxSpeed,15)==p.MaxSpeed
+  &&HumanAimModel.TurnSpeed(p.MaxSpeed,180)<=p.MaxSpeed*1.651f,
+  level+" small corrections preserve their speed while large turns have a bounded higher peak");
+ foreach(float degrees in new[]{90f,180f})
+ {
+  var turn=new HumanAimModel(p,Vector2.Zero,0,3);
+  turn.Observe(0,new(600*MathF.Cos(degrees*MathF.PI/180),600*MathF.Sin(degrees*MathF.PI/180),0));
+  turn.Step(.08f,Vector3.Zero,true);
+  Check(turn.PlanDuration<1.875f*degrees/p.MaxSpeed*.9f,
+   $"{level} {degrees}deg planned turn no longer uses the slow small-correction speed cap");
+ }
+}
 Console.WriteLine($"{count} checks passed");

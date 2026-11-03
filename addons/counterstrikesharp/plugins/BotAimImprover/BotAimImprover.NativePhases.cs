@@ -51,7 +51,8 @@ public partial class BotAimImprover
         RefreshNativeFireGuard(hook);
         return ExitNativePhase(hook);
     }
-    private HookResult OnNativeUpkeepPre(DynamicHook hook)=>EnterNativePhase(hook,"upkeep");
+    private HookResult OnNativeUpkeepPre(DynamicHook hook)
+    {RefreshNativeFireGuard(hook);return EnterNativePhase(hook,"upkeep");}
     private HookResult OnNativeUpkeepPost(DynamicHook hook)=>ExitNativePhase(hook);
     private string NativePhase(nint pointer)=>!_nativePhasesReady ? "diagnostics-unavailable"
         : _nativePhases.TryGetValue(pointer,out var phases) && phases.TryPeek(out var phase) ? phase : "outside-native-phase";

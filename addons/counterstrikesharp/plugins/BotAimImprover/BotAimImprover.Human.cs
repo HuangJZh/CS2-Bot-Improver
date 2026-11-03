@@ -18,6 +18,7 @@ public partial class BotAimImprover
         public bool Enabled {get;set;}=true;
         public bool Diagnostics {get;set;}=false;
         public bool DirectViewControl {get;set;}=false; // Experimental until recoil/weapon checks are validated.
+        public bool LargeTurnAssist {get;set;}=true;
         public float HorizontalFieldOfView {get;set;}=110;
         public float HumanAllyStrength {get;set;}=.85f;
         public bool EnemyElites {get;set;}=true;
@@ -143,6 +144,7 @@ public partial class BotAimImprover
                 var profile=CombatProfile(shooter,fireNow);
                 history.Shot(fireNow,firePawn.Bot?.Enemy.Raw??uint.MaxValue,profile.BurstLength,
                     profile.BurstPause*(.8f+Random.Shared.NextSingle()*.4f));
+                if(firePawn.Bot is {} firingBot){_turnAssistActive.Remove(firingBot.Handle);_pendingLargeTurns.Remove(firingBot.Handle);}
                 if(_humanStates.TryGetValue(shooter.Slot,out var fireState)&&fireState.Pawn==shooter.PlayerPawn.Raw
                     &&fireState.PlannedWeapon==(firePawn.WeaponServices?.ActiveWeapon.Raw??uint.MaxValue)
                     &&fireState.Enemy==history.LastTarget)
@@ -253,11 +255,12 @@ public partial class BotAimImprover
         _testGateUntil=float.NegativeInfinity;
         foreach(var slot in _humanStates.Keys.ToArray())ReleaseHuman(slot);
         foreach(var slot in _fireGuards.Keys.ToArray())ReleaseFireGuard(slot);
+        foreach(var slot in _weaponTurnClocks.Keys.ToArray())ReleaseWeaponTurnClock(slot);
         _modelSpots.Clear();_humanPhases.Clear();_soundPreaim.Clear();_lastFootstep.Clear();_attentionTurnAt.Clear();
         _preaimTargets.Clear();_preaimVisited.Clear();ResetAllSilentMovement();ReadHumanDifficulty();
         ResetTactics();_aimIntents.Clear();_humanTeamsScanAt=0;_humanTeams=0;
         _eliteProfiles.Clear();
-        _combatHistories.Clear();_noticedTargets.Clear();ResetTeamSupport();
+        _combatHistories.Clear();_noticedTargets.Clear();_nativeTurnAt.Clear();_turnAssistActive.Clear();_pendingLargeTurns.Clear();ResetTeamSupport();
     }
     private static bool IsGun(CCSPlayerPawn pawn)
         => pawn.WeaponServices?.ActiveWeapon.Value?.As<CCSWeaponBase>().VData?.GearSlot is gear_slot_t.GEAR_SLOT_RIFLE or gear_slot_t.GEAR_SLOT_PISTOL;
@@ -279,6 +282,10 @@ public partial class BotAimImprover
         var spot=AimMath.Ray(eyeVec,next);
         _modelSpots[pointer]=spot;
         WriteModelSpot(bot,spot);
+        // Synchronize bounded native look steering as well as TargetSpot: sound
+        // search has no visual Enemy, so TargetSpot alone need not turn the view.
+        bool visualHandoff=_humanStates.TryGetValue(controller.Slot,out var looking)&&looking.LastSight&&looking.Enemy==aim.SourcePawn;
+        WriteNativeTurnGoal(bot,current,desired,profile,now,visualHandoff);
         RefreshFireGuard(controller);
         return true;
     }
@@ -397,7 +404,13 @@ public partial class BotAimImprover
             }
             // A retained native enemy is not a live visual threat. Let a ready
             // sound cue interrupt old visual memory before any early return.
-            if(visible)_soundPreaim.Remove(controller.Slot);
+            if(visible)
+            {
+                // The same heard attacker has already triggered attention and a
+                // turn. Visual confirmation must not charge a full second alert.
+                if(_soundPreaim.TryGetValue(controller.Slot,out var heard)&&heard.SourcePawn==enemy.EntityHandle.Raw
+                    &&now>=heard.Start&&now<heard.Until)state.Model.CreditAlertReaction(now-heard.Start);
+            }
             else if(TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
             // Preserve native search/navigation once visual memory is gone. While a
             // recent observation is still usable, keep the memory-based plan alive so
@@ -413,6 +426,13 @@ public partial class BotAimImprover
             var fireContext=new HumanFireContext(HumanFireContext.Classify(pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName),now<state.UnderFireUntil);
             state.PlannedWeapon=pawn.WeaponServices?.ActiveWeapon.Raw ?? uint.MaxValue;
             state.Output=state.Model.Step(now,eyeVec,visible,fireContext,new(pawn.EyeAngles.X,pawn.EyeAngles.Y));
+            // Finish the already-started auditory turn while visual perception /
+            // reaction catches up. The cue is a fixed uncertain heard position,
+            // not the newly visible entity's undisclosed live coordinates.
+            if(visible&&state.Output.Phase is "perception" or "reaction"
+                &&_soundPreaim.TryGetValue(controller.Slot,out var continuingCue)&&continuingCue.SourcePawn==enemy.EntityHandle.Raw
+                &&TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
+            if(visible)_soundPreaim.Remove(controller.Slot);
             _humanPhases[state.Output.Phase]=_humanPhases.GetValueOrDefault(state.Output.Phase)+1;
             // Close the native execution gap before the first shot. During a live
             // spray native recoil owns the view and this bounded correction fades.
@@ -432,6 +452,12 @@ public partial class BotAimImprover
             var spot=AimMath.Ray(eyeVec,state.ExecutionRequest.Angles);
             _modelSpots[pointer]=spot;
             WriteModelSpot(bot,spot);
+            bool liveSpray=now-state.LastShotAt<.2f;
+            if(!liveSpray&&visible&&state.Output.Phase=="flick"&&(state.Model.ContactGapDegrees>35||_turnAssistActive.Contains(pointer)))
+                WriteNativeTurnGoal(bot,actualView,state.Model.MovementEndpoint,state.Model.Profile,now);
+            else if(!liveSpray&&visible&&state.Output.Phase is "tracking" or "correction"
+                &&(MathF.Abs(AimMath.Wrap(state.Output.Angles.Y-actualView.Y))>6||_turnAssistActive.Contains(pointer)))
+                WriteNativeTurnGoal(bot,actualView,state.Output.Angles,state.Model.Profile,now);
             RefreshFireGuard(controller);
         }
         catch(Exception error)
@@ -526,6 +552,55 @@ public partial class BotAimImprover
         var spot=bot.TargetSpot;spot.X=point.X;spot.Y=point.Y;spot.Z=point.Z;
         var predicted=bot.TargetSpotPredicted;predicted.X=point.X;predicted.Y=point.Y;predicted.Z=point.Z;
         var velocity=bot.TargetSpotVelocity;velocity.X=0;velocity.Y=0;velocity.Z=0;
+    }
+    private readonly Dictionary<nint,float> _nativeTurnAt=new();
+    private sealed record PendingLargeTurn(uint Pawn,Angles Before,Angles Next,Angles Goal,float At);
+    private readonly Dictionary<nint,PendingLargeTurn> _pendingLargeTurns=new();
+    private readonly HashSet<nint> _turnAssistActive=new();
+    // Large turns alone may take a bounded view step. Small aim/recoil correction
+    // remains native; no full 90/180-degree endpoint is applied in one callback.
+    private void WriteNativeTurnGoal(CCSBot bot,Angles actual,Angles goal,HumanAimProfile profile,float now,bool retainForVisual=false)
+    {
+        bool seen=_nativeTurnAt.TryGetValue(bot.Handle,out var last);
+        if(seen&&now==last)return;
+        float dt=seen?Math.Clamp(now-last,0,.02f):Server.TickInterval;
+        _nativeTurnAt[bot.Handle]=now;
+        float speed=HumanAimModel.TurnSpeed(profile.MaxSpeed,AimMath.Delta(goal,actual).Length());
+        var next=AimMath.Advance(actual,goal,dt,.012f,speed);
+        bot.LookPitch=next.X;bot.LookYaw=next.Y;
+        float gap=MathF.Abs(AimMath.Delta(goal,actual).Y);
+        if(gap>35)_turnAssistActive.Add(bot.Handle);
+        if(gap<=.4f&&!retainForVisual)_turnAssistActive.Remove(bot.Handle);
+        if(_humanSettings.LargeTurnAssist&&!_humanSettings.DirectViewControl&&_setEyeAngles!=null
+            &&_turnAssistActive.Contains(bot.Handle)&&ResolveBotController(bot.Handle) is {IsValid:true,IsBot:true,PawnIsAlive:true} p
+            &&!p.HasBeenControlledByPlayerThisRound&&!OtherViewOwner(p.Slot)&&p.PlayerPawn.Value is {IsValid:true} pawn)
+            _pendingLargeTurns[bot.Handle]=new(p.PlayerPawn.Raw,actual,next,goal,now);
+    }
+    private void ApplyPendingLargeTurn(nint pointer)
+    {
+        if(!_pendingLargeTurns.Remove(pointer,out var turn)||turn.At!=Server.CurrentTime
+            ||ResolveBotController(pointer) is not {IsValid:true,IsBot:true,PawnIsAlive:true} p
+            ||p.PlayerPawn.Raw!=turn.Pawn||p.HasBeenControlledByPlayerThisRound||OtherViewOwner(p.Slot)
+            ||p.PlayerPawn.Value is not {IsValid:true} pawn||!IsGun(pawn)||_setEyeAngles==null)return;
+        uint flags=p.Flags;
+        try
+        {
+            try
+            {
+                if(OperatingSystem.IsWindows())p.Flags=flags|0x100u;
+                _setEyeAngles.Invoke(pawn.Handle,new QAngle(turn.Next.X,turn.Next.Y,0).Handle);
+                var bot=new CCSBot(pointer);
+                bot.LookPitch=turn.Next.X;bot.LookYaw=turn.Next.Y;bot.LookPitchVel=0;bot.LookYawVel=0;
+            }
+            finally{if(OperatingSystem.IsWindows()&&p.IsValid)p.Flags=flags;}
+            WriteTelemetry(new{kind="large_turn_step",time=Server.CurrentTime,slot=p.Slot,pawn=turn.Pawn,
+                before_yaw=turn.Before.Y,requested_yaw=turn.Next.Y,goal_yaw=turn.Goal.Y});
+        }
+        catch(Exception error)
+        {
+            _humanSettings.LargeTurnAssist=false;_pendingLargeTurns.Clear();_turnAssistActive.Clear();
+            Logger.LogError(error,"Bounded turn assistance disabled; native turn and facing fire safety remain active");
+        }
     }
     private bool WriteCachedHumanSpot(CCSBot bot,CCSPlayerController controller,Vector eye)
     {
