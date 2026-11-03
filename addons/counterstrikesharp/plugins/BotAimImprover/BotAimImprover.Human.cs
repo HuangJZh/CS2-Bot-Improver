@@ -566,7 +566,7 @@ public partial class BotAimImprover
         float dt=seen?Math.Clamp(now-last,0,.02f):Server.TickInterval;
         _nativeTurnAt[bot.Handle]=now;
         float speed=HumanAimModel.TurnSpeed(profile.MaxSpeed,AimMath.Delta(goal,actual).Length());
-        var next=AimMath.Advance(actual,goal,dt,.012f,speed);
+        var next=AimMath.Advance(actual,goal,dt,.012f/HumanAimModel.TurnRateMultiplier,speed);
         bot.LookPitch=next.X;bot.LookYaw=next.Y;
         float gap=MathF.Abs(AimMath.Delta(goal,actual).Y);
         if(gap>35)_turnAssistActive.Add(bot.Handle);

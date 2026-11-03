@@ -530,9 +530,9 @@ Check(FacingFirePolicy.OutsideCone(0,90)&&FacingFirePolicy.OutsideCone(0,180)
 foreach(var level in new[]{"Low","Medium","High"})
 {
  var p=HumanAimProfile.For(level);
- Check(HumanAimModel.TurnSpeed(p.MaxSpeed,15)==p.MaxSpeed
-  &&HumanAimModel.TurnSpeed(p.MaxSpeed,180)<=p.MaxSpeed*1.651f,
-  level+" small corrections preserve their speed while large turns have a bounded higher peak");
+ Check(MathF.Abs(HumanAimModel.TurnSpeed(p.MaxSpeed,15)/p.MaxSpeed-1.20f)<.00001f
+  &&HumanAimModel.TurnSpeed(p.MaxSpeed,180)<=p.MaxSpeed*1.651f*1.20f,
+  level+" initial positioning and bounded large turns receive the twenty percent turn-rate increase");
  foreach(float degrees in new[]{90f,180f})
  {
   var turn=new HumanAimModel(p,Vector2.Zero,0,3);
@@ -542,4 +542,16 @@ foreach(var level in new[]{"Low","Medium","High"})
    $"{level} {degrees}deg planned turn no longer uses the slow small-correction speed cap");
  }
 }
+foreach(var level in new[]{"Low","Medium","High"})
+ foreach(float gap in new[]{5f,90f,180f})
+ {
+  var p=HumanAimProfile.For(level);float width=MathF.Max(.12f,MathF.Atan2(8,600)*180/MathF.PI);
+  float oldSpeed=p.MaxSpeed*(1+.65f*Math.Clamp((gap-25)/95,0,1));
+  float oldDuration=MathF.Max(gap<width*.5f?.015f:p.FlickTime+p.FlickAmplitudeTime*MathF.Log2(1+gap/width),1.875f*gap/oldSpeed);
+  var turn=new HumanAimModel(p,Vector2.Zero,0,3);turn.Observe(0,new(600*MathF.Cos(gap*MathF.PI/180),600*MathF.Sin(gap*MathF.PI/180),0));
+  turn.Step(.08f,Vector3.Zero,true);
+  Check(MathF.Abs(HumanAimModel.TurnSpeed(p.MaxSpeed,gap)/oldSpeed-1.20f)<.00001f
+   &&MathF.Abs(turn.PlanDuration*1.20f-oldDuration)<.0001f,
+   $"{level} {gap}deg movement rate scales once and motor duration divides by 1.2");
+ }
 Console.WriteLine($"{count} checks passed");

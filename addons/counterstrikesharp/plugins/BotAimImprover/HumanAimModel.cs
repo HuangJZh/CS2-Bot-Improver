@@ -115,7 +115,10 @@ public sealed class HumanAimModel
     {
         if(!_planned&&float.IsFinite(seconds))_reactionCredit=MathF.Max(_reactionCredit,Math.Clamp(seconds,0,Profile.Reaction*.75f));
     }
-    public static float TurnSpeed(float speed,float gap)=>speed*(1+.65f*Math.Clamp((gap-25)/95,0,1));
+    public const float TurnRateMultiplier=1.20f;
+    public static float TurnSpeed(float speed,float gap)=>TurnRateMultiplier*speed*(1+.65f*Math.Clamp((gap-25)/95,0,1));
+    private float MovementDuration(float amplitude,float width)
+        =>(amplitude<width*.5f?.015f:Profile.FlickTime+Profile.FlickAmplitudeTime*MathF.Log2(1+amplitude/width))/TurnRateMultiplier;
     public bool NeedsObservation(float now) => now>=_nextSample;
     public VisualEstimate? ObserveVisual(float now,Vector3 eye,Vector3 visiblePoint,Vector2 actualView,float radius,float extraUncertainty=0,string part="point")
     {
@@ -201,7 +204,7 @@ public sealed class HumanAimModel
             ContactKind=amplitude<10f ? "prepared" : amplitude>45f ? "unexpected" : "neutral";
             _startView=_view;
             float angularWidth=MathF.Max(.12f,MathF.Atan2(8,targetDistance)*180/MathF.PI);
-            _duration=amplitude<angularWidth*.5f ? .015f : Profile.FlickTime+Profile.FlickAmplitudeTime*MathF.Log2(1+amplitude/angularWidth);
+            _duration=MovementDuration(amplitude,angularWidth);
             // Quintic easing peaks at 1.875 times average speed. A shorter plan
             // hits the motor speed cap, ends before the view arrives and creates
             // an unnecessary second correction/pause on large turns.
@@ -222,7 +225,7 @@ public sealed class HumanAimModel
             _startView=_view;
             float amplitude=AimMath.Delta(desired,_view).Length();
             float width=MathF.Max(.12f,MathF.Atan2(8,targetDistance)*180/MathF.PI);
-            _duration=_shotCommitted?0:amplitude<width*.5f?.015f:Profile.FlickTime+Profile.FlickAmplitudeTime*MathF.Log2(1+amplitude/width);
+            _duration=_shotCommitted?0:MovementDuration(amplitude,width);
             _movementSpeed=TurnSpeed(Profile.MaxSpeed,amplitude);
             if(!_shotCommitted)_duration=MathF.Max(_duration,1.875f*amplitude/_movementSpeed);
             // Aim a moving target's motor endpoint at estimated movement completion,
@@ -235,7 +238,7 @@ public sealed class HumanAimModel
                     float horizon=Math.Clamp(_duration,0,.18f);
                     endpoint=AimMath.Angles(eye+_eyeVelocity*horizon,predicted+_velocity*horizon*Profile.Prediction);
                     float travel=AimMath.Delta(endpoint,_view).Length();
-                    _duration=travel<width*.5f?.015f:Profile.FlickTime+Profile.FlickAmplitudeTime*MathF.Log2(1+travel/width);
+                    _duration=MovementDuration(travel,width);
                     _movementSpeed=TurnSpeed(Profile.MaxSpeed,travel);
                     _duration=MathF.Max(_duration,1.875f*travel/_movementSpeed);
                 }
@@ -263,8 +266,8 @@ public sealed class HumanAimModel
             }
             var planned=_startView+AimMath.Delta(_endView,_startView)*AimMath.Ease((now-_start)/_duration);
             var intended=_startView+AimMath.Delta(_intendedEndView,_startView)*AimMath.Ease((now-_start)/_duration);
-            _view=AimMath.Advance(_view,planned,dt,.012f,_movementSpeed);
-            _intendedView=AimMath.Advance(_intendedView,intended,dt,.012f,_movementSpeed);
+            _view=AimMath.Advance(_view,planned,dt,.012f/TurnRateMultiplier,_movementSpeed);
+            _intendedView=AimMath.Advance(_intendedView,intended,dt,.012f/TurnRateMultiplier,_movementSpeed);
             LastFireDecision=HumanFireDecision.Evaluate(_intendedView,desired,angularRadius,latest.Uncertainty,visible,age,false,context,Profile.MotorError,actualError);
             return new(_view,LastFireDecision.Allow,"flick",age);
         }
