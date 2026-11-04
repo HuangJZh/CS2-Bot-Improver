@@ -554,4 +554,24 @@ foreach(var level in new[]{"Low","Medium","High"})
    &&MathF.Abs(turn.PlanDuration*1.20f-oldDuration)<.0001f,
    $"{level} {gap}deg movement rate scales once and motor duration divides by 1.2");
  }
+var otherSource=new HeardSound(99,"gunfire",new(100,0,0),100,.3f,.55f,1.2f,Vector2.Zero);
+Check(SoundAttention.Merge(firstCue,otherSource).Start==.55f,
+ "a newly selected sound source cannot borrow the previous source's reaction deadline");
+var promoted=SoundAttention.Merge(firstCue,firstCue with{Source="gunfire",HeardAt=.1f,Start=.12f,Until=1.1f,Error=new(3,4)});
+Check(promoted.Gunshot&&promoted.Error==firstCue.Error&&promoted.Start==.12f,
+ "same-source footstep to gunfire promotion keeps coherent direction error and earliest reaction");
+var focus=new SoundGazeFocus();
+var brief=firstCue with{Until=.5f};focus.Select(brief,0);
+Check(focus.Holding(.2f)&&!focus.Ready(.2f)&&focus.Ready(.26f),
+ "pending sound reaction reserves gaze without starting an early turn");
+Check(focus.Holding(.8f),"a brief footstep has enough focus time to finish turning and glance before returning to navigation");
+focus.Select(brief with{HeardAt=.2f,Start=.45f,Until=.7f},.2f);
+Check(focus.ReadyAt==.25f,"repeated source refresh does not restart a gaze reaction");
+focus.Select(brief with{HeardAt=.7f,Start=.95f,Until=1.9f},.7f);
+Check(focus.Until<=1.6f,"continuous sounds cannot hold the gaze indefinitely");
+focus.End(1.6f);
+Check(!focus.Select(brief with{HeardAt=1.7f,Start=1.9f,Until=2.2f},1.7f),
+ "a completed source check cannot immediately pull the view away from navigation again");
+Check(focus.Select(brief with{Source="gunfire",HeardAt=1.8f,Start=1.9f,Until=2.7f},1.8f),
+ "a genuine escalation from footsteps to gunfire can interrupt the same-source recheck cooldown");
 Console.WriteLine($"{count} checks passed");

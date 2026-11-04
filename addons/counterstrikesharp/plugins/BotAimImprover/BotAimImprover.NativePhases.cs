@@ -49,11 +49,19 @@ public partial class BotAimImprover
     private HookResult OnNativeUpdatePost(DynamicHook hook)
     {
         RefreshNativeFireGuard(hook);
+        ReapplyOwnedSoundGaze(hook);
         return ExitNativePhase(hook);
     }
     private HookResult OnNativeUpkeepPre(DynamicHook hook)
     {RefreshNativeFireGuard(hook);return EnterNativePhase(hook,"upkeep");}
-    private HookResult OnNativeUpkeepPost(DynamicHook hook)=>ExitNativePhase(hook);
+    private HookResult OnNativeUpkeepPost(DynamicHook hook)
+    {ReapplyOwnedSoundGaze(hook);return ExitNativePhase(hook);}
+    private void ReapplyOwnedSoundGaze(DynamicHook hook)
+    {
+        if(!HumanActive||_humanSettings.DirectViewControl)return;
+        var pointer=hook.GetParam<nint>(0);
+        if(_pendingLargeTurns.TryGetValue(pointer,out var turn)&&turn.Auditory)ApplyPendingLargeTurn(pointer);
+    }
     private string NativePhase(nint pointer)=>!_nativePhasesReady ? "diagnostics-unavailable"
         : _nativePhases.TryGetValue(pointer,out var phases) && phases.TryPeek(out var phase) ? phase : "outside-native-phase";
     private void UninstallNativePhases()

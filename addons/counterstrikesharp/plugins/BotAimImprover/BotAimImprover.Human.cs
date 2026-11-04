@@ -129,7 +129,7 @@ public partial class BotAimImprover
             TickTeamNavigation();
             TickTeamSupport();
         });
-        RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_soundPreaim.Remove(p.Slot);_attentionTurnAt.Remove(p.Slot);ResetSilentMovement(p.Slot);}return HookResult.Continue; });
+        RegisterEventHandler<EventPlayerDeath>((e,i) => { if(e.Userid is {} p){ForgetVisualTarget(p.PlayerPawn.Raw);CancelSoundAttention(p);ReleaseHuman(p.Slot);ReleaseFireGuard(p.Slot);_attentionTurnAt.Remove(p.Slot);ResetSilentMovement(p.Slot);}return HookResult.Continue; });
         // Track bursts so the aim output can model human recoil control after the
         // first few rounds instead of holding a perfectly steady target point.
         RegisterEventHandler<EventWeaponFire>((e,i) => {
@@ -261,6 +261,7 @@ public partial class BotAimImprover
         ResetTactics();_aimIntents.Clear();_humanTeamsScanAt=0;_humanTeams=0;
         _eliteProfiles.Clear();
         _combatHistories.Clear();_noticedTargets.Clear();_nativeTurnAt.Clear();_turnAssistActive.Clear();_pendingLargeTurns.Clear();ResetTeamSupport();
+        _visualAttention.Clear();_visibilityScans.Clear();_soundFocus.Clear();_soundTurnOwners.Clear();
     }
     private static bool IsGun(CCSPlayerPawn pawn)
         => pawn.WeaponServices?.ActiveWeapon.Value?.As<CCSWeaponBase>().VData?.GearSlot is gear_slot_t.GEAR_SLOT_RIFLE or gear_slot_t.GEAR_SLOT_PISTOL;
@@ -272,20 +273,30 @@ public partial class BotAimImprover
     // bounded turn rate and a tier-scaled angular error, instead of ignoring sound.
     private bool TryApplySoundPreaim(CCSPlayerController controller,CCSBot bot,nint pointer,CCSPlayerPawn pawn,Vec eyeVec,float now)
     {
-        if(!_soundPreaim.TryGetValue(controller.Slot,out var aim))return false;
-        if(now<aim.Start)return false;
-        if(now>aim.Until){_soundPreaim.Remove(controller.Slot);return false;}
+        if(HasReliableVisibleThreat(controller,now)){CancelSoundAttention(controller);return false;}
+        if(!_soundFocus.TryGetValue(controller.Slot,out var owner)||owner.Pawn!=controller.PlayerPawn.Raw)
+            _soundFocus[controller.Slot]=owner=new(controller.PlayerPawn.Raw,new());
+        uint? previousSource=owner.Focus.Cue?.SourcePawn;
+        if(_soundPreaim.TryGetValue(controller.Slot,out var incoming))owner.Focus.Select(incoming,now);
+        if(!owner.Focus.Holding(now))
+        {
+            owner.Focus.End(now);CancelSoundSteering(controller);
+            if(incoming!=null&&incoming.Until<=now)_soundPreaim.Remove(controller.Slot);
+            return false;
+        }
+        var aim=owner.Focus.Cue!;
+        if(previousSource.HasValue&&previousSource.Value!=aim.SourcePawn)CancelSoundSteering(controller);
         var current=new Angles(pawn.EyeAngles.X,pawn.EyeAngles.Y);
-        var desired=AimMath.Angles(eyeVec,aim.Position);
-        var profile=HumanAimProfile.For(_humanDifficulty);
+        var desired=owner.Focus.Ready(now)?AimMath.Angles(eyeVec,aim.Position):current;
+        var profile=CombatProfile(controller,now);
         var next=AimMath.Advance(current,desired,AttentionDelta(controller.Slot,now),profile.TrackingTime,profile.MaxSpeed);
         var spot=AimMath.Ray(eyeVec,next);
         _modelSpots[pointer]=spot;
         WriteModelSpot(bot,spot);
         // Synchronize bounded native look steering as well as TargetSpot: sound
         // search has no visual Enemy, so TargetSpot alone need not turn the view.
-        bool visualHandoff=_humanStates.TryGetValue(controller.Slot,out var looking)&&looking.LastSight&&looking.Enemy==aim.SourcePawn;
-        WriteNativeTurnGoal(bot,current,desired,profile,now,visualHandoff);
+        _soundTurnOwners.Add(pointer);
+        WriteNativeTurnGoal(bot,current,desired,profile,now,false,true);
         RefreshFireGuard(controller);
         return true;
     }
@@ -307,36 +318,44 @@ public partial class BotAimImprover
             if(controller is not {IsValid:true,IsBot:true,PawnIsAlive:true} || controller.HasBeenControlledByPlayerThisRound)return HookResult.Continue;
             var pawn=controller.PlayerPawn.Value;
             if(pawn is not {IsValid:true} || !IsGun(pawn) || OtherViewOwner(controller.Slot))
-            { ReleaseHuman(controller.Slot);ReleaseFireGuard(controller.Slot);_modelSpots.Remove(pointer);return HookResult.Continue; }
+            { CancelSoundAttention(controller);ReleaseHuman(controller.Slot);ReleaseFireGuard(controller.Slot);_modelSpots.Remove(pointer);return HookResult.Continue; }
             if(!TryGetBotEyePosition(controller,out var eye))return HookResult.Continue;
             var eyeVec=new Vec(eye.X,eye.Y,eye.Z);
             float now=Server.CurrentTime;
             var bot=new CCSBot(pointer);
             if(pawn.IsDefusing||(_plantingUntil.TryGetValue(controller.Slot,out var plantingUntil)&&now<plantingUntil))
-            {ResetSilentMovement(controller.Slot);ReleaseHuman(controller.Slot);ReleaseFireGuard(controller.Slot);return HookResult.Continue;}
+            {CancelSoundAttention(controller);ResetSilentMovement(controller.Slot);ReleaseHuman(controller.Slot);ReleaseFireGuard(controller.Slot);return HookResult.Continue;}
             TickSilentMovement(controller,pawn,bot,now);
+            bool visualPriority=HasReliableVisibleThreat(controller,now);
+            if(visualPriority)CancelSoundAttention(controller);
             if(bot.Enemy.Value is not {IsValid:true} enemy || enemy.LifeState!=0 || enemy.TeamNum==controller.TeamNum)
             {
-                if(TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
-                if(TryApplySupportPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
-                if(TryApplyMapPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
                 // The native enemy handle can flicker between peeks. Keep the memory
                 // based plan for a short grace period instead of resetting every
                 // model (reset means a fresh sensor delay and reaction before the
                 // next shot). No target spot is written while the target is gone.
                 if(_humanStates.TryGetValue(controller.Slot,out var held) && held.Pawn==controller.PlayerPawn.Raw
-                    && now-held.LastUsed<.35f && held.Model.HasObservation && now-held.Model.LastVisible<.50f)
+                    && now-held.LastUsed<.35f && held.Model.HasObservation && now-held.Model.LastVisible<.22f)
                 {
                     held.LastUsed=now;
                     held.Output=held.Model.Step(now,eyeVec,false,default,new(pawn.EyeAngles.X,pawn.EyeAngles.Y));
-                    _modelSpots.Remove(pointer);
+                    var memorySpot=AimMath.Ray(eyeVec,held.Output.Angles);_modelSpots[pointer]=memorySpot;WriteModelSpot(bot,memorySpot);
                     RefreshFireGuard(controller);
                     return HookResult.Continue;
+                }
+                if(!visualPriority)
+                {
+                    if(TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
+                    if(TryApplySupportPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
+                    if(TryApplyMapPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
                 }
                 ReleaseHuman(controller.Slot);_modelSpots.Remove(pointer);RefreshFireGuard(controller);return HookResult.Continue;
             }
             _preaimTargets.Remove(controller.Slot);
             CancelCoverPeek(controller.Slot,"enemy-context");
+            if(visualPriority&&_visualAttention.TryGetValue(controller.Slot,out var protectedSight)
+                &&protectedSight.Target!=enemy.EntityHandle.Raw&&now<protectedSight.Until)
+            {ReleaseHuman(controller.Slot);_modelSpots.Remove(pointer);RefreshFireGuard(controller);return HookResult.Continue;}
             var combatProfile=CombatProfile(controller,now);
             NoticeAlternativeTargets(controller,pawn,eye,now);
             if(!_humanStates.TryGetValue(controller.Slot,out var state) || state.Pawn!=controller.PlayerPawn.Raw || state.Enemy!=enemy.EntityHandle.Raw
@@ -381,6 +400,9 @@ public partial class BotAimImprover
                 state.LastSight=visible;
                 if(visible)
                 {
+                    // Preferred/fallback samples also confirm partial exposures
+                    // such as HEAD_TOP; the fast head/chest scan is not exhaustive.
+                    if(!degradedSmoke)ConfirmVisualAttention(controller,enemy.EntityHandle.Raw,now);
                     // Reacquisition after lost memory is a fresh movement only when the
                     // target was gone long enough that the old plan is no longer usable.
                     // Short peeks keep the plan so reacquiring does not pay a fresh
@@ -404,13 +426,7 @@ public partial class BotAimImprover
             }
             // A retained native enemy is not a live visual threat. Let a ready
             // sound cue interrupt old visual memory before any early return.
-            if(visible)
-            {
-                // The same heard attacker has already triggered attention and a
-                // turn. Visual confirmation must not charge a full second alert.
-                if(_soundPreaim.TryGetValue(controller.Slot,out var heard)&&heard.SourcePawn==enemy.EntityHandle.Raw
-                    &&now>=heard.Start&&now<heard.Until)state.Model.CreditAlertReaction(now-heard.Start);
-            }
+            if(visible){ApplyVisibleAlertCredit(controller,state,now);CancelSoundAttention(controller);}
             else if(TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
             // Preserve native search/navigation once visual memory is gone. While a
             // recent observation is still usable, keep the memory-based plan alive so
@@ -426,13 +442,6 @@ public partial class BotAimImprover
             var fireContext=new HumanFireContext(HumanFireContext.Classify(pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName),now<state.UnderFireUntil);
             state.PlannedWeapon=pawn.WeaponServices?.ActiveWeapon.Raw ?? uint.MaxValue;
             state.Output=state.Model.Step(now,eyeVec,visible,fireContext,new(pawn.EyeAngles.X,pawn.EyeAngles.Y));
-            // Finish the already-started auditory turn while visual perception /
-            // reaction catches up. The cue is a fixed uncertain heard position,
-            // not the newly visible entity's undisclosed live coordinates.
-            if(visible&&state.Output.Phase is "perception" or "reaction"
-                &&_soundPreaim.TryGetValue(controller.Slot,out var continuingCue)&&continuingCue.SourcePawn==enemy.EntityHandle.Raw
-                &&TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
-            if(visible)_soundPreaim.Remove(controller.Slot);
             _humanPhases[state.Output.Phase]=_humanPhases.GetValueOrDefault(state.Output.Phase)+1;
             // Close the native execution gap before the first shot. During a live
             // spray native recoil owns the view and this bounded correction fades.
@@ -554,15 +563,20 @@ public partial class BotAimImprover
         var velocity=bot.TargetSpotVelocity;velocity.X=0;velocity.Y=0;velocity.Z=0;
     }
     private readonly Dictionary<nint,float> _nativeTurnAt=new();
-    private sealed record PendingLargeTurn(uint Pawn,Angles Before,Angles Next,Angles Goal,float At);
+    private sealed record PendingLargeTurn(uint Pawn,Angles Before,Angles Next,Angles Goal,float At,bool Auditory=false);
     private readonly Dictionary<nint,PendingLargeTurn> _pendingLargeTurns=new();
     private readonly HashSet<nint> _turnAssistActive=new();
     // Large turns alone may take a bounded view step. Small aim/recoil correction
     // remains native; no full 90/180-degree endpoint is applied in one callback.
-    private void WriteNativeTurnGoal(CCSBot bot,Angles actual,Angles goal,HumanAimProfile profile,float now,bool retainForVisual=false)
+    private void WriteNativeTurnGoal(CCSBot bot,Angles actual,Angles goal,HumanAimProfile profile,float now,bool retainForVisual=false,bool soundOwner=false)
     {
         bool seen=_nativeTurnAt.TryGetValue(bot.Handle,out var last);
-        if(seen&&now==last)return;
+        if(seen&&now==last)
+        {
+            if(soundOwner&&_pendingLargeTurns.TryGetValue(bot.Handle,out var repeat)&&repeat.Auditory&&repeat.At==now)
+            {bot.LookPitch=repeat.Next.X;bot.LookYaw=repeat.Next.Y;}
+            return;
+        }
         float dt=seen?Math.Clamp(now-last,0,.02f):Server.TickInterval;
         _nativeTurnAt[bot.Handle]=now;
         float speed=HumanAimModel.TurnSpeed(profile.MaxSpeed,AimMath.Delta(goal,actual).Length());
@@ -571,29 +585,42 @@ public partial class BotAimImprover
         float gap=MathF.Abs(AimMath.Delta(goal,actual).Y);
         if(gap>35)_turnAssistActive.Add(bot.Handle);
         if(gap<=.4f&&!retainForVisual)_turnAssistActive.Remove(bot.Handle);
-        if(_humanSettings.LargeTurnAssist&&!_humanSettings.DirectViewControl&&_setEyeAngles!=null
-            &&_turnAssistActive.Contains(bot.Handle)&&ResolveBotController(bot.Handle) is {IsValid:true,IsBot:true,PawnIsAlive:true} p
+        if((soundOwner||_humanSettings.LargeTurnAssist&&!_humanSettings.DirectViewControl&&_setEyeAngles!=null&&_turnAssistActive.Contains(bot.Handle))
+            &&ResolveBotController(bot.Handle) is {IsValid:true,IsBot:true,PawnIsAlive:true} p
             &&!p.HasBeenControlledByPlayerThisRound&&!OtherViewOwner(p.Slot)&&p.PlayerPawn.Value is {IsValid:true} pawn)
-            _pendingLargeTurns[bot.Handle]=new(p.PlayerPawn.Raw,actual,next,goal,now);
+            _pendingLargeTurns[bot.Handle]=new(p.PlayerPawn.Raw,actual,next,goal,now,soundOwner);
     }
     private void ApplyPendingLargeTurn(nint pointer)
     {
-        if(!_pendingLargeTurns.Remove(pointer,out var turn)||turn.At!=Server.CurrentTime
+        if(!_pendingLargeTurns.TryGetValue(pointer,out var turn)||turn.At!=Server.CurrentTime
             ||ResolveBotController(pointer) is not {IsValid:true,IsBot:true,PawnIsAlive:true} p
             ||p.PlayerPawn.Raw!=turn.Pawn||p.HasBeenControlledByPlayerThisRound||OtherViewOwner(p.Slot)
-            ||p.PlayerPawn.Value is not {IsValid:true} pawn||!IsGun(pawn)||_setEyeAngles==null)return;
+            ||p.PlayerPawn.Value is not {IsValid:true} pawn||!IsGun(pawn))return;
+        if(pawn.IsDefusing||(_plantingUntil.TryGetValue(p.Slot,out var planting)&&Server.CurrentTime<planting))
+        {CancelSoundAttention(p);_pendingLargeTurns.Remove(pointer);return;}
+        if(!turn.Auditory)_pendingLargeTurns.Remove(pointer);
+        else
+        {
+            if(HasReliableVisibleThreat(p,Server.CurrentTime)){CancelSoundAttention(p);return;}
+            if(!_soundFocus.TryGetValue(p.Slot,out var focus)||focus.Pawn!=p.PlayerPawn.Raw||!focus.Focus.Holding(Server.CurrentTime))
+            {CancelSoundSteering(p);return;}
+        }
         uint flags=p.Flags;
         try
         {
             try
             {
-                if(OperatingSystem.IsWindows())p.Flags=flags|0x100u;
-                _setEyeAngles.Invoke(pawn.Handle,new QAngle(turn.Next.X,turn.Next.Y,0).Handle);
+                if(_setEyeAngles!=null&&(!turn.Auditory||_humanSettings.LargeTurnAssist))
+                {
+                    if(OperatingSystem.IsWindows())p.Flags=flags|0x100u;
+                    _setEyeAngles.Invoke(pawn.Handle,new QAngle(turn.Next.X,turn.Next.Y,0).Handle);
+                }
                 var bot=new CCSBot(pointer);
                 bot.LookPitch=turn.Next.X;bot.LookYaw=turn.Next.Y;bot.LookPitchVel=0;bot.LookYawVel=0;
             }
             finally{if(OperatingSystem.IsWindows()&&p.IsValid)p.Flags=flags;}
-            WriteTelemetry(new{kind="large_turn_step",time=Server.CurrentTime,slot=p.Slot,pawn=turn.Pawn,
+            WriteTelemetry(new{kind=turn.Auditory?"sound_gaze_step":"large_turn_step",time=Server.CurrentTime,slot=p.Slot,pawn=turn.Pawn,
+                source_pawn=turn.Auditory?_soundFocus.GetValueOrDefault(p.Slot)?.Focus.Cue?.SourcePawn:null,
                 before_yaw=turn.Before.Y,requested_yaw=turn.Next.Y,goal_yaw=turn.Goal.Y});
         }
         catch(Exception error)

@@ -8,22 +8,88 @@ public partial class BotAimImprover
     private readonly Dictionary<int,HeardSound> _soundPreaim=new();
     private readonly Dictionary<uint,float> _lastFootstep=new();
     private readonly Dictionary<int,float> _attentionTurnAt=new();
+    private sealed record VisualAttention(uint Pawn,uint Target,float Until,float AlertCredit);
+    private sealed record VisibilityScan(uint Pawn,uint Enemy,int Tick,float Pitch,float Yaw,bool Visible);
+    private sealed record SoundFocusOwner(uint Pawn,SoundGazeFocus Focus);
+    private readonly Dictionary<int,VisualAttention> _visualAttention=new();
+    private readonly Dictionary<int,VisibilityScan> _visibilityScans=new();
+    private readonly Dictionary<int,SoundFocusOwner> _soundFocus=new();
+    private readonly HashSet<nint> _soundTurnOwners=new();
 
     private bool HasReliableVisibleThreat(CCSPlayerController listener,float now)
     {
         var pawn=listener.PlayerPawn.Value;var bot=pawn?.Bot;
-        return pawn is {IsValid:true} && bot is not null && bot.IsEnemyVisible && pawn.BlindUntilTime<=now
-            && bot.Enemy.Value is {IsValid:true,LifeState:0} enemy && enemy.TeamNum!=listener.TeamNum
-            && _humanStates.TryGetValue(listener.Slot,out var s) && s.Pawn==listener.PlayerPawn.Raw
-            && s.Enemy==bot.Enemy.Raw && s.LastSight && now-s.Model.LastVisible<.20f;
+        if(pawn is not {IsValid:true}||bot is null)return false;
+        if(_combatHistories.TryGetValue(listener.Slot,out var firing)&&firing.Pawn==listener.PlayerPawn.Raw
+            &&now-firing.History.LastShotAt<.25f&&bot.Enemy.Value is {IsValid:true,LifeState:0})return true;
+        if(pawn.BlindUntilTime>now){_visualAttention.Remove(listener.Slot);return false;}
+        bool remembered=_visualAttention.TryGetValue(listener.Slot,out var memory)&&memory.Pawn==listener.PlayerPawn.Raw&&now<memory.Until;
+        if(remembered&&memory!.Target==bot.Enemy.Raw&&bot.IsEnemyVisible)return true;
+        var view=new Vector2(pawn.EyeAngles.X,pawn.EyeAngles.Y);
+        if(_visibilityScans.TryGetValue(listener.Slot,out var cached)&&cached.Pawn==listener.PlayerPawn.Raw
+            &&cached.Enemy==bot.Enemy.Raw&&cached.Tick==Server.TickCount
+            &&AimMath.Delta(view,new(cached.Pitch,cached.Yaw)).Length()<2)return cached.Visible||remembered;
+        bool seen=false;
+        if(TryGetBotEyePosition(listener,out var eye))
+        {
+            var from=new Vector3(eye.X,eye.Y,eye.Z);
+            // Strict FOV, smoke and world LOS checks are independent of the model's
+            // delayed sample queue. Never turn toward these scans or force Enemy.
+            foreach(var p in EntityPlayers().OrderByDescending(p=>p.PlayerPawn.Raw==bot.Enemy.Raw))
+            {
+                if(p is not {IsValid:true,PawnIsAlive:true}||p.TeamNum==listener.TeamNum||p.TeamNum is not (2 or 3)
+                    ||p.PlayerPawn.Value is not {IsValid:true} target)continue;
+                foreach(int part in new[]{0,3})
+                {
+                    if(!TryComputePartPos(target,part,out var x,out var y,out var z))continue;
+                    var point=new Vector3(x,y,z);var delta=AimMath.Delta(AimMath.Angles(from,point),view);
+                    if(MathF.Abs(delta.Y)>_humanSettings.HorizontalFieldOfView*.5f||MathF.Abs(delta.X)>50
+                        ||HumanSmokeBlocks(eye,point)||!PointVisibleFromEye(eye,x,y,z,.999f,out _))continue;
+                    ConfirmVisualAttention(listener,target.EntityHandle.Raw,now);
+                    seen=true;break;
+                }
+                if(seen)break;
+            }
+        }
+        _visibilityScans[listener.Slot]=new(listener.PlayerPawn.Raw,bot.Enemy.Raw,Server.TickCount,view.X,view.Y,seen);
+        return seen||remembered;
+    }
+    private void ConfirmVisualAttention(CCSPlayerController listener,uint target,float now)
+    {
+        float credit=_visualAttention.TryGetValue(listener.Slot,out var old)&&old.Pawn==listener.PlayerPawn.Raw
+            &&old.Target==target&&now<old.Until?old.AlertCredit:0;
+        if(_soundPreaim.TryGetValue(listener.Slot,out var sound)&&sound.SourcePawn==target&&now>=sound.Start&&now<sound.Until)
+            credit=MathF.Max(credit,now-sound.Start);
+        _visualAttention[listener.Slot]=new(listener.PlayerPawn.Raw,target,now+.22f,credit);
+    }
+    private void CancelSoundSteering(CCSPlayerController p)
+    {
+        if(p.PlayerPawn.Value?.Bot is not {} bot||!_soundTurnOwners.Remove(bot.Handle))return;
+        _nativeTurnAt.Remove(bot.Handle);_turnAssistActive.Remove(bot.Handle);
+        if(_pendingLargeTurns.TryGetValue(bot.Handle,out var turn)&&turn.Auditory)_pendingLargeTurns.Remove(bot.Handle);
+        _modelSpots.Remove(bot.Handle);
+        if(!OtherViewOwner(p.Slot)&&p.PlayerPawn.Value is {IsValid:true} pawn)
+        {bot.LookPitch=pawn.EyeAngles.X;bot.LookYaw=pawn.EyeAngles.Y;bot.LookPitchVel=0;bot.LookYawVel=0;}
+        WriteTelemetry(new{kind="sound_gaze_release",time=Server.CurrentTime,slot=p.Slot});
+    }
+    private void CancelSoundAttention(CCSPlayerController p)
+    {CancelSoundSteering(p);_soundPreaim.Remove(p.Slot);_soundFocus.Remove(p.Slot);}
+    private void ForgetVisualTarget(uint pawn)
+    {
+        foreach(var slot in _visualAttention.Where(x=>x.Value.Target==pawn||x.Value.Pawn==pawn).Select(x=>x.Key).ToArray())
+        {_visualAttention.Remove(slot);_visibilityScans.Remove(slot);}
+    }
+    private void ApplyVisibleAlertCredit(CCSPlayerController p,HumanState state,float now)
+    {
+        if(_visualAttention.TryGetValue(p.Slot,out var sight)&&sight.Pawn==p.PlayerPawn.Raw&&sight.Target==state.Enemy&&now<sight.Until)
+            state.Model.CreditAlertReaction(sight.AlertCredit);
     }
     private void QueueHeardSound(CCSPlayerController listener,CCSPlayerController source,Vector3 position,
         float distance,float now,float delay,string kind,float errorScale,float duration)
     {
         _soundPreaim.TryGetValue(listener.Slot,out var previous);
         float error=(1f+HumanAimProfile.For(_humanDifficulty).PerceptionError*12f)*errorScale;
-        var angularError=previous is not null && previous.Until>now && previous.SourcePawn==source.PlayerPawn.Raw
-            && previous.Gunshot==(kind=="gunfire") ? previous.Error
+        var angularError=previous is not null && previous.Until>now && previous.SourcePawn==source.PlayerPawn.Raw ? previous.Error
             : new Vector2((Random.Shared.NextSingle()*2-1)*error*.6f,(Random.Shared.NextSingle()*2-1)*error);
         var pawn=listener.PlayerPawn.Value!;var origin=pawn.AbsOrigin!;
         var eye=new Vector3(origin.X,origin.Y,origin.Z+pawn.ViewOffset.Z);
@@ -47,8 +113,9 @@ public partial class BotAimImprover
         {
             if(listener is not {IsValid:true,IsBot:true,PawnIsAlive:true} || listener.TeamNum==source.TeamNum
                 || listener.TeamNum is not (2 or 3) || listener.HasBeenControlledByPlayerThisRound
-                || listener.PlayerPawn.Value is not {IsValid:true} lp || lp.AbsOrigin is not {} lo
-                || HasReliableVisibleThreat(listener,now))continue;
+                || listener.PlayerPawn.Value is not {IsValid:true} lp || lp.AbsOrigin is not {} lo||OtherViewOwner(listener.Slot)
+                ||lp.IsDefusing||(_plantingUntil.TryGetValue(listener.Slot,out var planting)&&now<planting))continue;
+            if(HasReliableVisibleThreat(listener,now)){CancelSoundAttention(listener);continue;}
             float distance=Vector3.Distance(position,new(lo.X,lo.Y,lo.Z+lp.ViewOffset.Z));
             if(distance<=radius)QueueHeardSound(listener,source,position,distance,now,delay,kind,errorScale,duration);
         }
