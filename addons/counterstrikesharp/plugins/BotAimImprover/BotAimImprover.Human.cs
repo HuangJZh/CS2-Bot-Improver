@@ -16,6 +16,7 @@ public partial class BotAimImprover
     private sealed class HumanSettings
     {
         public bool Enabled {get;set;}=true;
+        public bool NativeCombat {get;set;}=true;
         public bool Diagnostics {get;set;}=false;
         public bool DirectViewControl {get;set;}=false; // Experimental until recoil/weapon checks are validated.
         public bool LargeTurnAssist {get;set;}=true;
@@ -78,6 +79,9 @@ public partial class BotAimImprover
         InitializeTeamNavigation();
         InitializeRoundLearning();
         InitializeTeamSupport();
+        RegisterListener<Listeners.OnMapStart>(_=>Server.NextFrame(ApplyTeammatePassthrough));
+        RegisterEventHandler<EventRoundStart>((e,i)=>{ApplyTeammatePassthrough();return HookResult.Continue;});
+        ApplyTeammatePassthrough();
         var processArgs=Environment.GetCommandLineArgs();
         int testPort=Array.IndexOf(processArgs,"-port"),testIp=Array.IndexOf(processArgs,"-ip");
         if(processArgs.Contains("-dedicated") && testPort>=0 && testPort+1<processArgs.Length && processArgs[testPort+1]=="27025"
@@ -262,6 +266,7 @@ public partial class BotAimImprover
         _eliteProfiles.Clear();
         _combatHistories.Clear();_noticedTargets.Clear();_nativeTurnAt.Clear();_turnAssistActive.Clear();_pendingLargeTurns.Clear();ResetTeamSupport();
         _visualAttention.Clear();_visibilityScans.Clear();_soundFocus.Clear();_soundTurnOwners.Clear();
+        _nativeContacts.Clear();
     }
     private static bool IsGun(CCSPlayerPawn pawn)
         => pawn.WeaponServices?.ActiveWeapon.Value?.As<CCSWeaponBase>().VData?.GearSlot is gear_slot_t.GEAR_SLOT_RIFLE or gear_slot_t.GEAR_SLOT_PISTOL;
@@ -311,6 +316,7 @@ public partial class BotAimImprover
     private HookResult PrepareHumanAim(nint pointer)
     {
         if(!HumanActive)return HookResult.Continue;
+        if(_humanSettings.NativeCombat){ObserveNativeCombat(pointer);return HookResult.Continue;}
         CCSPlayerController? controller=null;
         try
         {
@@ -631,7 +637,7 @@ public partial class BotAimImprover
     }
     private bool WriteCachedHumanSpot(CCSBot bot,CCSPlayerController controller,Vector eye)
     {
-        if(!HumanActive || controller.HasBeenControlledByPlayerThisRound || OtherViewOwner(controller.Slot))return false;
+        if(!HumanActive || _humanSettings.NativeCombat || controller.HasBeenControlledByPlayerThisRound || OtherViewOwner(controller.Slot))return false;
         // PickNewAimSpot cannot restore perfect coordinates between model updates.
         if(_modelSpots.TryGetValue(bot.Handle,out var point))WriteModelSpot(bot,point);
         // No active visual plan: leave native searching intact, but never run legacy perfect aim override.

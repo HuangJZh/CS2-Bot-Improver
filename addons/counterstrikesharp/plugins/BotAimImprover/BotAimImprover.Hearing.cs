@@ -104,7 +104,7 @@ public partial class BotAimImprover
     }
     private void HearSound(CCSPlayerController source,float radius,float duration,string kind,float delay,float errorScale)
     {
-        if(!HumanActive || source is not {IsValid:true,PawnIsAlive:true} || source.TeamNum is not (2 or 3)
+        if(!HumanActive || _humanSettings.NativeCombat || source is not {IsValid:true,PawnIsAlive:true} || source.TeamNum is not (2 or 3)
             || source.PlayerPawn.Value is not {IsValid:true} pawn || pawn.AbsOrigin is not {} origin
             || !float.IsFinite(radius+duration) || radius<=0 || duration<=0)return;
         float now=Server.CurrentTime;

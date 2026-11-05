@@ -13,6 +13,7 @@ public partial class BotState
     // Registers game events and the per-tick bot behavior listener
     public override void Load(bool hotReload)
     {
+        ReadCombatBackend();
         InstallDefuseBombHook();
         InstallBotBlindHook();
         InitializeFovPatches();
@@ -35,13 +36,13 @@ public partial class BotState
         RegisterListener<Listeners.OnEntityCreated>(InvalidateFlashEntities);
         RegisterListener<Listeners.OnEntitySpawned>(InvalidateFlashEntities);
         RegisterListener<Listeners.OnEntityDeleted>(InvalidateFlashEntities);
-        RegisterListener<Listeners.OnMapStart>(_ => ClearFlashEntities());
+        RegisterListener<Listeners.OnMapStart>(_ => {ReadCombatBackend();ClearFlashEntities();});
         RegisterListener<Listeners.OnMapEnd>(ClearFlashEntities);
         RegisterListener<Listeners.OnTick>(OnTick);
         // Prevent bots from holding their knives when there're enemies alive
         _gunReequipTimer = AddTimer(
             1.0f,
-            ReequipGunForActiveBots,
+            ()=>{if(!_nativeCombat)ReequipGunForActiveBots();},
             CounterStrikeSharp.API.Modules.Timers.TimerFlags.REPEAT);
         StartRushAntennaPublisher();
     }
@@ -83,7 +84,7 @@ public partial class BotState
         Server.NextFrame(() =>
         {
             if (player == null || !player.IsValid) return;
-            ApplyBotState(player);
+            if(!_nativeCombat)ApplyBotState(player);
         });
 
         return HookResult.Continue;
@@ -93,6 +94,7 @@ public partial class BotState
     [GameEventHandler]
     public HookResult OnRoundFreezeEnd(EventRoundFreezeEnd @event, GameEventInfo info)
     {
+        if(_nativeCombat)return HookResult.Continue;
         foreach (var player in Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller"))
         {
             if (!player.IsValid || !player.IsBot) continue;
@@ -104,6 +106,7 @@ public partial class BotState
     // Clears per-round state and releases elimination knife locks
     private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
     {
+        ReadCombatBackend();
         ClearFovObservers();
         ReleaseKnifeLocks();
         StopDefuseReveal();

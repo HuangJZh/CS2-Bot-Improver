@@ -33,12 +33,13 @@ public partial class BotState
 
             int idx = (int)player.Index;
             float now = Server.CurrentTime;
-            InterruptReload(player, pawn, bot, now);
+            if(!_nativeCombat)InterruptReload(player, pawn, bot, now);
             // Door Stuck Fix
             bool inDoorCooldown = _doorEventCooldown.TryGetValue(idx, out float doorCooldownEnd) && now < doorCooldownEnd;
 
-            UpdateBotBehavior(bot, now);
-            bool curIsAttacking = UpdateBotCombat(player, pawn, bot, idx);
+            if(!_nativeCombat)UpdateBotBehavior(bot, now);
+            bool curIsAttacking = _nativeCombat?bot.IsAttacking:UpdateBotCombat(player, pawn, bot, idx);
+            if(_nativeCombat&&(curIsAttacking||bot.IsEnemyVisible))continue;
             if (!UpdateBotMovement(pawn, bot, idx, curIsAttacking, inDoorCooldown))
                 continue;
 

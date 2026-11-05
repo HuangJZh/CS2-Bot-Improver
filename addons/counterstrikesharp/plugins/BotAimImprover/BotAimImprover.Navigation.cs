@@ -24,8 +24,7 @@ public partial class BotAimImprover
         public required List<int> Path;
         public required Vec Goal;
         public required int Team;
-        public float Started,LastProgress,BestDistance=float.PositiveInfinity,SpacingSince=-1,LogAt,SpacingUntil,SpacingCooldown;
-        public long SpacingToken;
+        public float Started,LastProgress,BestDistance=float.PositiveInfinity,LogAt;
         public int Cursor;
     }
     private readonly Dictionary<int,NavigationPlan> _navigationPlans=new();
@@ -128,13 +127,8 @@ public partial class BotAimImprover
     private void EndNavigation(int slot,string reason)
     {
         if(!_navigationPlans.Remove(slot,out var plan))return;
-        CancelNavigationSpacing(slot,plan);
+
         NavCount(reason);WriteTelemetry(new{kind="navigation_end",time=Server.CurrentTime,slot,reason});
-    }
-    private void CancelNavigationSpacing(int slot,NavigationPlan plan)
-    {
-        if(plan.SpacingToken>0)try{_humanController?.CancelUsercmdInjection(slot,plan.SpacingToken);}catch(Exception){}
-        plan.SpacingToken=0;
     }
     private void TickTeamNavigation()
     {
@@ -169,8 +163,8 @@ public partial class BotAimImprover
                 if(urgent||objectiveAction){EndNavigation(slot,"urgent-objective");continue;}
                 bool nativeOwner=OtherViewOwner(slot)||_coverPeeks.ContainsKey(slot)||!pawn.BotAllowActive;
                 if(!TeamNavigationPolicy.CanDrive(new(combat,busy,(pawn.Flags&1)!=0&&pawn.MoveType!=MoveType_t.MOVETYPE_LADDER,
-                    bot.IsFriendInTheWay||bot.IsWaitingBehindFriend,_roundLive,nativeOwner,urgent,now-plan.Started,35)))
-                {CancelNavigationSpacing(slot,plan);plan.LastProgress=now;NavCount("yield-to-native");continue;}
+                    false,_roundLive,nativeOwner,urgent,now-plan.Started,35)))
+                {plan.LastProgress=now;NavCount("yield-to-native");continue;}
                 var nodes=plan.Path;
                 // Advance only on genuine approach to the next area, not on time.
                 int oldCursor=plan.Cursor;
@@ -185,19 +179,8 @@ public partial class BotAimImprover
                 while(look<nodes.Count-1&&length<220)
                 {length+=Vec.Distance(_navigationGraph.Areas[nodes[look]].Point,_navigationGraph.Areas[nodes[look+1]].Point);look++;}
                 var destination=_navigationGraph.Areas[nodes[look]].Point;
-                bool crowd=now-plan.Started>3&&EntityPlayers().Any(m=>m.Slot!=slot&&m.TeamNum==p.TeamNum&&m.PawnIsAlive
-                    &&m.PlayerPawn.Value is {IsValid:true} mp&&mp.AbsOrigin!=null&&TeamNavigationPolicy.TooCloseAhead(origin,destination,Position(mp)));
-                ResetSilentMovement(slot); // Do not randomly slow a coordinated transit.
-                if(crowd)
-                {
-                    if(plan.SpacingSince<0)plan.SpacingSince=now;
-                    if(now-plan.SpacingSince>.6f){plan.SpacingCooldown=now+1;plan.SpacingSince=-1;CancelNavigationSpacing(slot,plan);}
-                    // Walk briefly instead of holding the native goal at the current
-                    // origin. Never freeze an entire column behind its own followers.
-                    if(now>=plan.SpacingCooldown&&now>=plan.SpacingUntil)
-                    {plan.SpacingToken=_humanController?.InjectUsercmd(slot,(ulong)PlayerButtons.Walk,220)??0;plan.SpacingUntil=now+.22f;NavCount("spacing-yield");}
-                }
-                else{plan.SpacingSince=-1;CancelNavigationSpacing(slot,plan);}
+                ResetSilentMovement(slot);
+                bool crowd=false; // Team collision is disabled; no spacing input.
                 _navigationTarget.X=destination.X;_navigationTarget.Y=destination.Y;_navigationTarget.Z=destination.Z;
                 _navigationMoveTo.Invoke(bot.Handle,_navigationTarget.Handle,1);NavCount("move-to");
                 if(now>=plan.LogAt)

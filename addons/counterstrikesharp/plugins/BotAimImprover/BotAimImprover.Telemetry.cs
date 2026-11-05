@@ -70,7 +70,7 @@ public partial class BotAimImprover
                     _telemetry=new StreamWriter(new FileStream(_telemetryPath,FileMode.CreateNew,FileAccess.Write,FileShare.Read),new System.Text.UTF8Encoding(false),65536);
                     _telemetryRules=Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").FirstOrDefault(p=>p.IsValid)?.GameRules;
                     _telemetryUntil=Server.CurrentTime+seconds;_telemetryTick=-1;
-                    WriteTelemetry(new {kind="session",schema="bot-aim-telemetry-v1",map=Server.MapName,difficulty=_humanDifficulty,model_active=HumanActive,module_version=ModuleVersion,direct_view_requested=_humanSettings.DirectViewControl,direct_view_available=_setEyeAngles!=null,tick_interval=Server.TickInterval,
+                    WriteTelemetry(new {kind="session",schema="bot-aim-telemetry-v1",map=Server.MapName,difficulty=_humanDifficulty,model_active=HumanActive&&!_humanSettings.NativeCombat,combat_backend=_humanSettings.NativeCombat?"native":"human",module_version=ModuleVersion,direct_view_requested=_humanSettings.DirectViewControl,direct_view_available=_setEyeAngles!=null,tick_interval=Server.TickInterval,
                         native_phase_ready=_nativePhasesReady,entity_players=EntityPlayers().Length,
                         entity_bots=EntityPlayers().Count(p=>p.IsBot),legacy_roster_players=Utilities.GetPlayers().Count,
                         legacy_roster_bots=Utilities.GetPlayers().Count(p=>p.IsBot),
@@ -86,6 +86,7 @@ public partial class BotAimImprover
         if(_telemetry == null || !player.IsValid || !player.IsBot || player.HasBeenControlledByPlayerThisRound)return;
         var pawn=player.PlayerPawn.Value;if(pawn is not {IsValid:true})return;
         _humanStates.TryGetValue(player.Slot,out var state);
+        _nativeContacts.TryGetValue(player.Slot,out var nativeContact);
         CCSPlayer_AimPunchServices? punch=pawn.AimPunchServices;
         if(punch?.Handle==nint.Zero)punch=null;
         var angles=pawn.EyeAngles;var pos=pawn.AbsOrigin;var vel=pawn.AbsVelocity;var bot=pawn.Bot;
@@ -105,6 +106,8 @@ public partial class BotAimImprover
             enemyDistance=MathF.Sqrt(dx*dx+dy*dy+dz*dz);
         }
         WriteTelemetry(new {kind,tick=Server.TickCount,time=Server.CurrentTime,slot=player.Slot,pawn=player.PlayerPawn.Raw,alive=player.PawnIsAlive,
+            combat_backend=_humanSettings.NativeCombat?"native":"human",native_selected_point=nativeContact?.Point,
+            native_contact_first=nativeContact?.First,native_reaction_ready_at=nativeContact?.ReadyAt,
             game_warmup=_telemetryRules?.WarmupPeriod,game_freeze=_telemetryRules?.FreezePeriod,rounds_played=_telemetryRules?.TotalRoundsPlayed,
             x=pos?.X,y=pos?.Y,z=pos?.Z,pitch=angles.X,yaw=angles.Y,vx=vel.X,vy=vel.Y,vz=vel.Z,flags=pawn.Flags,
             weapon=pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName,scoped=pawn.IsScoped,

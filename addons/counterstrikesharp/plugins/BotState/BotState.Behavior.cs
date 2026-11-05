@@ -104,20 +104,7 @@ public partial class BotState
         surpriseTimescale = 1.0f;
         // Native perception owns sniper threat state. Forcing it true for every
         // opponent made rifle encounters look like permanent sniper encounters.
-        // Teammate Stuck Fix
-        ref bool IsWaitingBehindFriend = ref bot.IsWaitingBehindFriend;
-        IsWaitingBehindFriend = false;
-
-        CountdownTimer politeTimer = bot.PoliteTimer;
-
-        ref float politeTimerDuration = ref politeTimer.Duration;
-        politeTimerDuration = 0.0f;
-
-        ref float politeTimerTimestamp = ref politeTimer.Timestamp;
-        politeTimerTimestamp = 0.0f;
-
-        ref float politeTimerTimescale = ref politeTimer.Timescale;
-        politeTimerTimescale = 1.0f;
+        // Teammate overlap is handled by mp_solid_teammates=0, not timer writes.
 
     }
 }

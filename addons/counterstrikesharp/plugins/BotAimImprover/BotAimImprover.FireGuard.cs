@@ -130,7 +130,7 @@ public partial class BotAimImprover
             {released.PlanHoldSince=null;released.PlanHoldTimedOut=false;released.Execution.ResetReadiness();}
             ReleaseFireGuard(slot,decision.Reason);return;
         }
-        if(decision.Reason is "target-outside-fire-cone" or "turn-not-ready")HoldWeaponTurnClock(player);
+        if(decision.Reason is "target-outside-fire-cone" or "turn-not-ready" or "native-reaction")HoldWeaponTurnClock(player);
         else ReleaseWeaponTurnClock(slot);
         if(_fireGuards.TryGetValue(slot,out var current) && current.Token>0)return;
         long token=_humanController!.StartUsercmdSuppression(slot,(ulong)PlayerButtons.Attack);
@@ -153,6 +153,7 @@ public partial class BotAimImprover
     private FireGateDecision EvaluateFireGate(CCSPlayerController player,CCSPlayerPawn pawn,CCSBot bot,bool advanceTimers)
     {
         if(TestGateActive)return new(false,true,"test-override");
+        if(_humanSettings.NativeCombat)return EvaluateNativeCombatGate(player,pawn,bot);
         // Inhibit only: these coarse native-enemy coordinates never steer aim or
         // enter the perceptual model. Keep this check ahead of every fail-open path,
         // timeout and burst latch, including a newly assigned or retained enemy.

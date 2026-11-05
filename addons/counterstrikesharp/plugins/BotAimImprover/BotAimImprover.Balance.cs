@@ -51,7 +51,7 @@ public partial class BotAimImprover
     private int[] AimOrder(CCSPlayerController controller,CCSPlayerPawn pawn,CCSPlayerPawn target)
     {
         var item=pawn.WeaponServices?.ActiveWeapon.Value?.DesignerName;
-        if(_aimMode==AimMode.HEAD)return item=="weapon_awp"?_priorityTrunk:_priorityHead;
+        if(_aimMode==AimMode.HEAD)return _priorityHead;
         if(_aimMode==AimMode.BODY)return _priorityBody;
         float chance=CombatBalancePolicy.HeadIntentChance(_humanDifficulty,HumanFireContext.Classify(item),item);
         bool head=_aimIntents.Resolve(controller.Slot,new(pawn.EntityHandle.Raw,target.EntityHandle.Raw,

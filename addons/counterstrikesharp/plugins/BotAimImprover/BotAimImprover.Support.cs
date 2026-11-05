@@ -46,7 +46,7 @@ public partial class BotAimImprover
     {
         if(!HumanActive||!_humanSettings.TeamSupport||!_humanSettings.TeamNavigation||_navigationMoveTo==null||_navigationFailed
             ||p.HasBeenControlledByPlayerThisRound||!IsGun(pawn)||pawn.IsDefusing||OtherViewOwner(p.Slot)
-            ||bot.IsEnemyVisible||bot.IsAttacking||bot.IsFriendInTheWay||bot.IsWaitingBehindFriend
+            ||bot.IsEnemyVisible||bot.IsAttacking
             ||(pawn.Flags&1)==0||pawn.MoveType==MoveType_t.MOVETYPE_LADDER
             ||(_plantingUntil.TryGetValue(p.Slot,out var until)&&now<until)
             ||(_humanStates.TryGetValue(p.Slot,out var state)&&now<state.UnderFireUntil))return false;

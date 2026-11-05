@@ -10,7 +10,7 @@ namespace BotSupport;
 public sealed class BotSupport : BasePlugin
 {
     public override string ModuleName => "BotSupport";
-    public override string ModuleVersion => "1.0.6";
+    public override string ModuleVersion => "1.0.7-native";
     public override string ModuleAuthor => "HuangJZh fork";
     public override string ModuleDescription => "Wheel weapon requests and probabilistic post-shot stops";
     private readonly Dictionary<int, float> _requests = new();
@@ -19,6 +19,7 @@ public sealed class BotSupport : BasePlugin
     private int _buyRound;
     private bool _roundEnded;
     private string _difficulty = "Medium";
+    private bool _nativeCombat=true;
     private static readonly HashSet<string> Firearms = new(StringComparer.OrdinalIgnoreCase)
     {
         "ak47", "aug", "famas", "galilar", "m4a1", "m4a1_silencer", "sg556",
@@ -46,6 +47,7 @@ public sealed class BotSupport : BasePlugin
     }
     private void ReadDifficulty()
     {
+        _nativeCombat=BotCombatPolicy.CombatBackend.Native(ModuleDirectory);
         // Match the actual installed preset, including user changes to reaction times.
         var overrides = Path.GetFullPath(Path.Combine(ModuleDirectory,"../../../../overrides"));
         try
@@ -60,6 +62,7 @@ public sealed class BotSupport : BasePlugin
     }
     private HookResult OnFire(EventWeaponFire e, GameEventInfo info)
     {
+        if(_nativeCombat)return HookResult.Continue;
         var p=e.Userid;
         if (p is not { IsValid:true, IsBot:true, PawnIsAlive:true } || p.ControllingBot || p.HasBeenControlledByPlayerThisRound
             || p.PlayerPawn.Value is not { IsValid:true } pawn || pawn.Bot == null

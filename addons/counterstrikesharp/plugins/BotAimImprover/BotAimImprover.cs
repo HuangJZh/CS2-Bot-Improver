@@ -15,7 +15,7 @@ namespace BotAimImprover;
 public partial class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8-human.8.46-experimental";
+    public override string ModuleVersion => "2.1.8-native.8.47-experimental";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 
@@ -201,6 +201,7 @@ public partial class BotAimImprover : BasePlugin
         {
             string arg = info.ArgCount > 1 ? info.GetArg(1).Trim().ToLowerInvariant() : "";
             string reply;
+            var previousMode=_aimMode;
             switch (arg)
             {
                 case "head":
@@ -211,6 +212,7 @@ public partial class BotAimImprover : BasePlugin
                     _aimMode = AimMode.BODY;
                     reply = "[BotAimImprover] aim mode -> BODY (always body-first)";
                     break;
+                case "mix":
                 case "mixed":
                     _aimMode = AimMode.MIXED;
                     reply = "[BotAimImprover] aim mode -> MIXED (default)";
@@ -219,6 +221,7 @@ public partial class BotAimImprover : BasePlugin
                     reply = $"[BotAimImprover] Current aim mode: {_aimMode}. Valid values: head, body, mixed";
                     break;
             }
+            if(previousMode!=_aimMode)_aimIntents.Clear();
             Server.PrintToConsole(reply);
         });
     }
@@ -274,6 +277,8 @@ public partial class BotAimImprover : BasePlugin
             if (botController == null || !TryGetBotEyePosition(botController, out var botEye))
                 return HookResult.Continue;
 
+            if(_humanSettings.NativeCombat)
+            {if(HumanActive)ApplyNativeAimPoint(bot,botController,enemyPawn,botEye);return HookResult.Continue;}
             if(HumanActive)PrepareHumanAim(pCCSBot);
             if (WriteCachedHumanSpot(bot,botController,botEye)) return HookResult.Continue;
             if (!botController.HasBeenControlledByPlayerThisRound && ApplySmokeError(bot, enemyPawn, botEye))

@@ -16,6 +16,7 @@ public partial class BotState
     // Records sniper shots, applies counter-strafe, and rolls combat crouching.
     private HookResult OnWeaponFire(EventWeaponFire @event, GameEventInfo info)
     {
+        if(_nativeCombat)return HookResult.Continue;
         var shooter = @event.Userid;
         if (shooter == null || !shooter.IsValid || !shooter.IsBot) return HookResult.Continue;
 
