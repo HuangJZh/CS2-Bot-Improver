@@ -7,10 +7,10 @@ public static class CombatBackend
         try
         {
             using var doc=JsonDocument.Parse(File.ReadAllText(Path.GetFullPath(Path.Combine(moduleDirectory,"../BotAimImprover/human-aim.json"))));
-            return !doc.RootElement.TryGetProperty("NativeCombat",out var value)||value.ValueKind!=JsonValueKind.False;
+            return doc.RootElement.TryGetProperty("NativeCombat",out var value)&&value.ValueKind==JsonValueKind.True;
         }
-        catch(IOException){return true;}
-        catch(JsonException){return true;}
-        catch(InvalidOperationException){return true;}
+        catch(IOException){return false;}
+        catch(JsonException){return false;}
+        catch(InvalidOperationException){return false;}
     }
 }

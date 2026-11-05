@@ -10,7 +10,7 @@ namespace BotSupport;
 public sealed class BotSupport : BasePlugin
 {
     public override string ModuleName => "BotSupport";
-    public override string ModuleVersion => "1.0.7-native";
+    public override string ModuleVersion => "1.0.8-human-restored";
     public override string ModuleAuthor => "HuangJZh fork";
     public override string ModuleDescription => "Wheel weapon requests and probabilistic post-shot stops";
     private readonly Dictionary<int, float> _requests = new();
@@ -19,7 +19,7 @@ public sealed class BotSupport : BasePlugin
     private int _buyRound;
     private bool _roundEnded;
     private string _difficulty = "Medium";
-    private bool _nativeCombat=true;
+    private bool _nativeCombat=false;
     private static readonly HashSet<string> Firearms = new(StringComparer.OrdinalIgnoreCase)
     {
         "ak47", "aug", "famas", "galilar", "m4a1", "m4a1_silencer", "sg556",

@@ -16,7 +16,7 @@ public partial class BotAimImprover
     private sealed class HumanSettings
     {
         public bool Enabled {get;set;}=true;
-        public bool NativeCombat {get;set;}=true;
+        public bool NativeCombat {get;set;}=false;
         public bool Diagnostics {get;set;}=false;
         public bool DirectViewControl {get;set;}=false; // Experimental until recoil/weapon checks are validated.
         public bool LargeTurnAssist {get;set;}=true;

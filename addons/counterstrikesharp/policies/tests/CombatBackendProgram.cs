@@ -10,15 +10,15 @@ try
  {
   string path=Path.Combine(plugins,module);Directory.CreateDirectory(path);
   if(File.Exists(config))File.Delete(config);
-  Check(CombatBackend.Native(path),module+" uses the trial native default when no configuration exists");
+  Check(!CombatBackend.Native(path),module+" defaults to restored human combat when no configuration exists");
   File.WriteAllText(config,"{\"NativeCombat\":false}");
   Check(!CombatBackend.Native(path),module+" reads the same explicit human-backend switch as the aim module");
   File.WriteAllText(config,"{\"NativeCombat\":true}");
   Check(CombatBackend.Native(path),module+" follows the explicit native-backend switch");
   File.WriteAllText(config,"{}");
-  Check(CombatBackend.Native(path),module+" existing configurations without a new key select the same default");
+  Check(!CombatBackend.Native(path),module+" existing configurations without a new key select restored human combat");
   File.WriteAllText(config,"[]");
-  Check(CombatBackend.Native(path),module+" malformed settings cannot crash plugin initialization");
+  Check(!CombatBackend.Native(path),module+" malformed settings cannot reactivate the failed native trial");
  }
 }
 finally
