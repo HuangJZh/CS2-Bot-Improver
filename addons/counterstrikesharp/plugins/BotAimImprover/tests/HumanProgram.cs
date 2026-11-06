@@ -337,9 +337,13 @@ foreach(float gap in new[]{5f,25f,70f})
   Console.WriteLine($"TUNING {level} gap={gap} old_median_ms={oldMedian*1000:F1} new_median_ms={newMedian*1000:F1}");
  }
 }
-var allyProfile=CombatBalancePolicy.AllyProfile(HumanAimProfile.For("Medium"),.85f);
-Check(MathF.Abs(allyProfile.MaxSpeed/HumanAimProfile.For("Medium").MaxSpeed-.85f)<.00001f,
- "human ally motor speed has the requested fifteen percent parameter handicap");
+var allyProfile=CombatBalancePolicy.AllyProfile(HumanAimProfile.For("Medium"),.75f);
+Check(MathF.Abs(allyProfile.MaxSpeed/HumanAimProfile.For("Medium").MaxSpeed-.75f)<.00001f,
+ "human ally motor speed has the requested twenty-five percent parameter handicap");
+Check(CombatBalancePolicy.NormalizeAllyStrength(.75f)==.75f,
+ "configuration accepts the requested 0.75 strength without clamping it back to 0.8");
+Check(CombatBalancePolicy.NormalizeAllyStrength(.85f)==.85f&&CombatBalancePolicy.NormalizeAllyStrength(float.NaN)==.75f,
+ "legacy explicit strength remains valid and invalid settings use the new default");
 Check(allyProfile.Reaction>HumanAimProfile.For("Medium").Reaction&&allyProfile.MotorError>HumanAimProfile.For("Medium").MotorError,
  "ally handicap slows response and slightly reduces precision");
 Check(CombatBalancePolicy.IsHumanAlly(3,1<<3)&&!CombatBalancePolicy.IsHumanAlly(2,1<<3),

@@ -21,7 +21,7 @@ public partial class BotAimImprover
         public bool DirectViewControl {get;set;}=false; // Experimental until recoil/weapon checks are validated.
         public bool LargeTurnAssist {get;set;}=true;
         public float HorizontalFieldOfView {get;set;}=110;
-        public float HumanAllyStrength {get;set;}=.85f;
+        public float HumanAllyStrength {get;set;}=CombatBalancePolicy.DefaultAllyStrength;
         public bool EnemyElites {get;set;}=true;
         public bool TeamNavigation {get;set;}=true;
         public bool RoundLearning {get;set;}=true;
@@ -227,7 +227,7 @@ public partial class BotAimImprover
         {
             if(File.Exists(path))_humanSettings=JsonSerializer.Deserialize<HumanSettings>(File.ReadAllText(path)) ?? new();
             else File.WriteAllText(path,JsonSerializer.Serialize(_humanSettings,new JsonSerializerOptions{WriteIndented=true}));
-            _humanSettings.HumanAllyStrength=float.IsFinite(_humanSettings.HumanAllyStrength)?Math.Clamp(_humanSettings.HumanAllyStrength,.8f,1f):.85f;
+            _humanSettings.HumanAllyStrength=CombatBalancePolicy.NormalizeAllyStrength(_humanSettings.HumanAllyStrength);
             _humanSettings.HorizontalFieldOfView=float.IsFinite(_humanSettings.HorizontalFieldOfView) ? Math.Clamp(_humanSettings.HorizontalFieldOfView,70,140) : 110;
         }
         catch(Exception error) { Logger.LogWarning(error,"Cannot read human-aim settings; keeping defaults"); }

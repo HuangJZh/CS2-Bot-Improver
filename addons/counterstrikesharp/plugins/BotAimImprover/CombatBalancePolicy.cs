@@ -2,6 +2,13 @@ namespace BotAimImprover;
 
 public static class CombatBalancePolicy
 {
+    public const float DefaultAllyStrength = .75f;
+
+    public static float NormalizeAllyStrength(float strength)
+    {
+        return float.IsFinite(strength) ? Math.Clamp(strength, DefaultAllyStrength, 1f) : DefaultAllyStrength;
+    }
+
     // A combat-parameter scale, never a damage multiplier or a claimed win-rate.
     public static HumanAimProfile AllyProfile(HumanAimProfile p,float strength)=>p.ScaleCombat(strength);
     public static bool IsHumanAlly(int team,int humanTeams)=>team is 2 or 3
