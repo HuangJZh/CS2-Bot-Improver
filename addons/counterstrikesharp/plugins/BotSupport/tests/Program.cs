@@ -26,7 +26,7 @@ Check(SupportPolicy.Select([new(1,1700,100)],2,"auto",0)?.Gun.Item=="weapon_mp7"
 Check(SupportPolicy.Select([new(1,1300,100)],3,"auto",0)?.Gun.Item=="weapon_bizon","Bizon above MP9 when affordable");
 Check(SupportPolicy.Select([new(1,1250,100)],3,"auto",0)?.Gun.Item=="weapon_mp9","CT cheapest tiers");
 Check(SupportPolicy.Select([new(1,1050,100)],2,"auto",0)?.Gun.Item=="weapon_mac10","spend exact low balance on MAC10");
-Check(SupportPolicy.Select([new(1,2700,100)],2,"auto",0)?.Gun.Item=="weapon_ak47","AK below SG threshold");
+Check(SupportPolicy.Select([new(1,2700,100)],2,"auto",0)?.Gun.Item=="weapon_ak47","AK affordable at exact balance");
 Check(SupportPolicy.Select([new(1,2900,100)],3,"auto",0)?.Gun.Item=="weapon_m4a1_silencer","M4 at exact price");
 Check(SupportPolicy.Select([new(1,1700,100)],2,"awp")?.Gun.Item=="weapon_mp7","specific request also falls back when unaffordable");
 Check(SupportPolicy.Select([new(1,1500,100),new(2,1700,900)],2,"auto",0)?.Donor.Slot==2,"richest donor retained for fallback");
@@ -34,5 +34,7 @@ Check(!SupportPolicy.Guns(3,"auto").Any(g => g.Item=="weapon_aug"),"AUG absent f
 Check(Enumerable.Range(0,2).Select(i => SupportPolicy.Select(rich,2,"auto",i)!.Value.Gun.Item).ToHashSet().SetEquals(new[]{"weapon_awp","weapon_ak47"}),"T random pool has AWP and AK");
 Check(Enumerable.Range(0,3).Select(i => SupportPolicy.Select(rich,3,"auto",i)!.Value.Gun.Item).ToHashSet().SetEquals(new[]{"weapon_awp","weapon_m4a1_silencer","weapon_m4a1"}),"CT random pool has AWP and both M4s");
 Check(Enumerable.Range(0,10).All(i => SupportPolicy.Select([new(1,3000,100)],3,"auto",i)!.Value.Gun.Item!="weapon_awp"),"unaffordable AWP excluded from random pool");
+Check(!SupportPolicy.Guns(2,"awp").Any(g=>g.Item is "weapon_aug" or "weapon_sg556"),"T donation fallback excludes scoped rifles");
+Check(SupportPolicy.Select([new(1,4000,100)],2,"awp")?.Gun.Item=="weapon_ak47","unaffordable AWP falls back to AK rather than SG553");
 Console.WriteLine($"{count} checks passed");
 

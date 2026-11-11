@@ -19,10 +19,11 @@
     "BotAimImprover": "custom source 2.1.8-human.8.50; upstream c5a2e0f unchanged",
     "BotState": "custom 1.10.6-human.1; adopted ae672d3 knife/taser guard",
     "NadeSystem": "preserved custom source; upstream 7605f272 unchanged",
-    "BotSupport": "preserved custom source",
+    "BotSupport": "custom 1.0.9-purchase-fix; SG553 removed from donation fallback",
     "BotRandomizer": "preserved installed bot-only customization; binary pinned by SHA256",
     "BotTeamplay": "preserved installed custom binary; pinned by SHA256",
-    "InventorySimulator": "3.8.1-local-only.3, upstream tag 3.8.1 (5f1c3d4)"
+    "InventorySimulator": "3.8.1-local-only.3, upstream tag 3.8.1 (5f1c3d4)",
+    "BotBuy": "custom 1.0.14-custom.2; source expanded from 11884e0564b8b57bee5f4729a5fca781bd5e6749"
   },
   "contracts": {
     "BotControllerApi": "ApiVersion (replaces AbiVersion); SubtickMove.Button UInt64",
@@ -343,15 +344,15 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotBuy/BotBuy.deps.json",
-      "sha256": "73d0604a8fef54a321d2664f2782f1521cb304e680a1aada80e68bb56198a9d9"
+      "sha256": "fc15006b7f87157eab204bb61c83e23d9165dc79039a1a45f586f3823747aa94"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotBuy/BotBuy.dll",
-      "sha256": "a778c841ee82cc7692684bcc46e04b31a5c3bf217a67ddf3585efa8eabb361b5"
+      "sha256": "a7b7ffac84f680ea2cb7ae4dceb9f7fbaeec9e1cd13f3189e1382f7abfb50e6e"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotBuy/BotBuy.pdb",
-      "sha256": "c34ac8e714cac7e4386d1aff72d63d1e23b0cffd4e11af487ce1db28d35b908c"
+      "sha256": "c05897018101969fd3f3aca5bda1b2f88feb036482574f6c1e699ccb8fd1e20a"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotControllerImpl/BotControllerImpl.dll",
@@ -387,11 +388,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotSupport/BotSupport.dll",
-      "sha256": "c8d163cea8138974a7116aac57341934c308ae26bf16a3a663955e5325839f43"
+      "sha256": "3798b6cbd0ea9f56e4ba1d53bb92074ac42f4b3e39909b75ec17c1c3e800412a"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotSupport/BotSupport.pdb",
-      "sha256": "93cceaebd16361c3945f934c7c8bf26ff5c746d7caa39aad5ce15fba67b1d9ba"
+      "sha256": "4d2845aebb336c769431c1ad13ac992aeedefa2e856cbaff72f586dc1b8308d5"
     },
     {
       "path": "addons/counterstrikesharp/plugins/InventorySimulator/InventorySimulator.deps.json",
@@ -1838,19 +1839,19 @@
   "data_files": [
     {
       "path": "overrides/botprofile.vpk",
-      "sha256": "214e2be88b15519e20c828edc49b9addfc54d98fbcb301040f87b7b2099d915f"
+      "sha256": "7e427afa3e3af436f0e180f561d038a7f886ec187a82d6faff5937da746ceef6"
     },
     {
       "path": "overrides/High/botprofile.vpk",
-      "sha256": "6d03aa358a3668544127463781e1e5762eefbea2bd8adbe62edc2f62e68449de"
+      "sha256": "869e002397f68b466197c6c343725ef8aef06d072f5c2e7ae1f99f6683305e06"
     },
     {
       "path": "overrides/Low/botprofile.vpk",
-      "sha256": "08dd84a5fbf0ebca9aa75234fa7caa30e8c104d45785e30ef301429622df9edf"
+      "sha256": "6295a3bb4b547b4961f6e172989957a7f676840fea750436db5c2be8551e5d88"
     },
     {
       "path": "overrides/Medium/botprofile.vpk",
-      "sha256": "214e2be88b15519e20c828edc49b9addfc54d98fbcb301040f87b7b2099d915f"
+      "sha256": "7e427afa3e3af436f0e180f561d038a7f886ec187a82d6faff5937da746ceef6"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/navigation/de_ancient.json",
@@ -2095,5 +2096,6 @@
     "mutable": true,
     "recorded_on": "2026-11-11",
     "note": "Managed by Panel/user; do not overwrite from the base lock."
-  }
+  },
+  "custom_revision": "purchase-fix-20261111"
 }

@@ -86,50 +86,46 @@ End
 // weapon preference templates
 
 Template SniperPro
-		WeaponPreference = awp
-		WeaponPreference = ak47
-		WeaponPreference = aug
-		WeaponPreference = galilar
-		WeaponPreference = deagle
-		WeaponPreference = m4a1
-		WeaponPreference = sg556
-		WeaponPreference = m4a1_silencer
-		WeaponPreference = p90
-		WeaponPreference = mac10
-		WeaponPreference = famas
-		WeaponPreference = ssg08
-		WeaponPreference = tec9
-		WeaponPreference = fiveseven
+        WeaponPreference = awp
+        WeaponPreference = ak47
+        WeaponPreference = m4a1_silencer
+        WeaponPreference = m4a1
+        WeaponPreference = galilar
+        WeaponPreference = deagle
+        WeaponPreference = p90
+        WeaponPreference = mac10
+        WeaponPreference = famas
+        WeaponPreference = ssg08
+        WeaponPreference = tec9
+        WeaponPreference = fiveseven
 End
 
 Template RiflePro
-		WeaponPreference = ak47
-		WeaponPreference = aug
-		WeaponPreference = sg556
-		WeaponPreference = famas
-		WeaponPreference = galilar
-		WeaponPreference = m4a1_silencer
-		WeaponPreference = deagle
-		WeaponPreference = fiveseven
-		WeaponPreference = tec9
-		WeaponPreference = m4a1
-		WeaponPreference = p90
-		WeaponPreference = mp9
-		WeaponPreference = mac10
-		WeaponPreference = elite
+        WeaponPreference = ak47
+        WeaponPreference = m4a1_silencer
+        WeaponPreference = m4a1
+        WeaponPreference = awp
+        WeaponPreference = famas
+        WeaponPreference = galilar
+        WeaponPreference = deagle
+        WeaponPreference = fiveseven
+        WeaponPreference = tec9
+        WeaponPreference = p90
+        WeaponPreference = mp9
+        WeaponPreference = mac10
+        WeaponPreference = elite
 End
 
 Template Scoper
-		WeaponPreference = sg556
-        WeaponPreference = aug
         WeaponPreference = awp
+        WeaponPreference = ak47
+        WeaponPreference = m4a1_silencer
+        WeaponPreference = m4a1
         WeaponPreference = deagle
         WeaponPreference = tec9
         WeaponPreference = fiveseven
         WeaponPreference = ssg08
-        WeaponPreference = m4a1_silencer
         WeaponPreference = galilar
-        WeaponPreference = m4a1
         WeaponPreference = p90
         WeaponPreference = mac10
         WeaponPreference = mp9
@@ -137,15 +133,14 @@ Template Scoper
 End
 
 Template SniperPure
-		WeaponPreference = awp
-        WeaponPreference = ssg08
+        WeaponPreference = awp
         WeaponPreference = ak47
+        WeaponPreference = m4a1_silencer
+        WeaponPreference = m4a1
+        WeaponPreference = ssg08
         WeaponPreference = deagle
         WeaponPreference = fiveseven
         WeaponPreference = tec9
-        WeaponPreference = m4a1
-        WeaponPreference = sg556
-        WeaponPreference = m4a1_silencer
         WeaponPreference = p90
         WeaponPreference = mac10
         WeaponPreference = mp9
@@ -154,49 +149,48 @@ Template SniperPure
 End
 
 Template Duelist
-		WeaponPreference = ak47
-		WeaponPreference = aug
-		WeaponPreference = p90
-		WeaponPreference = tec9
-		WeaponPreference = fiveseven
-		WeaponPreference = bizon
-		WeaponPreference = ump45
-		WeaponPreference = mac10
-		WeaponPreference = mp9
-		WeaponPreference = xm1014
-		WeaponPreference = m4a1_silencer
-		WeaponPreference = sg556
-		WeaponPreference = m4a1
-		WeaponPreference = elite
+        WeaponPreference = ak47
+        WeaponPreference = m4a1_silencer
+        WeaponPreference = m4a1
+        WeaponPreference = awp
+        WeaponPreference = p90
+        WeaponPreference = tec9
+        WeaponPreference = fiveseven
+        WeaponPreference = bizon
+        WeaponPreference = ump45
+        WeaponPreference = mac10
+        WeaponPreference = mp9
+        WeaponPreference = xm1014
+        WeaponPreference = elite
 End
 
 Template Rusher
-		WeaponPreference = p90
-    	WeaponPreference = mac10
-    	WeaponPreference = mp9
-    	WeaponPreference = tec9
-    	WeaponPreference = elite
-    	WeaponPreference = bizon
-    	WeaponPreference = ump45
-    	WeaponPreference = mp5sd
-    	WeaponPreference = mp7
-    	WeaponPreference = m4a1_silencer
-    	WeaponPreference = ak47
-    	WeaponPreference = m4a1
-		WeaponPreference = galilar
-		WeaponPreference = fiveseven
+        WeaponPreference = ak47
+        WeaponPreference = m4a1_silencer
+        WeaponPreference = m4a1
+        WeaponPreference = awp
+        WeaponPreference = p90
+        WeaponPreference = mac10
+        WeaponPreference = mp9
+        WeaponPreference = tec9
+        WeaponPreference = elite
+        WeaponPreference = bizon
+        WeaponPreference = ump45
+        WeaponPreference = mp5sd
+        WeaponPreference = mp7
+        WeaponPreference = galilar
+        WeaponPreference = fiveseven
 End
 
 Template Fastshot
-		WeaponPreference = awp
+        WeaponPreference = awp
+        WeaponPreference = ak47
+        WeaponPreference = m4a1_silencer
+        WeaponPreference = m4a1
         WeaponPreference = ssg08
         WeaponPreference = deagle
         WeaponPreference = xm1014
         WeaponPreference = nova
-        WeaponPreference = m4a1
-        WeaponPreference = ak47
-        WeaponPreference = m4a1_silencer
-        WeaponPreference = sg556
         WeaponPreference = mag7
         WeaponPreference = sawedoff
         WeaponPreference = p90
@@ -205,20 +199,20 @@ Template Fastshot
 End
 
 Template Camper    	
-		WeaponPreference = xm1014
-    	WeaponPreference = negev
-		WeaponPreference = mag7
-    	WeaponPreference = sawedoff
-    	WeaponPreference = nova
-    	WeaponPreference = p90
-    	WeaponPreference = bizon
-    	WeaponPreference = awp
-    	WeaponPreference = ak47
-    	WeaponPreference = m4a1_silencer
-    	WeaponPreference = sg556
-    	WeaponPreference = fiveseven
-		WeaponPreference = tec9
-    	WeaponPreference = elite		
+        WeaponPreference = ak47
+        WeaponPreference = m4a1_silencer
+        WeaponPreference = m4a1
+        WeaponPreference = awp
+        WeaponPreference = xm1014
+        WeaponPreference = negev
+        WeaponPreference = mag7
+        WeaponPreference = sawedoff
+        WeaponPreference = nova
+        WeaponPreference = p90
+        WeaponPreference = bizon
+        WeaponPreference = fiveseven
+        WeaponPreference = tec9
+        WeaponPreference = elite
 End
 
 // skill templates

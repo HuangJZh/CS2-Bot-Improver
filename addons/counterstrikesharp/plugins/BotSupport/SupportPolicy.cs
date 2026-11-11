@@ -12,7 +12,7 @@ public static class SupportPolicy
     {
         if(team is not (2 or 3)) return [];
         Gun[] rifles = team == 2
-            ? [new("weapon_sg556", "SG 553", 3000), new("weapon_ak47", "AK-47", 2700), new("weapon_galilar", "Galil AR", 1800)]
+            ? [new("weapon_ak47", "AK-47", 2700), new("weapon_galilar", "Galil AR", 1800)]
             : [new("weapon_m4a1_silencer", "M4A1-S", 2900), new("weapon_m4a1", "M4A4", 2900), new("weapon_famas", "FAMAS", 1950)];
         Gun[] smgs = [new("weapon_p90", "P90", 2350), new("weapon_bizon", "PP-Bizon", 1300),
             new("weapon_mp7", "MP7", 1400), new("weapon_mp5sd", "MP5-SD", 1400), new("weapon_ump45", "UMP-45", 1200),
