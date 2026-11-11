@@ -122,7 +122,8 @@ public partial class BotAimImprover
         RegisterListener<Listeners.OnTick>(() =>
         {
             CleanCombatHistories();
-            foreach(var (slot,state) in _humanStates.ToArray())
+            // ReleaseHuman removes entries but never adds to this dictionary.
+            foreach(var (slot,state) in _humanStates)
             {
                 var p=EntityPlayerAtSlot(slot);
                 if(p is not {IsValid:true,IsBot:true,PawnIsAlive:true} || p.HasBeenControlledByPlayerThisRound
@@ -500,6 +501,7 @@ public partial class BotAimImprover
     private bool TrySelectHumanPoint(CCSPlayerController controller,CCSBot bot,CCSPlayerPawn pawn,CCSPlayerPawn enemy,Vector eye,out Vec point,out float radius,out string result,out int attempts,out string pointLabel,out float rayFraction,out bool smokeBlocked)
     {
         point=default;radius=4;result="no-point";attempts=0;pointLabel="none";rayFraction=0f;smokeBlocked=false;
+        if(!TryReadTargetGeometry(enemy,out var geometry))return false;
         var order=AimOrder(controller,pawn,enemy);
         var forward=new Angles(pawn.EyeAngles.X,pawn.EyeAngles.Y);
         float fovHalf=_humanSettings.HorizontalFieldOfView*.5f;
@@ -521,14 +523,14 @@ public partial class BotAimImprover
         }
         foreach(var index in order)
         {
-            if(!TryComputePartPos(enemy,index,out var x,out var y,out var z))continue;
+            if(!TryComputePartPos(geometry,index,out var x,out var y,out var z))continue;
             var candidateRadius=index is >=3 and <=7 or 10 or 11 ? 8f : 4f;
             if(Consider(x,y,z,candidateRadius,"base:"+_aimPoints[index].Name,.999f))break;
         }
         if(!found)
             foreach(var (frac,lateral) in _fallbackPoints)
             {
-                if(!TryComputeOffsetPos(enemy,frac,lateral,out var x,out var y,out var z))continue;
+                if(!geometry.TryPoint(frac,lateral,false,out var x,out var y,out var z))continue;
                 var candidateRadius=frac>=.9f?4f:frac>=.55f?8f:6f;
                 var minFraction=frac>=.9f?.999f:.985f;
                 if(Consider(x,y,z,candidateRadius,$"fan:{frac:0.00}/{lateral:0}",minFraction))break;
@@ -647,6 +649,8 @@ public partial class BotAimImprover
     {
         RefreshSmokeVolumes(Server.CurrentTime);
         var start=new Vec(eye.X,eye.Y,eye.Z);
-        return _smokes.Any(s=>SmokeAimPolicy.Blocks(start,target,s.Center,s.Radius));
+        foreach(var s in _smokes)
+            if(SmokeAimPolicy.Blocks(start,target,s.Center,s.Radius))return true;
+        return false;
     }
 }

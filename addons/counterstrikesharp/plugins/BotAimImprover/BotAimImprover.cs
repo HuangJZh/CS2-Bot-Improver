@@ -15,7 +15,7 @@ namespace BotAimImprover;
 public partial class BotAimImprover : BasePlugin
 {
     public override string ModuleName => "BotAimImprover";
-    public override string ModuleVersion => "2.1.8-human.8.50";
+    public override string ModuleVersion => "2.1.8-human.8.51";
     public override string ModuleAuthor => "ed0ard & htfy96 & XBribo & unicbm";
     public override string ModuleDescription => "Restores intelligent aim part selection for CS2 bots.";
 
@@ -139,6 +139,11 @@ public partial class BotAimImprover : BasePlugin
 
     public override void Load(bool hotReload)
     {
+        RegisterListener<Listeners.OnEntityCreated>(_=>_playerDiscovery.Invalidate());
+        RegisterListener<Listeners.OnEntitySpawned>(_=>_playerDiscovery.Invalidate());
+        RegisterListener<Listeners.OnEntityDeleted>(_=>_playerDiscovery.Invalidate());
+        RegisterListener<Listeners.OnMapStart>(_=>_playerDiscovery.Invalidate());
+        RegisterListener<Listeners.OnMapEnd>(_playerDiscovery.Invalidate);
         bool win = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
 
         try
@@ -329,7 +334,9 @@ public partial class BotAimImprover : BasePlugin
 
     /// Find the CCSPlayerController whose pawn's m_pBot field equals pCCSBot.
     /// Cache identity follows native controller handles, not the connection roster.
-    private static CCSPlayerController[] EntityPlayers() => Utilities
+    private readonly TickCache<CCSPlayerController[]> _playerDiscovery=new();
+    private CCSPlayerController[] EntityPlayers()=>_playerDiscovery.Get(Server.TickCount,DiscoverPlayers);
+    private static CCSPlayerController[] DiscoverPlayers() => Utilities
         .FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller")
         .Where(p=>p.IsValid).ToArray();
     private static CCSPlayerController? EntityPlayerAtIndex(int index)
@@ -375,31 +382,21 @@ public partial class BotAimImprover : BasePlugin
                                           out float x, out float y, out float z)
     {
         x = y = z = 0;
+        return TryReadTargetGeometry(enemyPawn,out var geometry)&&TryComputePartPos(geometry,idx,out x,out y,out z);
+    }
+    private static bool TryReadTargetGeometry(CCSPlayerPawn pawn,out AimTargetGeometry geometry)
+    {
+        geometry=default;
+        if(pawn.AbsOrigin is not {} origin)return false;
+        geometry=new(origin.X,origin.Y,origin.Z,pawn.ViewOffset?.Z??64f,pawn.EyeAngles?.Y??0f);
+        return true;
+    }
+    private static bool TryComputePartPos(AimTargetGeometry geometry,int idx,out float x,out float y,out float z)
+    {
+        x = y = z = 0;
         if (idx < 0 || idx >= _aimPoints.Length) return false;
-        var origin = enemyPawn.AbsOrigin;
-        if (origin == null) return false;
-
         ref readonly AimPoint p = ref _aimPoints[idx];
-        float ox = origin.X, oy = origin.Y, oz = origin.Z;
-        float eyeZ = enemyPawn.ViewOffset?.Z ?? 64.0f;
-
-        float yawDeg = enemyPawn.EyeAngles?.Y ?? 0.0f;
-        double yawRad = yawDeg * Math.PI / 180.0;
-        float rX = (float)Math.Sin(yawRad);   // RIGHT vector x
-        float rY = (float)-Math.Cos(yawRad);  // RIGHT vector y
-
-        if (p.FeetAbs)
-        {
-            x = ox; y = oy; z = oz + p.Frac;   // absolute rise (FEET)
-        }
-        else
-        {
-            x = ox + rX * p.Lateral;
-            y = oy + rY * p.Lateral;
-            z = oz + eyeZ * p.Frac;
-        }
-        return !(float.IsNaN(x) || float.IsNaN(y) || float.IsNaN(z)
-                 || float.IsInfinity(x) || float.IsInfinity(y) || float.IsInfinity(z));
+        return geometry.TryPoint(p.Frac,p.Lateral,p.FeetAbs,out x,out y,out z);
     }
 
     // Fraction/lateral variant used by the fallback sampler for body/arm points

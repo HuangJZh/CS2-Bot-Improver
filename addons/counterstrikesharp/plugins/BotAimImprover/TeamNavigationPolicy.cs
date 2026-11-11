@@ -22,15 +22,41 @@ public sealed class NavigationMap
 public sealed class TeamNavigationGraph
 {
     public IReadOnlyDictionary<int,NavigationArea> Areas {get;}
+    private const float CellSize=256;
+    private readonly Dictionary<(int X,int Y),List<NavigationArea>> _polygons=new(),_centers=new();
+    private readonly Dictionary<int,int> _order=new();
+    private readonly NavigationArea[] _nodes;
+    private bool _indexed=true;
     public TeamNavigationGraph(IEnumerable<NavigationArea> areas)
     {
-        var nodes=areas.ToArray();
+        var nodes=_nodes=areas.ToArray();
         if(nodes.Length is 0 or >20000||nodes.Any(a=>a.Position.Length!=3||!Finite(a.Point)
             ||a.Corners.Length<3||a.Corners.Any(c=>c.Length!=3||!float.IsFinite(c.Sum()))))
             throw new ArgumentException("Invalid navigation graph");
         Areas=nodes.ToDictionary(a=>a.Id);
         if(nodes.Any(a=>a.Neighbors.Any(n=>!Areas.ContainsKey(n))))throw new ArgumentException("Dangling navigation edge");
+        for(int i=0;i<nodes.Length;i++)_order[nodes[i].Id]=i;
+        long indexedEntries=0;
+        foreach(var a in nodes)
+        {
+            float minX=a.Corners.Min(c=>c[0]),maxX=a.Corners.Max(c=>c[0]);
+            float minY=a.Corners.Min(c=>c[1]),maxY=a.Corners.Max(c=>c[1]);
+            if(!Indexable(new(minX,minY,0))||!Indexable(new(maxX,maxY,0))||!Indexable(a.Point))
+            {_indexed=false;break;}
+            var lo=Cell(new(minX,minY,0));var hi=Cell(new(maxX,maxY,0));
+            // Unusual/custom maps still use the exact linear fallback.
+            long entries=(long)(hi.X-lo.X+1)*(hi.Y-lo.Y+1);
+            indexedEntries+=entries;
+            if(entries>4096||indexedEntries>250_000){_indexed=false;break;}
+            Add(_centers,Cell(a.Point),a);
+            for(int x=lo.X;x<=hi.X;x++)for(int y=lo.Y;y<=hi.Y;y++)Add(_polygons,(x,y),a);
+        }
+        if(!_indexed){_polygons.Clear();_centers.Clear();}
     }
+    private static bool Indexable(Vector3 p)=>MathF.Abs(p.X)<100_000_000&&MathF.Abs(p.Y)<100_000_000;
+    private static (int X,int Y) Cell(Vector3 p)=>((int)MathF.Floor(p.X/CellSize),(int)MathF.Floor(p.Y/CellSize));
+    private static void Add(Dictionary<(int X,int Y),List<NavigationArea>> grid,(int X,int Y) cell,NavigationArea a)
+    {if(!grid.TryGetValue(cell,out var list))grid[cell]=list=new();list.Add(a);}
     private static bool Finite(Vector3 p)=>float.IsFinite(p.X+p.Y+p.Z);
     private static bool Contains(NavigationArea a,Vector3 point)
     {
@@ -43,12 +69,38 @@ public sealed class TeamNavigationGraph
     public int? Locate(Vector3 point,float maxDistance=320)
     {
         if(!Finite(point))return null;
-        var containing=Areas.Values.Where(a=>Contains(a,point)&&MathF.Abs(a.Point.Z-point.Z)<120)
-            .OrderBy(a=>MathF.Abs(a.Point.Z-point.Z)).FirstOrDefault();
+        bool indexed=_indexed&&Indexable(point);
+        NavigationArea? containing=null;float height=float.PositiveInfinity;
+        if(indexed)
+        {
+            if(_polygons.TryGetValue(Cell(point),out var candidates))
+                foreach(var a in candidates)ConsiderContaining(point,a,ref containing,ref height);
+        }
+        else foreach(var a in _nodes)ConsiderContaining(point,a,ref containing,ref height);
+        // Containment intentionally ignores maxDistance, as in the old method.
         if(containing!=null)return containing.Id;
-        var nearest=Areas.Values.Where(a=>MathF.Abs(a.Point.Z-point.Z)<120)
-            .OrderBy(a=>Vector3.DistanceSquared(point,a.Point)).FirstOrDefault();
+        if(float.IsNaN(maxDistance)||maxDistance<0)return null;
+        NavigationArea? nearest=null;float best=float.PositiveInfinity;
+        if(indexed&&float.IsFinite(maxDistance)&&maxDistance<=4096)
+        {
+            // One extra cell protects against floating-point boundary rounding.
+            var c=Cell(point);int radius=(int)MathF.Ceiling(maxDistance/CellSize)+1;
+            for(int x=c.X-radius;x<=c.X+radius;x++)for(int y=c.Y-radius;y<=c.Y+radius;y++)
+                if(_centers.TryGetValue((x,y),out var list))foreach(var a in list)ConsiderNearest(point,a,ref nearest,ref best);
+        }
+        else foreach(var a in _nodes)ConsiderNearest(point,a,ref nearest,ref best);
         return nearest!=null&&Vector3.Distance(point,nearest.Point)<=maxDistance?nearest.Id:null;
+    }
+    private static void ConsiderContaining(Vector3 point,NavigationArea a,ref NavigationArea? containing,ref float height)
+    {
+        float dz=MathF.Abs(a.Point.Z-point.Z);
+        if(dz<120&&dz<height&&Contains(a,point)){containing=a;height=dz;}
+    }
+    private void ConsiderNearest(Vector3 point,NavigationArea a,ref NavigationArea? nearest,ref float best)
+    {
+        if(MathF.Abs(a.Point.Z-point.Z)>=120)return;
+        float d=Vector3.DistanceSquared(point,a.Point);
+        if(nearest==null||d<best||d==best&&_order[a.Id]<_order[nearest.Id]){nearest=a;best=d;}
     }
     public List<int>? Path(int start,int goal,IReadOnlyDictionary<int,int>? occupied=null,IReadOnlyDictionary<int,float>? learnedRisk=null)
     {

@@ -22,7 +22,14 @@ public sealed record HumanAimProfile(float Reaction, float SensorDelay, float Sa
         AmplitudeError=AmplitudeError/strength,PerceptionError=PerceptionError/strength,
         BurstPause=BurstPause/strength
     };
-    public static HumanAimProfile For(string level)
+    // Profiles are immutable records; share the three presets instead of
+    // allocating baseline + scaled + interval records on every fire-gate check.
+    private static readonly HumanAimProfile LowPreset=BuildPreset("Low");
+    private static readonly HumanAimProfile MediumPreset=BuildPreset("Medium");
+    private static readonly HumanAimProfile HighPreset=BuildPreset("High");
+    public static HumanAimProfile For(string level)=>level switch
+    {"Low"=>LowPreset,"High"=>HighPreset,_=>MediumPreset};
+    private static HumanAimProfile BuildPreset(string level)
     {
         var baseline=Baseline(level);
         return baseline.ScaleCombat(OverallStrength) with{SampleInterval=baseline.SampleInterval/OverallStrength};

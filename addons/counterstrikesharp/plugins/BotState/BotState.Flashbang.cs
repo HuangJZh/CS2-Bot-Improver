@@ -22,6 +22,7 @@ public partial class BotState
     private Vector? _scratchEye;
     private readonly List<CHandle<CBaseEntity>> _flashProjectiles = new();
     private readonly List<CHandle<CCSPlayerController>> _flashControllers = new();
+    private readonly List<(uint idx, Vector pos, float detonateAt)> _liveFlashes = new();
     private bool _flashEntitiesDirty = true;
     private MemoryFunctionVoid<nint, float, float, float>? _botBlindFunction;
 
@@ -343,7 +344,9 @@ public partial class BotState
         float now = Server.CurrentTime;
 
         RefreshFlashEntities();
-        var live = new List<(uint idx, Vector pos, float detonateAt)>();
+        // Tick-local contents, retained capacity. Never cache projectile positions.
+        var live = _liveFlashes;
+        live.Clear();
         foreach (var handle in _flashProjectiles)
         {
             var ent = handle.Value;

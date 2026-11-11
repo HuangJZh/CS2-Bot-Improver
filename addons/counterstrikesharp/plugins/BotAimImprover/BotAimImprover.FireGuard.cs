@@ -234,11 +234,12 @@ public partial class BotAimImprover
                 foreach(int slot in _fireGuards.Keys.ToArray())ReleaseFireGuard(slot);
                 return;
             }
-            foreach(int slot in _fireGuards.Keys.ToArray())
+            // ReleaseFireGuard only removes; safe during .NET 10 enumeration.
+            foreach(var (slot,guard) in _fireGuards)
             {
                 var player=EntityPlayerAtSlot(slot);
                 if(player is not {IsValid:true,IsBot:true,PawnIsAlive:true} || player.HasBeenControlledByPlayerThisRound
-                    || player.PlayerPawn.Raw!=_fireGuards[slot].Pawn)ReleaseFireGuard(slot);
+                    || player.PlayerPawn.Raw!=guard.Pawn)ReleaseFireGuard(slot);
             }
             foreach(var player in EntityPlayers())
                 if(player is {IsValid:true,IsBot:true})RefreshFireGuard(player);

@@ -1,0 +1,96 @@
+{
+  "checks": 34149,
+  "scope": "Offline navigation microbenchmark, not game FPS or whole-plugin CPU",
+  "results": [
+    {
+      "map": "de_ancient",
+      "areas": 1969,
+      "queries": 2400,
+      "before_ms": 67.7062,
+      "after_ms": 8.7166,
+      "before_bytes": 1316064,
+      "after_bytes": 0
+    },
+    {
+      "map": "de_anubis",
+      "areas": 2633,
+      "queries": 2400,
+      "before_ms": 93.2923,
+      "after_ms": 3.8386,
+      "before_bytes": 1287984,
+      "after_bytes": 0
+    },
+    {
+      "map": "de_cache",
+      "areas": 2209,
+      "queries": 2400,
+      "before_ms": 78.9177,
+      "after_ms": 3.1035,
+      "before_bytes": 1250544,
+      "after_bytes": 0
+    },
+    {
+      "map": "de_dust2",
+      "areas": 2242,
+      "queries": 2400,
+      "before_ms": 75.0858,
+      "after_ms": 2.9506,
+      "before_bytes": 1302024,
+      "after_bytes": 0
+    },
+    {
+      "map": "de_inferno",
+      "areas": 2738,
+      "queries": 2400,
+      "before_ms": 99.3539,
+      "after_ms": 3.8412,
+      "before_bytes": 1324488,
+      "after_bytes": 0
+    },
+    {
+      "map": "de_mirage",
+      "areas": 2544,
+      "queries": 2400,
+      "before_ms": 86.293,
+      "after_ms": 3.5109,
+      "before_bytes": 1300152,
+      "after_bytes": 0
+    },
+    {
+      "map": "de_nuke",
+      "areas": 3040,
+      "queries": 2400,
+      "before_ms": 110.2877,
+      "after_ms": 4.9499,
+      "before_bytes": 1264584,
+      "after_bytes": 0
+    },
+    {
+      "map": "de_overpass",
+      "areas": 3938,
+      "queries": 2400,
+      "before_ms": 122.8429,
+      "after_ms": 4.1114,
+      "before_bytes": 1302960,
+      "after_bytes": 0
+    },
+    {
+      "map": "de_train",
+      "areas": 2154,
+      "queries": 2400,
+      "before_ms": 78.6942,
+      "after_ms": 3.7166,
+      "before_bytes": 1303896,
+      "after_bytes": 0
+    },
+    {
+      "map": "de_vertigo",
+      "areas": 2105,
+      "queries": 2400,
+      "before_ms": 74.4328,
+      "after_ms": 3.8175,
+      "before_bytes": 1280496,
+      "after_bytes": 0
+    }
+  ]
+}

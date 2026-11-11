@@ -23,7 +23,8 @@ public partial class BotAimImprover
     }
     private void CleanCombatHistories()
     {
-        foreach(var (slot,entry) in _combatHistories.ToArray())
+        // .NET 10 dictionary enumeration permits Remove; this loop never adds.
+        foreach(var (slot,entry) in _combatHistories)
         {
             var p=EntityPlayerAtSlot(slot);
             if(p is not {IsValid:true,IsBot:true,PawnIsAlive:true}||p.HasBeenControlledByPlayerThisRound||p.PlayerPawn.Raw!=entry.Pawn)
@@ -58,10 +59,10 @@ public partial class BotAimImprover
         foreach(var candidate in EntityPlayers())
         {
             if(candidate is not {IsValid:true,PawnIsAlive:true}||candidate.TeamNum==p.TeamNum||candidate.TeamNum is not (2 or 3)
-                ||candidate.PlayerPawn.Value is not {IsValid:true} target)continue;
-            foreach(int part in new[]{0,3})
+                ||candidate.PlayerPawn.Value is not {IsValid:true} target||!TryReadTargetGeometry(target,out var geometry))continue;
+            foreach(int part in _attentionParts)
             {
-                if(!TryComputePartPos(target,part,out var x,out var y,out var z))continue;
+                if(!TryComputePartPos(geometry,part,out var x,out var y,out var z))continue;
                 var point=new Vec(x,y,z);var delta=AimMath.Delta(AimMath.Angles(from,point),view);
                 if(MathF.Abs(delta.Y)>_humanSettings.HorizontalFieldOfView*.5f||MathF.Abs(delta.X)>50
                     ||HumanSmokeBlocks(eye,point)||!PointVisibleFromEye(eye,x,y,z,.999f,out _))continue;

@@ -1,7 +1,7 @@
 {
   "schema": "cs2-bot-custom-base-lock-v1",
-  "custom_version": "8.50",
-  "date": "2026-11-08",
+  "custom_version": "8.51",
+  "date": "2026-11-11",
   "cs2_buildid": "26445667",
   "stable_restore_tag": "custom-8.49-stable",
   "upstream": {
@@ -16,8 +16,8 @@
     "BotController": "a46b15a865c135a95f44688bd964da478f83a51a",
     "BotHider": "8be8e95919abb4ab05bb82b8cbdf516b4e347aa5",
     "BotVision": "df8f0707c7590cd55d9ffb8f6824ec9f3c959f5f",
-    "BotAimImprover": "custom source 2.1.8-human.8.50; upstream c5a2e0f unchanged",
-    "BotState": "custom 1.10.6-human.1; adopted ae672d3 knife/taser guard",
+    "BotAimImprover": "custom source 2.1.8-human.8.51; behavior-preserving discovery, geometry, profile and navigation optimization",
+    "BotState": "custom 1.10.6-human.2; reuse flash scratch list, unchanged avoidance decisions",
     "NadeSystem": "preserved custom source; upstream 7605f272 unchanged",
     "BotSupport": "custom 1.0.9-purchase-fix; SG553 removed from donation fallback",
     "BotRandomizer": "preserved installed bot-only customization; binary pinned by SHA256",
@@ -336,11 +336,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.dll",
-      "sha256": "aae826b5a55207368c8f1818476524b7ce95339ebfcb93c736f58dd747b7c9f8"
+      "sha256": "66cc6b93a3653e8add69e7349170328e0b89e3120cd993ec0943093619b9c3f8"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.pdb",
-      "sha256": "04c4c3ca762bf7f4127a1f95bfff93272d0dfb83fe2577cfd750c88205acd0f4"
+      "sha256": "f972b0c28c4c6b86fdc2ff03d9929f230d0ef895a2d0c4954f30e80d84fbbaf1"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotBuy/BotBuy.deps.json",
@@ -376,11 +376,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotState/BotState.dll",
-      "sha256": "a3fd320a3f21d110cb0f6dbd40ac4965630e0c9bd3b31a285050d1f33807d4c8"
+      "sha256": "b1fb7100a250b4545620164c5d18eaff8e97f2796f1b5aafebcf03bdbadafee9"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotState/BotState.pdb",
-      "sha256": "8ca9308a6a1ee2ccf8b7c927e82bc7b87bd885774073d0215ca8cd25d623c51b"
+      "sha256": "fd7cc85c40d366131beb7326c5d6adc74a792d4c5bde0a7dfb87163da589cc89"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotSupport/BotSupport.deps.json",
@@ -2097,5 +2097,5 @@
     "recorded_on": "2026-11-11",
     "note": "Managed by Panel/user; do not overwrite from the base lock."
   },
-  "custom_revision": "purchase-fix-20261111"
+  "custom_revision": "performance-20261111"
 }

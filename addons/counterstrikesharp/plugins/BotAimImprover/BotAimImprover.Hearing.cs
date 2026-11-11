@@ -15,6 +15,7 @@ public partial class BotAimImprover
     private readonly Dictionary<int,VisibilityScan> _visibilityScans=new();
     private readonly Dictionary<int,SoundFocusOwner> _soundFocus=new();
     private readonly HashSet<nint> _soundTurnOwners=new();
+    private static readonly int[] _attentionParts=[0,3];
 
     private bool HasReliableVisibleThreat(CCSPlayerController listener,float now)
     {
@@ -35,13 +36,19 @@ public partial class BotAimImprover
             var from=new Vector3(eye.X,eye.Y,eye.Z);
             // Strict FOV, smoke and world LOS checks are independent of the model's
             // delayed sample queue. Never turn toward these scans or force Enemy.
-            foreach(var p in EntityPlayers().OrderByDescending(p=>p.PlayerPawn.Raw==bot.Enemy.Raw))
+            var players=EntityPlayers();
+            uint enemy=bot.Enemy.Raw;
+            // Same stable priority as OrderByDescending, without a sort/buffer
+            // and repeated native pawn-handle reads from the comparer.
+            for(int pass=0;pass<2&&!seen;pass++)
+            foreach(var p in players)
             {
-                if(p is not {IsValid:true,PawnIsAlive:true}||p.TeamNum==listener.TeamNum||p.TeamNum is not (2 or 3)
-                    ||p.PlayerPawn.Value is not {IsValid:true} target)continue;
-                foreach(int part in new[]{0,3})
+                if(!p.IsValid||(p.PlayerPawn.Raw==enemy)!=(pass==0))continue;
+                if(!p.PawnIsAlive||p.TeamNum==listener.TeamNum||p.TeamNum is not (2 or 3)
+                    ||p.PlayerPawn.Value is not {IsValid:true} target||!TryReadTargetGeometry(target,out var geometry))continue;
+                foreach(int part in _attentionParts)
                 {
-                    if(!TryComputePartPos(target,part,out var x,out var y,out var z))continue;
+                    if(!TryComputePartPos(geometry,part,out var x,out var y,out var z))continue;
                     var point=new Vector3(x,y,z);var delta=AimMath.Delta(AimMath.Angles(from,point),view);
                     if(MathF.Abs(delta.Y)>_humanSettings.HorizontalFieldOfView*.5f||MathF.Abs(delta.X)>50
                         ||HumanSmokeBlocks(eye,point)||!PointVisibleFromEye(eye,x,y,z,.999f,out _))continue;
@@ -109,7 +116,7 @@ public partial class BotAimImprover
             || !float.IsFinite(radius+duration) || radius<=0 || duration<=0)return;
         float now=Server.CurrentTime;
         var position=new Vector3(origin.X,origin.Y,origin.Z+pawn.ViewOffset.Z);
-        foreach(var listener in Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller"))
+        foreach(var listener in EntityPlayers())
         {
             if(listener is not {IsValid:true,IsBot:true,PawnIsAlive:true} || listener.TeamNum==source.TeamNum
                 || listener.TeamNum is not (2 or 3) || listener.HasBeenControlledByPlayerThisRound
