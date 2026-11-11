@@ -3,4 +3,4 @@
 <ItemGroup Condition="'$(CounterStrikeSharpApiPath)' == ''"><PackageReference Include="CounterStrikeSharp.API" Version="1.0.379" /></ItemGroup>
 <ItemGroup Condition="'$(CounterStrikeSharpApiPath)' != ''"><Reference Include="$(CounterStrikeSharpApiPath)/*.dll"><Private>false</Private></Reference></ItemGroup>
 <ItemGroup><Compile Remove="tests/**/*.cs" /></ItemGroup><ItemGroup><Compile Include="../../policies/CombatBackend.cs" Link="CombatBackend.cs" /></ItemGroup>
-</Project>
+<ItemGroup><Compile Include="../../policies/TeamSniperPolicy.cs" Link="TeamSniperPolicy.cs" /></ItemGroup></Project>

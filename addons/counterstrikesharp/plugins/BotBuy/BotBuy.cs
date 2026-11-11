@@ -12,7 +12,7 @@ namespace BotBuyPatch;
 public sealed partial class BotBuyPatch : BasePlugin
 {
     public override string ModuleName        => "BotBuyPatch";
-    public override string ModuleVersion     => "1.0.14-custom.2";
+    public override string ModuleVersion     => "1.0.14-custom.3";
     public override string ModuleAuthor      => "ed0ard";
     public override string ModuleDescription => "Enable bots to take more buy options";
 
@@ -68,6 +68,7 @@ public sealed partial class BotBuyPatch : BasePlugin
         _buyRoundGeneration++;
         ReleaseCarriedBuyPlans();
         _carriedPrimaries.Clear();
+        _sniperBuyers.Clear();_sniperPolicyActive=false;
         // Don't Buy on Aim_Rush or Rush_001
         if (Server.MapName == "aim_rush" || Server.MapName == "rush_001") return HookResult.Continue;
 
@@ -106,6 +107,7 @@ public sealed partial class BotBuyPatch : BasePlugin
             return HookResult.Continue;
         }
         ProtectCarriedPrimaries(allPlayers);
+        ConfigureSniperPurchases(allPlayers);
         // Swap HKP2000
         foreach (var player in allPlayers.Where(p => p.IsValid && p.IsBot))
         {
@@ -560,7 +562,7 @@ public sealed partial class BotBuyPatch : BasePlugin
             : Array.Empty<string>();
 
 //----------------------------------------------------------------------------------------------
-    private bool Buy(CCSPlayerController player, string itemName)
+    private bool Buy(CCSPlayerController player, string itemName,bool plannedPrimary=false)
     {
         if (!player.IsValid || !player.IsBot || player.InGameMoneyServices == null)
             return false;
@@ -570,6 +572,11 @@ public sealed partial class BotBuyPatch : BasePlugin
             return false;
 
         if (!PurchasePolicy.CanBuy(itemName, WeaponNames(player))) return false;
+        // The team plan owns this round's primary. Legacy OT random buying
+        // must not insert a gun before that plan and trigger a second purchase.
+        if (PurchasePolicy.IsPrimary(itemName)&&_carriedBuyPlans.Contains(player.Slot)&&!plannedPrimary)return false;
+        if (BotPurchasePolicy.TeamSniperPolicy.IsSniper(itemName)&&!CanPurchaseSniper(player))
+            return Buy(player,"weapon_"+(player.TeamNum==2?"ak47":"m4a1_silencer"),plannedPrimary);
         int money = player.InGameMoneyServices.Account;
         bool isCT = player.Team == CsTeam.CounterTerrorist;
         bool isT = player.Team == CsTeam.Terrorist;

@@ -28,6 +28,7 @@ public sealed partial class BotBuyPatch
     private void ResetBuyState()
     {
         _buyRoundGeneration++;
+        _sniperBuyers.Clear();_sniperPolicyActive=false;
         ReleaseCarriedBuyPlans(); _carriedPrimaries.Clear();
         _prevWeapons.Clear(); _prevArmor.Clear(); _prevMoney.Clear();
         _botUserIdToIndex.Clear(); _botIndexCounter=0;
@@ -52,13 +53,9 @@ public sealed partial class BotBuyPatch
             _carriedPrimaries[player.EntityHandle.Raw]=guns;
             // A native buy plan completes the engine's buying state without issuing any primary buy.
             // Keep normal armor and kit purchases; existing guns are never dropped just to rebuy.
-            var pawn=player.PlayerPawn.Value!;
-            var equipment=pawn.ItemServices?.As<CCSPlayer_ItemServices>();
             var plan=new List<string>();
             // Preserve the existing policy: don't pay to repair armor above 40.
-            if (pawn.ArmorValue<=40) { plan.Add("vesthelm"); plan.Add("vest"); }
-            else if (pawn.ArmorValue>=100 && equipment?.HasHelmet==false) plan.Add("vesthelm");
-            if (player.TeamNum==3 && equipment?.HasDefuser==false) plan.Add("defuser");
+            AddNeededEquipment(player,plan);
             string aliases=string.Join(' ',plan);
             if (_buyController?.SetBuyPlan(player.Slot,aliases)==true)
             {

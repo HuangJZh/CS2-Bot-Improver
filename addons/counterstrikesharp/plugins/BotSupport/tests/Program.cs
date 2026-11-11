@@ -36,5 +36,8 @@ Check(Enumerable.Range(0,3).Select(i => SupportPolicy.Select(rich,3,"auto",i)!.V
 Check(Enumerable.Range(0,10).All(i => SupportPolicy.Select([new(1,3000,100)],3,"auto",i)!.Value.Gun.Item!="weapon_awp"),"unaffordable AWP excluded from random pool");
 Check(!SupportPolicy.Guns(2,"awp").Any(g=>g.Item is "weapon_aug" or "weapon_sg556"),"T donation fallback excludes scoped rifles");
 Check(SupportPolicy.Select([new(1,4000,100)],2,"awp")?.Gun.Item=="weapon_ak47","unaffordable AWP falls back to AK rather than SG553");
+Check(SupportPolicy.Select(rich,2,"auto",0,allowSniper:false)?.Gun.Item=="weapon_ak47","quota-full auto request chooses AK");
+Check(SupportPolicy.Select(rich,3,"awp",allowSniper:false)?.Gun.Item=="weapon_m4a1_silencer","quota-full explicit AWP request falls back to M4");
+Check(Enumerable.Range(0,20).All(i=>SupportPolicy.Select(rich,3,"auto",i,allowSniper:false)?.Gun.Item!="weapon_awp"),"random request cannot bypass quota");
 Console.WriteLine($"{count} checks passed");
 

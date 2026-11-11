@@ -10,7 +10,7 @@ namespace BotSupport;
 public sealed class BotSupport : BasePlugin
 {
     public override string ModuleName => "BotSupport";
-    public override string ModuleVersion => "1.0.9-purchase-fix";
+    public override string ModuleVersion => "1.0.10-sniper-limit";
     public override string ModuleAuthor => "HuangJZh fork";
     public override string ModuleDescription => "Wheel weapon requests and probabilistic post-shot stops";
     private readonly Dictionary<int, float> _requests = new();
@@ -141,7 +141,11 @@ public sealed class BotSupport : BasePlugin
         var teamBots=controllers.Count(b => b is { IsValid:true, IsBot:true } && b.TeamNum==caller.TeamNum);
         Logger.LogInformation("Weapon request slot={Slot}: teammate bots={TeamBots} eligible donors={Donors}",
             caller.Slot,teamBots,bots.Length);
-        var choice=SupportPolicy.Select(bots.Select(b => new Donor(b.Slot,b.InGameMoneyServices!.Account,Distance(b,caller))),caller.TeamNum,request);
+        int snipers=controllers.Count(p=>p.IsValid&&p.PawnIsAlive&&p.TeamNum==caller.TeamNum
+            &&p.PlayerPawn.Value?.WeaponServices?.MyWeapons.Any(w=>w.Value is {IsValid:true} gun
+                &&BotPurchasePolicy.TeamSniperPolicy.IsSniper(gun.DesignerName))==true);
+        var choice=SupportPolicy.Select(bots.Select(b => new Donor(b.Slot,b.InGameMoneyServices!.Account,Distance(b,caller))),caller.TeamNum,request,
+            allowSniper:snipers<BotPurchasePolicy.TeamSniperPolicy.Limit(caller.TeamNum));
         if(choice == null)
         {
             Logger.LogInformation("Weapon request failed: no donor can afford the requested weapon");

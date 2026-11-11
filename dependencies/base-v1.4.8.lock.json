@@ -1,7 +1,7 @@
 {
   "schema": "cs2-bot-custom-base-lock-v1",
   "custom_version": "8.51",
-  "date": "2026-11-11",
+  "date": "2026-11-12",
   "cs2_buildid": "26445667",
   "stable_restore_tag": "custom-8.49-stable",
   "upstream": {
@@ -19,11 +19,11 @@
     "BotAimImprover": "custom source 2.1.8-human.8.51; behavior-preserving discovery, geometry, profile and navigation optimization",
     "BotState": "custom 1.10.6-human.2; reuse flash scratch list, unchanged avoidance decisions",
     "NadeSystem": "preserved custom source; upstream 7605f272 unchanged",
-    "BotSupport": "custom 1.0.9-purchase-fix; SG553 removed from donation fallback",
+    "BotSupport": "custom 1.0.10-sniper-limit; team sniper quota also applies to donations",
     "BotRandomizer": "preserved installed bot-only customization; binary pinned by SHA256",
     "BotTeamplay": "preserved installed custom binary; pinned by SHA256",
     "InventorySimulator": "3.8.1-local-only.3, upstream tag 3.8.1 (5f1c3d4)",
-    "BotBuy": "custom 1.0.14-custom.2; source expanded from 11884e0564b8b57bee5f4729a5fca781bd5e6749"
+    "BotBuy": "custom 1.0.14-custom.3; T one / CT two sniper purchase slots, carried inventory preserved"
   },
   "contracts": {
     "BotControllerApi": "ApiVersion (replaces AbiVersion); SubtickMove.Button UInt64",
@@ -348,11 +348,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotBuy/BotBuy.dll",
-      "sha256": "a7b7ffac84f680ea2cb7ae4dceb9f7fbaeec9e1cd13f3189e1382f7abfb50e6e"
+      "sha256": "3e851f95e1a4fde3d7154de372c58b89305c78f72de2f716cd0d7683ec580200"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotBuy/BotBuy.pdb",
-      "sha256": "c05897018101969fd3f3aca5bda1b2f88feb036482574f6c1e699ccb8fd1e20a"
+      "sha256": "1384902983890451414841282d18de3d042765618e42548d1c700ba9f64053af"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotControllerImpl/BotControllerImpl.dll",
@@ -388,11 +388,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotSupport/BotSupport.dll",
-      "sha256": "3798b6cbd0ea9f56e4ba1d53bb92074ac42f4b3e39909b75ec17c1c3e800412a"
+      "sha256": "479cd147a35fb536e6a5011e08e7908373c05a696c83282429167e4dcbf7fdd3"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotSupport/BotSupport.pdb",
-      "sha256": "4d2845aebb336c769431c1ad13ac992aeedefa2e856cbaff72f586dc1b8308d5"
+      "sha256": "6c3b32717518765a2786832206db3ad743ec6624ff07e8468cc62f0f0d81838e"
     },
     {
       "path": "addons/counterstrikesharp/plugins/InventorySimulator/InventorySimulator.deps.json",
@@ -2097,5 +2097,5 @@
     "recorded_on": "2026-11-11",
     "note": "Managed by Panel/user; do not overwrite from the base lock."
   },
-  "custom_revision": "performance-20261111"
+  "custom_revision": "sniper-limit-20261112"
 }

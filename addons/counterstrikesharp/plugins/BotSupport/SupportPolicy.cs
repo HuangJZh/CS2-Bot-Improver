@@ -29,13 +29,13 @@ public static class SupportPolicy
         return new[] { preferred.Value }.Concat(rifles.OrderByDescending(g => g.Price))
             .Concat(smgs.OrderByDescending(g => g.Price)).DistinctBy(g => g.Item).ToArray();
     }
-    public static (Donor Donor, Gun Gun)? Select(IEnumerable<Donor> donors, int team, string request, int? choice = null)
+    public static (Donor Donor, Gun Gun)? Select(IEnumerable<Donor> donors, int team, string request, int? choice = null,bool allowSniper=true)
     {
         var candidates = donors.Where(d => double.IsFinite(d.Distance) && d.Distance <= 1500)
             .OrderByDescending(d => d.Money).ThenBy(d => d.Distance).ThenBy(d => d.Slot).ToArray();
         if(candidates.Length == 0) return null;
         var donor=candidates[0];
-        var guns=Guns(team,request);
+        var guns=Guns(team,request).Where(g=>allowSniper||g.Item!="weapon_awp").ToArray();
         if(request.Equals("auto",StringComparison.OrdinalIgnoreCase))
         {
             var main=guns.Where(g => g.Item is "weapon_awp" or "weapon_ak47" or "weapon_m4a1_silencer" or "weapon_m4a1")
