@@ -2,3 +2,7 @@
 **/obj/
 **/__pycache__/
 *.pyc
+
+# Local cosmetic host identity and runtime-only data
+addons/counterstrikesharp/plugins/InventorySimulator/local-only.json
+addons/counterstrikesharp/plugins/InventorySimulator/cache/

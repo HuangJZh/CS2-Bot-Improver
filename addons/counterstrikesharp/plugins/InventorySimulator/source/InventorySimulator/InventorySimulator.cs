@@ -1,0 +1,175 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Ian Lucas. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+using CounterStrikeSharp.API;
+using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Memory;
+
+namespace InventorySimulator;
+
+public partial class InventorySimulator : BasePlugin
+{
+    public override string ModuleAuthor => "Ian Lucas";
+    public override string ModuleDescription => "Inventory Simulator - local insecure host only";
+    public override string ModuleName => "InventorySimulator";
+    public override string ModuleVersion => "3.8.1-local-only.3";
+
+    private bool _localHooksLoaded;
+
+    public override void Load(bool hotReload)
+    {
+        if (!LocalOnly.Initialize(this))
+            return;
+        Runtime.Initialize(this);
+        ConVars.Initialize(this);
+        ConVars.IsWsEnabled.Value = true;
+        ConVars.IsWsImmediately.Value = true;
+        ConVars.IsPublicApiStatTrakIncrement.Value = false;
+        ConVars.IsPublicApiSprayConsume.Value = false;
+        ConVars.IsPetEnabled.Value = false;
+        RegisterListener<Listeners.OnMapEnd>(LocalOnly.MapEnded);
+        RegisterListener<Listeners.OnEntityCreated>(OnEntityCreated);
+        RegisterListener<Listeners.OnEntitySpawned>(OnEntitySpawned);
+        RegisterListener<Listeners.OnEntityDeleted>(OnEntityDeleted);
+        RegisterListener<Listeners.OnMapStart>(OnMapStart);
+        RegisterEventHandler<EventPlayerConnect>(OnPlayerConnect, HookMode.Post);
+        RegisterEventHandler<EventPlayerConnectFull>(OnPlayerConnectFull, HookMode.Post);
+        RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn, HookMode.Post);
+        RegisterEventHandler<EventPlayerDeath>(OnPlayerDeathPre);
+        RegisterEventHandler<EventRoundMvp>(OnRoundMvpPre);
+        RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect, HookMode.Post);
+        VirtualFunctions.GiveNamedItemFunc.Hook(OnGiveNamedItemPre, HookMode.Pre);
+        Natives.CCSPlayerInventory_GetItemInLoadout.Hook(GetItemInLoadout, HookMode.Post);
+        _localHooksLoaded = true;
+        ConVars.File.ValueChanged += OnFileChanged;
+        ConVars.IsRequireInventory.ValueChanged += OnIsRequireInventoryChanged;
+        ConVars.IsSprayOnUse.ValueChanged += OnIsSprayOnUseChanged;
+        ConVars.IsLoadoutEnabled.ValueChanged += OnIsLoadoutEnabledChanged;
+        ConVars.IsPetImmortal.ValueChanged += OnIsPetImmortalChanged;
+        ConVars.IsPetFreeRoam.ValueChanged += OnPetRoamConVarChanged;
+        ConVars.IsPetRespawn.ValueChanged += OnPetRoamConVarChanged;
+        ConVars.Url.ValueChanged += OnUrlChanged;
+        ConVars.ApiKey.ValueChanged += OnApiSuspensionConVarChanged;
+        ConVars.IsPublicApiStatTrakIncrement.ValueChanged += OnApiSuspensionConVarChanged;
+        ConVars.IsPublicApiSprayConsume.ValueChanged += OnApiSuspensionConVarChanged;
+        _lastUrl = ConVars.Url.Value;
+        OnFileChanged(null, ConVars.File.Value);
+        OnIsRequireInventoryChanged(null, ConVars.IsRequireInventory.Value);
+        OnIsSprayOnUseChanged(null, ConVars.IsSprayOnUse.Value);
+        OnIsPetImmortalChanged(null, ConVars.IsPetImmortal.Value);
+        OnPetRoamChanged(ConVars.IsPetFreeRoam.Value || ConVars.IsPetRespawn.Value);
+    }
+
+    private string _lastUrl = "";
+    private bool _isActivatePlayerHooked = false;
+    private bool _isPlayerButtonsChangedHooked = false;
+    private bool _isTakeDamageHooked = false;
+    private bool _isChickenManagerPostSimulateHooked = false;
+
+    public void OnUrlChanged(object? _, string value)
+    {
+        Api.ResetSuspension();
+        if (value == _lastUrl)
+            return;
+        _lastUrl = value;
+        var isOfficialHost =
+            Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            && uri.Host.Equals("inventory.cstrike.app", StringComparison.OrdinalIgnoreCase);
+        if (!isOfficialHost)
+        {
+            ConVars.IsPublicApiStatTrakIncrement.Value = false;
+            ConVars.IsPublicApiSprayConsume.Value = false;
+        }
+    }
+
+    public void OnApiSuspensionConVarChanged<T>(object? _, T value)
+    {
+        Api.ResetSuspension();
+    }
+
+    public void OnFileChanged(object? _, string value)
+    {
+        if (Inventories.Load(value))
+            foreach (var player in Utilities.GetPlayers().Where(p => !p.IsBot))
+                if (Inventories.TryGet(player.SteamID, out var inventory))
+                    player.GetState().Inventory = inventory;
+    }
+
+    public void OnIsRequireInventoryChanged(object? _, bool value)
+    {
+        if (value == _isActivatePlayerHooked)
+            return;
+        if (value)
+            Natives.CServerSideClientBase_ActivatePlayer.Hook(OnActivatePlayerPre, HookMode.Pre);
+        else
+            Natives.CServerSideClientBase_ActivatePlayer.Unhook(OnActivatePlayerPre, HookMode.Pre);
+        _isActivatePlayerHooked = value;
+    }
+
+    public void OnIsLoadoutEnabledChanged(object? _, bool __)
+    {
+        foreach (var player in Utilities.GetPlayers().Where(p => !p.IsBot))
+            player.HandleInventoryLoad();
+    }
+
+    public void OnIsSprayOnUseChanged(object? _, bool value)
+    {
+        if (value == _isPlayerButtonsChangedHooked)
+            return;
+        if (value)
+            RegisterListener<Listeners.OnPlayerButtonsChanged>(OnPlayerButtonsChanged);
+        else
+            RemoveListener<Listeners.OnPlayerButtonsChanged>(OnPlayerButtonsChanged);
+        _isPlayerButtonsChangedHooked = value;
+    }
+
+    public void OnIsPetImmortalChanged(object? _, bool value)
+    {
+        if (value == _isTakeDamageHooked)
+            return;
+        if (value)
+            RegisterListener<Listeners.OnEntityTakeDamagePre>(OnEntityTakeDamagePre);
+        else
+            RemoveListener<Listeners.OnEntityTakeDamagePre>(OnEntityTakeDamagePre);
+        _isTakeDamageHooked = value;
+    }
+
+    public void OnPetRoamConVarChanged(object? _, bool __)
+    {
+        OnPetRoamChanged(ConVars.IsPetFreeRoam.Value || ConVars.IsPetRespawn.Value);
+    }
+
+    public void OnPetRoamChanged(bool value)
+    {
+        if (value == _isChickenManagerPostSimulateHooked)
+            return;
+        if (value)
+            Natives.CCSChickenManager_ServerGamePostSimulate.Hook(
+                OnChickenManagerServerGamePostSimulate,
+                HookMode.Post
+            );
+        else
+            Natives.CCSChickenManager_ServerGamePostSimulate.Unhook(
+                OnChickenManagerServerGamePostSimulate,
+                HookMode.Post
+            );
+        _isChickenManagerPostSimulateHooked = value;
+    }
+
+    public override void Unload(bool hotReload)
+    {
+        LocalOnly.MapEnded();
+        if (!_localHooksLoaded)
+            return;
+        _localHooksLoaded = false;
+        VirtualFunctions.GiveNamedItemFunc.Unhook(OnGiveNamedItemPre, HookMode.Pre);
+        Natives.CCSPlayerInventory_GetItemInLoadout.Unhook(GetItemInLoadout, HookMode.Post);
+        OnIsRequireInventoryChanged(null, false);
+        OnIsSprayOnUseChanged(null, false);
+        OnIsPetImmortalChanged(null, false);
+        OnPetRoamChanged(false);
+        CCSPlayerControllerState.ClearAllEconItemView();
+    }
+}

@@ -35,7 +35,7 @@ public partial class BotState
         // Random combat crouch
         double crouchChance = 0.0;
         string? wpn = pawn.WeaponServices?.ActiveWeapon?.Value?.DesignerName;
-        if (wpn != null)
+        if (wpn is not (null or "weapon_knife" or "weapon_taser"))
         {
             if (wpn is "weapon_glock" or "weapon_hkp2000" or "weapon_p250" or "weapon_fiveseven")
                 crouchChance = 0.20;
@@ -63,6 +63,8 @@ public partial class BotState
             else if (wpn == "weapon_negev")
                 crouchChance = 0.90;
         }
+
+        if (wpn is null or "weapon_knife" or "weapon_taser") return HookResult.Continue;
 
         ref bool isCrouching = ref bot.IsCrouching;
         isCrouching = _combatPostures.OnShot(idx, pawn.EntityHandle.Raw, wpn ?? "", Server.CurrentTime, crouchChance, _random.NextDouble);
