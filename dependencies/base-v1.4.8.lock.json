@@ -2,7 +2,7 @@
   "schema": "cs2-bot-custom-base-lock-v1",
   "custom_version": "8.51",
   "date": "2026-11-12",
-  "cs2_buildid": "26445667",
+  "cs2_buildid": "26598758",
   "stable_restore_tag": "custom-8.49-stable",
   "upstream": {
     "repository": "https://github.com/ed0ard/CS2-Bot-Improver",
@@ -11,7 +11,7 @@
     "common_custom_base": "71d83a4723765dde2f21dd16728b6297dd005237",
     "package_sha256": "eb8d176620578121f33a6d9df7ecab19cc43a76889a7c74152b6b9d22305cbd7"
   },
-  "counterstrikesharp": "1.0.379+f58e383",
+  "counterstrikesharp": "1.0.379 managed; native 1.0.379-local-14197 @ 86e57d6",
   "components": {
     "BotController": "a46b15a865c135a95f44688bd964da478f83a51a",
     "BotHider": "8be8e95919abb4ab05bb82b8cbdf516b4e347aa5",
@@ -40,7 +40,7 @@
   "runtime_files": [
     {
       "path": "cfg/gamemode_retakecasual.cfg",
-      "sha256": "cf8366bd25f634eb6c4612370a1aa7b20f6ee990a074dd5cdcabcef0eeae1ee0"
+      "sha256": "6eccf511234cf6505dc8cda2e70072a6ec82dce3930f5319b234dd6abe9596c6"
     },
     {
       "path": "addons/BotController/config.json",
@@ -1792,7 +1792,7 @@
     },
     {
       "path": "addons/counterstrikesharp/bin/win64/counterstrikesharp.dll",
-      "sha256": "ad0359fdecd8a9693125e5498bf645f4413d246f839e85bb7b4387ace8b56cf1"
+      "sha256": "397aeda78abd68a98245ff6dd70bff2af891bd30d4ee44c84a790b4a1e038a0a"
     },
     {
       "path": "addons/counterstrikesharp/api/runtimes/win/lib/net10.0/System.Diagnostics.EventLog.dll",
@@ -1839,7 +1839,7 @@
   "data_files": [
     {
       "path": "overrides/botprofile.vpk",
-      "sha256": "7e427afa3e3af436f0e180f561d038a7f886ec187a82d6faff5937da746ceef6"
+      "sha256": "6295a3bb4b547b4961f6e172989957a7f676840fea750436db5c2be8551e5d88"
     },
     {
       "path": "overrides/High/botprofile.vpk",
@@ -2097,5 +2097,13 @@
     "recorded_on": "2026-11-11",
     "note": "Managed by Panel/user; do not overwrite from the base lock."
   },
-  "custom_revision": "sniper-limit-20261112"
+  "custom_revision": "startup-14197-20261112",
+  "counterstrikesharp_native_hotfix": {
+    "source": "https://github.com/roflmuffin/CounterStrikeSharp/pull/1490",
+    "commit": "86e57d69ee33d0480a6ebd221b579860a26eeb78",
+    "sdk_commit": "81020d1a26b9d4321b9f030c96929ec18e8c0cff",
+    "build_run": "https://github.com/HuangJZh/CS2-Bot-Improver/actions/runs/43207178824",
+    "sha256": "397aeda78abd68a98245ff6dd70bff2af891bd30d4ee44c84a790b4a1e038a0a",
+    "status": "Locally built upstream draft fix; managed API and plugin binaries preserved."
+  }
 }
