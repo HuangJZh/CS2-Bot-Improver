@@ -1,0 +1,51 @@
+name: Build pinned CSS 14197 Windows compatibility fix
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [upgrade/base-v1.4.8]
+    paths: [.github/workflows/build-css-14197-windows.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      BUILD_TYPE: Release
+      SEMVER: 1.0.379-local-14197
+      GITHUB_SHA_SHORT: 86e57d6
+    steps:
+      # Upstream PR 1490; reviewed compatibility fix, not an unpinned branch.
+      - uses: actions/checkout@v4
+        with:
+          repository: 0xpierre-dev/CounterStrikeSharp
+          ref: 86e57d69ee33d0480a6ebd221b579860a26eeb78
+          submodules: recursive
+          persist-credentials: false
+      - name: Verify source and SDK
+        shell: pwsh
+        run: |
+          if ((git rev-parse HEAD) -ne '86e57d69ee33d0480a6ebd221b579860a26eeb78') { throw 'Unexpected CSS source' }
+          if ((git -C libraries/hl2sdk-cs2 rev-parse HEAD) -ne '81020d1a26b9d4321b9f030c96929ec18e8c0cff') { throw 'Unexpected SDK source' }
+      - name: Build native library
+        shell: pwsh
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --build build --config Release -- /m:16
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Package native library and provenance
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path artifact | Out-Null
+          Copy-Item -LiteralPath build/Release/counterstrikesharp.dll -Destination artifact/counterstrikesharp.dll
+          Copy-Item -Path LICENSE* -Destination artifact
+          @{css_commit='86e57d69ee33d0480a6ebd221b579860a26eeb78'; sdk_commit='81020d1a26b9d4321b9f030c96929ec18e8c0cff'; upstream_pr='https://github.com/roflmuffin/CounterStrikeSharp/pull/1490'; sha256=(Get-FileHash artifact/counterstrikesharp.dll -Algorithm SHA256).Hash} | ConvertTo-Json | Set-Content artifact/provenance.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: css-14197-windows-native-86e57d6
+          path: artifact/
+          retention-days: 14
