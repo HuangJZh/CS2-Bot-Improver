@@ -578,4 +578,24 @@ Check(!focus.Select(brief with{HeardAt=1.7f,Start=1.9f,Until=2.2f},1.7f),
  "a completed source check cannot immediately pull the view away from navigation again");
 Check(focus.Select(brief with{Source="gunfire",HeardAt=1.8f,Start=1.9f,Until=2.7f},1.8f),
  "a genuine escalation from footsteps to gunfire can interrupt the same-source recheck cooldown");
+foreach(var level in new[]{"Low","Medium","High"})
+{
+ var original=HumanAimProfile.For(level);
+ var weakened=CombatBalancePolicy.EnemyProfile(original,.8f);
+ Check(MathF.Abs(weakened.MaxSpeed/original.MaxSpeed-.8f)<.00001f,level+" enemy motor strength reduced by twenty percent");
+ Check(MathF.Abs(weakened.Reaction/original.Reaction-1.25f)<.00001f&&MathF.Abs(weakened.MotorError/original.MotorError-1.25f)<.00001f,
+  level+" weaker enemies have coherently slower reaction and less precision");
+ foreach(float elite in new[]{1.2f,1.25f,1.3f})
+ {
+  var oldElite=CombatBalancePolicy.AllyProfile(original,elite);
+  var newElite=CombatBalancePolicy.AllyProfile(weakened,elite);
+  Check(MathF.Abs(newElite.MaxSpeed/oldElite.MaxSpeed-.8f)<.00001f&&MathF.Abs(newElite.MaxSpeed/weakened.MaxSpeed-elite)<.00001f,
+   level+" elite also loses twenty percent while retaining its relative advantage");
+ }
+ Check(CombatBalancePolicy.AllyProfile(original,.75f)==original.ScaleCombat(.75f),level+" teammate profile unchanged");
+}
+Check(CombatBalancePolicy.IsHumanEnemy(2,8)&&CombatBalancePolicy.IsHumanEnemy(3,4),"enemy reduction follows humans after side switch");
+Check(!CombatBalancePolicy.IsHumanEnemy(3,8)&&!CombatBalancePolicy.IsHumanEnemy(2,4),"enemy reduction never applies to teammates");
+Check(!CombatBalancePolicy.IsHumanEnemy(2,0)&&!CombatBalancePolicy.IsHumanEnemy(3,12),"spectators and humans on both sides stay neutral");
+Check(CombatBalancePolicy.NormalizeEnemyStrength(float.NaN)==.8f&&CombatBalancePolicy.NormalizeEnemyStrength(0)>.0f,"invalid enemy scale cannot cause invalid division");
 Console.WriteLine($"{count} checks passed");

@@ -8,18 +8,21 @@ public partial class BotAimImprover
     private readonly EngagementAimIntents _aimIntents=new();
     private float _humanTeamsScanAt;
     private int _humanTeams;
-    private HumanAimProfile? _baseCombatProfile,_allyCombatProfile;
+    private HumanAimProfile? _baseCombatProfile,_allyCombatProfile,_enemyCombatProfile;
     private string? _balanceDifficulty;
-    private float _balanceStrength;
+    private float _balanceStrength,_enemyStrength;
     private readonly EnemyEliteRoster _enemyElites=new();
     private readonly Dictionary<float,HumanAimProfile> _eliteProfiles=new();
     private HumanAimProfile CombatProfile(CCSPlayerController controller,float now)
     {
-        if(_baseCombatProfile==null||_balanceDifficulty!=_humanDifficulty||_balanceStrength!=_humanSettings.HumanAllyStrength)
+        if(_baseCombatProfile==null||_balanceDifficulty!=_humanDifficulty||_balanceStrength!=_humanSettings.HumanAllyStrength
+            ||_enemyStrength!=_humanSettings.EnemyStrength)
         {
             _balanceDifficulty=_humanDifficulty;_balanceStrength=_humanSettings.HumanAllyStrength;
             _baseCombatProfile=HumanAimProfile.For(_humanDifficulty);
             _allyCombatProfile=CombatBalancePolicy.AllyProfile(_baseCombatProfile,_balanceStrength);
+            _enemyStrength=_humanSettings.EnemyStrength;
+            _enemyCombatProfile=CombatBalancePolicy.EnemyProfile(_baseCombatProfile,_enemyStrength);
             _eliteProfiles.Clear();
         }
         if(now>=_humanTeamsScanAt)
@@ -42,10 +45,11 @@ public partial class BotAimImprover
             else _enemyElites.Reset();
         }
         if(CombatBalancePolicy.IsHumanAlly(controller.TeamNum,_humanTeams))return _allyCombatProfile!;
+        if(!CombatBalancePolicy.IsHumanEnemy(controller.TeamNum,_humanTeams))return _baseCombatProfile!;
         float strength=_humanSettings.EnemyElites?_enemyElites.Strength(controller.EntityHandle.Raw):1;
-        if(strength<=1)return _baseCombatProfile;
+        if(strength<=1)return _enemyCombatProfile!;
         if(!_eliteProfiles.TryGetValue(strength,out var elite))
-            _eliteProfiles[strength]=elite=CombatBalancePolicy.AllyProfile(_baseCombatProfile,strength);
+            _eliteProfiles[strength]=elite=CombatBalancePolicy.AllyProfile(_enemyCombatProfile!,strength);
         return elite;
     }
     private int[] AimOrder(CCSPlayerController controller,CCSPlayerPawn pawn,CCSPlayerPawn target)

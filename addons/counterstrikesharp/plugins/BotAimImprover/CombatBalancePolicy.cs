@@ -3,6 +3,8 @@ namespace BotAimImprover;
 public static class CombatBalancePolicy
 {
     public const float DefaultAllyStrength = .75f;
+    public const float DefaultEnemyStrength = .80f;
+    public static float NormalizeEnemyStrength(float strength)=>float.IsFinite(strength)?Math.Clamp(strength,.25f,2f):DefaultEnemyStrength;
 
     public static float NormalizeAllyStrength(float strength)
     {
@@ -13,6 +15,9 @@ public static class CombatBalancePolicy
     public static HumanAimProfile AllyProfile(HumanAimProfile p,float strength)=>p.ScaleCombat(strength);
     public static bool IsHumanAlly(int team,int humanTeams)=>team is 2 or 3
         &&humanTeams==(1<<team); // Spectators and humans on both teams get no asymmetric handicap.
+    public static bool IsHumanEnemy(int team,int humanTeams)=>team is 2 or 3
+        &&humanTeams==(1<<(team==2?3:2));
+    public static HumanAimProfile EnemyProfile(HumanAimProfile p,float strength)=>p.ScaleCombat(NormalizeEnemyStrength(strength));
     public static float HeadIntentChance(string difficulty,AimWeaponClass weapon,string? item)
     {
         if(item is "weapon_awp" or "weapon_scar20" or "weapon_g3sg1"||weapon==AimWeaponClass.Shotgun)return 0;
