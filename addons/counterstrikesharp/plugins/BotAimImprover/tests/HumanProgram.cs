@@ -598,4 +598,14 @@ Check(CombatBalancePolicy.IsHumanEnemy(2,8)&&CombatBalancePolicy.IsHumanEnemy(3,
 Check(!CombatBalancePolicy.IsHumanEnemy(3,8)&&!CombatBalancePolicy.IsHumanEnemy(2,4),"enemy reduction never applies to teammates");
 Check(!CombatBalancePolicy.IsHumanEnemy(2,0)&&!CombatBalancePolicy.IsHumanEnemy(3,12),"spectators and humans on both sides stay neutral");
 Check(CombatBalancePolicy.NormalizeEnemyStrength(float.NaN)==.8f&&CombatBalancePolicy.NormalizeEnemyStrength(0)>.0f,"invalid enemy scale cannot cause invalid division");
+var mediumEnemy=CombatBalancePolicy.EnemyProfile(HumanAimProfile.For("Medium"),.8f,"Medium");
+Check(MathF.Abs(mediumEnemy.Reaction-.170f)<.000001f,"ordinary Medium enemies use 170ms after all strength scaling");
+Check(mediumEnemy with{Reaction=HumanAimProfile.For("Medium").Reaction/.8f}==CombatBalancePolicy.EnemyProfile(HumanAimProfile.For("Medium"),.8f),
+ "170ms override leaves all other enemy combat parameters unchanged");
+Check(MathF.Abs(CombatBalancePolicy.AllyProfile(mediumEnemy,1.2f).Reaction-.170f/1.2f)<.000001f
+ &&MathF.Abs(CombatBalancePolicy.AllyProfile(mediumEnemy,1.3f).Reaction-.170f/1.3f)<.000001f,"Medium elite reaction remains relatively faster");
+foreach(var level in new[]{"Low","High"})
+ Check(CombatBalancePolicy.EnemyProfile(HumanAimProfile.For(level),.8f,level)==CombatBalancePolicy.EnemyProfile(HumanAimProfile.For(level),.8f),level+" reaction unchanged by Medium override");
+Check(MathF.Abs(CombatBalancePolicy.AllyProfile(HumanAimProfile.For("Medium"),.75f).Reaction-.120f/1.10f/.75f)<.000001f,
+ "Medium ally reaction unchanged by enemy-only override");
 Console.WriteLine($"{count} checks passed");

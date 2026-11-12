@@ -1,6 +1,6 @@
 {
   "schema": "cs2-bot-custom-base-lock-v1",
-  "custom_version": "8.52",
+  "custom_version": "8.53",
   "date": "2026-11-13",
   "cs2_buildid": "26598758",
   "stable_restore_tag": "custom-8.49-stable",
@@ -16,7 +16,7 @@
     "BotController": "a46b15a865c135a95f44688bd964da478f83a51a",
     "BotHider": "8be8e95919abb4ab05bb82b8cbdf516b4e347aa5",
     "BotVision": "df8f0707c7590cd55d9ffb8f6824ec9f3c959f5f",
-    "BotAimImprover": "custom source 2.1.8-human.8.52; EnemyStrength 0.80; ally unchanged at 0.75",
+    "BotAimImprover": "custom source 2.1.8-human.8.53; ordinary Medium enemy reaction 170ms; elite 131-142ms; allies and Low/High unchanged",
     "BotState": "custom 1.10.6-human.2; reuse flash scratch list, unchanged avoidance decisions",
     "NadeSystem": "preserved custom source; upstream 7605f272 unchanged",
     "BotSupport": "custom 1.0.10-sniper-limit; team sniper quota also applies to donations",
@@ -36,7 +36,8 @@
     "mp_solid_teammates": 0,
     "gameplay_tuning": "Existing custom settings; enemy combat strength now 0.80, ally 0.75, other tuning preserved.",
     "data": "difficulty VPKs, human-aim.json, navigation, nade snapshots, bot-only cosmetic config",
-    "EnemyStrength": 0.8
+    "EnemyStrength": 0.8,
+    "MediumEnemyReactionMs": 170
   },
   "runtime_files": [
     {
@@ -337,11 +338,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.dll",
-      "sha256": "cb4e0ccb69d55994224a7aec496964e4bdce02ad5a344fc58221cfaf4813e49c"
+      "sha256": "e2ed8821d146335b696f1908b529e8d0aeb68cd081239a3700db1e01aa62e00c"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.pdb",
-      "sha256": "53c51b6ee3a4616f5ad6e22126184b8454b4cdd7aa0dd8f225b2cbfcb81d39ab"
+      "sha256": "85c3e796a1942fa2d3552429c343496932a39eb73bfa5514ae4bceafa84ccdcf"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotBuy/BotBuy.deps.json",
@@ -2098,7 +2099,7 @@
     "recorded_on": "2026-11-11",
     "note": "Managed by Panel/user; do not overwrite from the base lock."
   },
-  "custom_revision": "enemy-strength-20261113",
+  "custom_revision": "medium-enemy-reaction-170-20261113",
   "counterstrikesharp_native_hotfix": {
     "source": "https://github.com/roflmuffin/CounterStrikeSharp/pull/1490",
     "commit": "86e57d69ee33d0480a6ebd221b579860a26eeb78",

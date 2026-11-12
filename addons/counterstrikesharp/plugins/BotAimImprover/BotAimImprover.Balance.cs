@@ -22,7 +22,7 @@ public partial class BotAimImprover
             _baseCombatProfile=HumanAimProfile.For(_humanDifficulty);
             _allyCombatProfile=CombatBalancePolicy.AllyProfile(_baseCombatProfile,_balanceStrength);
             _enemyStrength=_humanSettings.EnemyStrength;
-            _enemyCombatProfile=CombatBalancePolicy.EnemyProfile(_baseCombatProfile,_enemyStrength);
+            _enemyCombatProfile=CombatBalancePolicy.EnemyProfile(_baseCombatProfile,_enemyStrength,_humanDifficulty);
             _eliteProfiles.Clear();
         }
         if(now>=_humanTeamsScanAt)
