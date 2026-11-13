@@ -71,6 +71,7 @@ class RetakeTreeTests(unittest.TestCase):
         self.assertEqual(settings['reaction_time'], 0)
         self.assertEqual(len(settings['attack']), 13)
         self.assertTrue(all(len(row) == 5 for row in settings['attack']))
+        self.assertGreaterEqual(settings['attack'][1][0], .5, 'Native pistol input must not cut off a charge/windup every 0.2s')
         tree = parse_kv3((DATA / 'retake.kv3').read_text())
         self.assertEqual(tree['config'], 'scripts/ai/custom_improver/retake_config.kv3')
 
@@ -83,6 +84,7 @@ class RetakeTreeTests(unittest.TestCase):
         selector = next(n for n in walk(tree) if n.get('type') == 'selector')
         self.assertEqual(selector['children'][0]['file'], 'scripts/ai/modules/bt_attack.kv3')
         self.assertEqual(selector['children'][1]['entity_type_filter'], 'DAMAGE')
+
 
 
 if __name__ == '__main__':

@@ -11,7 +11,11 @@ public partial class BotState
     {
         ProcessFlashbangAvoidance();
         ExpireReveals(Server.CurrentTime);
-        if(RetakeOwnsGoals)return; // Valve BT owns positioning and objective states.
+        if(RetakeOwnsGoals)
+        {
+            if(_knifeLockedBotSlots.Count>0)ReleaseKnifeLocks();
+            return; // Valve BT owns positioning, weapon selection and objective states.
+        }
 
         // Server.MaxPlayers can cache the main menu's one-player limit.
         int maxPlayers = NativeAPI.GetMaxClients();

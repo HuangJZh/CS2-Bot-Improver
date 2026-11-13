@@ -297,7 +297,7 @@ public partial class NadeSystemPlugin : BasePlugin
                 // ── MOLOTOV — native CMolotovProjectile::Create() ─────
                 if (gtype is "molotov" or "incgrenade")
                 {
-                    int molotovItemDef = (teamNum == (int)CsTeam.CounterTerrorist) ? 48 : 46;
+                    int molotovItemDef = FindInventoryGrenade(bot,gtype)?.DesignerName=="weapon_incgrenade" ? 48 : 46;
 
                     var molotov = _molotovCreate.Invoke(
                         origin.Handle,

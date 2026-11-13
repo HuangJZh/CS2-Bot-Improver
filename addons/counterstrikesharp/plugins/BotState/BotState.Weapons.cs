@@ -34,9 +34,10 @@ public partial class BotState
     // Locks every surviving Bot on the winning team to its knife slot
     private void HandleTeamElimination(int victimSlot, CsTeam victimTeam)
     {
+        if(RetakeOwnsGoals)return; // The retake tree owns weapon selection until the round actually ends.
         if (_eliminationHandled || _botController == null) return;
 
-        var activePlayers = Utilities.GetPlayers()
+        var activePlayers = Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller")
             .Where(player => player.IsValid
                 && !player.IsHLTV
                 && ((int)player.TeamNum == (int)CsTeam.Terrorist

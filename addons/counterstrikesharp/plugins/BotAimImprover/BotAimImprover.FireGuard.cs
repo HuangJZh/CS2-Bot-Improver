@@ -130,7 +130,12 @@ public partial class BotAimImprover
             {released.PlanHoldSince=null;released.PlanHoldTimedOut=false;released.Execution.ResetReadiness();}
             ReleaseFireGuard(slot,decision.Reason);return;
         }
-        if(decision.Reason is "target-outside-fire-cone" or "turn-not-ready" or "native-reaction")HoldWeaponTurnClock(player);
+        // BT action_attack reads the weapon cooldown before requesting a trigger.
+        // Once its usercmd mask is installed, repeatedly extending that cooldown
+        // can prevent BT from ever making the request we are waiting to release.
+        long installed=_fireGuards.TryGetValue(slot,out var bound)?bound.Token:0;
+        bool needsClock=BotCombatPolicy.RetakeAiContract.NeedsWeaponClock(IsRetakeBot(player),installed);
+        if(needsClock&&(decision.Reason is "target-outside-fire-cone" or "turn-not-ready" or "native-reaction"))HoldWeaponTurnClock(player);
         else ReleaseWeaponTurnClock(slot);
         if(_fireGuards.TryGetValue(slot,out var current) && current.Token>0)return;
         long token=_humanController!.StartUsercmdSuppression(slot,(ulong)PlayerButtons.Attack);
@@ -209,8 +214,10 @@ public partial class BotAimImprover
     {
         var pawn=player.PlayerPawn.Value;
         if(pawn is not {IsValid:true} || !EligibleForFireGuard(player,pawn) || pawn.Bot is not {} bot)
-        {ReleaseFireGuard(player.Slot);return;}
-        ApplyFireGuard(player,EvaluateFireGate(player,pawn,bot,true));
+        {ReleaseRetakePulse(player.Slot);ReleaseFireGuard(player.Slot);return;}
+        var decision=EvaluateFireGate(player,pawn,bot,true);
+        ApplyFireGuard(player,decision);
+        RecoverRetakeTrigger(player,pawn,bot,decision);
     }
     private void RefreshNativeFireGuard(DynamicHook hook)
     {

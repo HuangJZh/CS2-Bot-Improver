@@ -627,4 +627,14 @@ foreach(var level in new[]{"Low","Medium","High"})
  Check(MathF.Abs(ally.MaxSpeed/enemy.MaxSpeed-.75f)<.000001f,level+" ally motor speed is 75 percent of ordinary enemies");
  Check(MathF.Abs(ally.MotorError/enemy.MotorError-1/.75f)<.000001f,level+" ally precision follows the same relative handicap");
 }
+var retakeWatch=new BotCombatPolicy.RetakeShotWatchdog();
+Check(!retakeWatch.Update(1,2,3,0,true,float.NegativeInfinity)&&!retakeWatch.Update(1,2,3,.59f,true,float.NegativeInfinity),"retake recovery waits for a real authorized stall");
+Check(retakeWatch.Update(1,2,3,.61f,true,float.NegativeInfinity),"retake authorized stall can request one trigger pulse");
+Check(!retakeWatch.Update(1,2,3,.7f,true,float.NegativeInfinity),"retake recovery does not repeat each frame");
+Check(!retakeWatch.Update(1,2,3,.8f,false,float.NegativeInfinity),"no permission cannot recover a trigger");
+Check(!retakeWatch.Update(1,2,4,2,true,float.NegativeInfinity),"new target cannot inherit the old stall window");
+Check(!retakeWatch.Update(1,2,4,2.5f,true,2.45f),"a real shot clears recovery waiting time");
+Check(BotCombatPolicy.RetakeAiContract.NeedsWeaponClock(false,1),"legacy fire path retains its weapon-clock guard");
+Check(BotCombatPolicy.RetakeAiContract.NeedsWeaponClock(true,0),"unbound retake input retains a startup weapon-clock guard");
+Check(!BotCombatPolicy.RetakeAiContract.NeedsWeaponClock(true,1),"bound retake input uses suppression without starving native weapon readiness");
 Console.WriteLine($"{count} checks passed");

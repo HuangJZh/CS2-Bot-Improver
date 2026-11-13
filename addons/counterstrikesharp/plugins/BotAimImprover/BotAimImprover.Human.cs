@@ -124,6 +124,7 @@ public partial class BotAimImprover
         }
         RegisterListener<Listeners.OnTick>(() =>
         {
+            MaintainRetakePulses();
             if(RetakeOwnsGoals&&(!HumanActive||_humanSettings.NativeCombat||!_humanSettings.RetakeAI))EndRetakeAi(true);
             CleanCombatHistories();
             // ReleaseHuman removes entries but never adds to this dictionary.
@@ -262,6 +263,7 @@ public partial class BotAimImprover
     }
     private void ResetHuman()
     {
+        ClearRetakeFireRecovery();
         _testGateUntil=float.NegativeInfinity;
         foreach(var slot in _humanStates.Keys.ToArray())ReleaseHuman(slot);
         foreach(var slot in _fireGuards.Keys.ToArray())ReleaseFireGuard(slot);
@@ -329,6 +331,7 @@ public partial class BotAimImprover
             controller=ResolveBotController(pointer);
             if(controller is not {IsValid:true,IsBot:true,PawnIsAlive:true} || controller.HasBeenControlledByPlayerThisRound)return HookResult.Continue;
             var pawn=controller.PlayerPawn.Value;
+            if(pawn is {IsValid:true})RecoverRetakeEquipment(controller,pawn);
             if(pawn is not {IsValid:true} || !IsGun(pawn) || OtherViewOwner(controller.Slot))
             { CancelSoundAttention(controller);ReleaseHuman(controller.Slot);ReleaseFireGuard(controller.Slot);_modelSpots.Remove(pointer);return HookResult.Continue; }
             if(!TryGetBotEyePosition(controller,out var eye))return HookResult.Continue;

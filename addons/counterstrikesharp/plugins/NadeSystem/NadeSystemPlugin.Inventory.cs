@@ -20,9 +20,8 @@ public partial class NadeSystemPlugin
     };
     private static CBasePlayerWeapon? FindInventoryGrenade(CCSPlayerController bot, string type)
     {
-        var item = InventoryItem(type, bot.TeamNum);
-        return item == null ? null : bot.PlayerPawn.Value?.WeaponServices?.MyWeapons
-            .Select(w => w.Value).FirstOrDefault(w => w is { IsValid: true } && w.DesignerName == item);
+        return bot.PlayerPawn.Value?.WeaponServices?.MyWeapons
+            .Select(w => w.Value).FirstOrDefault(w => w is { IsValid: true } && UtilityPurchasePolicy.InventoryMatches(type,w.DesignerName));
     }
     private static bool HasInventoryGrenade(CCSPlayerController bot, string type)
         => bot is { IsValid:true, IsBot:true, PawnIsAlive:true } && FindInventoryGrenade(bot,type) != null;
@@ -127,8 +126,17 @@ public partial class NadeSystemPlugin
                 money.Account-=cost;
                 try
                 {
-                    if(bot.GiveNamedItem(InventoryItem(type,bot.TeamNum)!) == nint.Zero)
+                    var created=bot.GiveNamedItem(InventoryItem(type,bot.TeamNum)!);
+                    if(created == nint.Zero)
                         throw new InvalidOperationException("Grenade purchase failed");
+                    // GiveNamedItem can create a world item when acquisition is
+                    // rejected. Charge only for an item actually added to inventory.
+                    if(!services.MyWeapons.Any(h=>h.Value is {IsValid:true} w&&w.Handle==created))
+                    {
+                        var rejected=new CBasePlayerWeapon(created);
+                        if(rejected.IsValid)rejected.Remove();
+                        throw new InvalidOperationException("Grenade was not acquired; removed new world item");
+                    }
                 }
                 catch(Exception error)
                 {

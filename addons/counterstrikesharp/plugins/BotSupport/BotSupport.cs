@@ -7,10 +7,10 @@ using System.Security.Cryptography;
 
 namespace BotSupport;
 
-public sealed class BotSupport : BasePlugin
+public sealed partial class BotSupport : BasePlugin
 {
     public override string ModuleName => "BotSupport";
-    public override string ModuleVersion => "1.0.10-sniper-limit";
+    public override string ModuleVersion => "1.0.11-held-primary-transfer";
     public override string ModuleAuthor => "HuangJZh fork";
     public override string ModuleDescription => "Wheel weapon requests and probabilistic post-shot stops";
     private readonly Dictionary<int, float> _requests = new();
@@ -30,6 +30,7 @@ public sealed class BotSupport : BasePlugin
     public override void Load(bool hotReload)
     {
         ReadDifficulty();
+        RegisterTransferFixture();
         AddCommandListener("playerchatwheel", Wheel, HookMode.Pre);
         AddCommandListener("needrop", (p,c) => Request(p,"auto"), HookMode.Pre);
         AddCommand("css_bot_request", "Request auto/awp/ak/m4a1/m4a4 from one bot", (p,c) => Request(p,c.ArgCount > 1 ? c.GetArg(1) : "auto"));
@@ -148,6 +149,7 @@ public sealed class BotSupport : BasePlugin
             allowSniper:snipers<BotPurchasePolicy.TeamSniperPolicy.Limit(caller.TeamNum));
         if(choice == null)
         {
+            if(SupportPolicy.Guns(caller.TeamNum,request).Length>0&&TransferBestPrimary(caller,bots))return HookResult.Handled;
             Logger.LogInformation("Weapon request failed: no donor can afford the requested weapon");
             Reply(caller,"没有符合条件的队友：需要在附近购买区、未交战，余额足够支付武器价格。可选 auto/awp/ak/m4a1/m4a4。");
             return HookResult.Handled;

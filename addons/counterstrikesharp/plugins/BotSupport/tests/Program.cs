@@ -39,5 +39,10 @@ Check(SupportPolicy.Select([new(1,4000,100)],2,"awp")?.Gun.Item=="weapon_ak47","
 Check(SupportPolicy.Select(rich,2,"auto",0,allowSniper:false)?.Gun.Item=="weapon_ak47","quota-full auto request chooses AK");
 Check(SupportPolicy.Select(rich,3,"awp",allowSniper:false)?.Gun.Item=="weapon_m4a1_silencer","quota-full explicit AWP request falls back to M4");
 Check(Enumerable.Range(0,20).All(i=>SupportPolicy.Select(rich,3,"auto",i,allowSniper:false)?.Gun.Item!="weapon_awp"),"random request cannot bypass quota");
+Check(SupportPolicy.SelectHeld([new(1,100,2700,50),new(2,200,4750,100)])?.Weapon==200,"held fallback chooses most expensive primary across donors");
+Check(SupportPolicy.SelectHeld([new(1,100,4750,200),new(2,200,4750,100)])?.Slot==2,"equal-value held guns prefer nearer teammate");
+Check(SupportPolicy.SelectHeld([new(1,100,4750,1501),new(2,200,2700,100)])?.Weapon==200,"held fallback respects existing nearby donor range");
+Check(SupportPolicy.SelectHeld([])==null,"no held primary cannot create a free weapon");
+Check(SupportPolicy.Select([new(1,0,100)],2,"auto")==null&&SupportPolicy.SelectHeld([new(1,100,4750,100)])!=null,"zero funds can fall back to a real held primary");
 Console.WriteLine($"{count} checks passed");
 

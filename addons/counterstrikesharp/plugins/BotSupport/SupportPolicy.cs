@@ -2,8 +2,13 @@ namespace BotSupport;
 
 public readonly record struct Gun(string Item, string Label, int Price);
 public readonly record struct Donor(int Slot, int Money, double Distance);
+public readonly record struct HeldPrimary(int Slot,uint Weapon,int Price,double Distance);
 public static class SupportPolicy
 {
+    public static HeldPrimary? SelectHeld(IEnumerable<HeldPrimary> weapons)=>weapons
+        .Where(w=>w.Price>0&&double.IsFinite(w.Distance)&&w.Distance<=1500)
+        .OrderByDescending(w=>w.Price).ThenBy(w=>w.Distance).ThenBy(w=>w.Slot).ThenBy(w=>w.Weapon)
+        .Select(w=>(HeldPrimary?)w).FirstOrDefault();
     public static int StopChance(string difficulty) => difficulty switch { "Low" => 75, "High" => 95, _ => 85 };
     public static bool StopSucceeds(string difficulty, int roll) => roll >= 0 && roll < StopChance(difficulty);
     public static bool IsWeaponRequest(string token) => token.Trim().ToLowerInvariant() is

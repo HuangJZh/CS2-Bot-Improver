@@ -24,6 +24,8 @@ public partial class NadeSystemPlugin : BasePlugin
     // * Emits native-style grenade radio feedback and throw events
     private void AnnounceGrenadeThrow(CCSPlayerController bot, string gtype)
     {
+        bool incendiary=FindInventoryGrenade(bot,gtype)?.DesignerName=="weapon_incgrenade";
+        if(gtype is "molotov" or "incgrenade")gtype=incendiary?"incgrenade":"molotov";
         ConsumeInventoryGrenade(bot, gtype);
 
         try
@@ -34,9 +36,9 @@ public partial class NadeSystemPlugin : BasePlugin
                 "smoke" => ("#SFUI_TitlesTXT_Smoke_in_the_hole", "smokegrenade"),
                 "flash" => ("#SFUI_TitlesTXT_Flashbang_in_the_hole", "flashbang"),
                 "he" => ("#SFUI_TitlesTXT_Fire_in_the_hole", "hegrenade"),
-                "molotov" when isCT => ("#SFUI_TitlesTXT_Incendiary_in_the_hole", "incgrenade"),
+                "molotov" when incendiary => ("#SFUI_TitlesTXT_Incendiary_in_the_hole", "incgrenade"),
                 "molotov" => ("#SFUI_TitlesTXT_Molotov_in_the_hole", "molotov"),
-                "incgrenade" => ("#SFUI_TitlesTXT_Incendiary_in_the_hole", "incgrenade"),
+                "incgrenade" => incendiary ? ("#SFUI_TitlesTXT_Incendiary_in_the_hole", "incgrenade") : ("#SFUI_TitlesTXT_Molotov_in_the_hole", "molotov"),
                 "decoy" => ("#SFUI_TitlesTXT_Decoy_in_the_hole", "decoy"),
                 _ => default,
             };

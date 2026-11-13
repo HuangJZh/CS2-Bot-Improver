@@ -1,7 +1,7 @@
 {
   "schema": "cs2-bot-custom-base-lock-v1",
-  "custom_version": "8.56",
-  "date": "2026-11-13",
+  "custom_version": "8.57",
+  "date": "2026-11-14",
   "cs2_buildid": "26598758",
   "stable_restore_tag": "custom-8.49-stable",
   "upstream": {
@@ -16,10 +16,10 @@
     "BotController": "a46b15a865c135a95f44688bd964da478f83a51a",
     "BotHider": "8be8e95919abb4ab05bb82b8cbdf516b4e347aa5",
     "BotVision": "df8f0707c7590cd55d9ffb8f6824ec9f3c959f5f",
-    "BotAimImprover": "custom 2.1.8-human.8.56; allies scaled to 75 percent of current ordinary enemy profile",
-    "BotState": "custom 1.10.6-human.3; yield movement and fake defuse to owned Retakes tree",
-    "NadeSystem": "preserved custom source; upstream 7605f272 unchanged",
-    "BotSupport": "custom 1.0.10-sniper-limit; team sniper quota also applies to donations",
+    "BotAimImprover": "custom 2.1.8-human.8.57; retake cooldown/input recovery and bounded partial-cover sight",
+    "BotState": "custom 1.10.6-human.4; full entity roster for elimination, no winning knife locks during retake",
+    "NadeSystem": "custom inventory.5-cross-team-fire; shared fire category, acquisition verification and actual held fire subtype",
+    "BotSupport": "custom 1.0.11-held-primary-transfer; no-affordable-purchase fallback transfers most valuable real teammate primary",
     "BotRandomizer": "preserved installed bot-only customization; binary pinned by SHA256",
     "BotTeamplay": "preserved installed custom binary; pinned by SHA256",
     "InventorySimulator": "3.8.1-local-only.3, upstream tag 3.8.1 (5f1c3d4)",
@@ -350,11 +350,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.dll",
-      "sha256": "d557a07af43c7420fa6b86331679e2fb29ba1b735d7a6709cc7f8b7944941d45"
+      "sha256": "4896d655a31f302e67d46394e5952290f03c8525a9a711f2b72290def5d1f390"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.pdb",
-      "sha256": "f2d32932b82c599acce99cd93285e016ef8580b314d019387b42f4ce6d47b168"
+      "sha256": "b15321dd725e7d88c829c8619728495d1a09b86b6e81bd08a232f728687cbc24"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotBuy/BotBuy.deps.json",
@@ -390,11 +390,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotState/BotState.dll",
-      "sha256": "7ed7fb20a030ea9b6502f147784b1052a7f31471f6a8d0cbd4cf039b6433d461"
+      "sha256": "2741dbd0ce144e6d817c7ee62479e19b3436a5ccb9b7aa03f4c22472c26eb33f"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotState/BotState.pdb",
-      "sha256": "a0d06cfc8dd187a90a16d3adf7298f478f9ff79e89a67dfef9c861baffd878bd"
+      "sha256": "601bab31427e99931d3129ec9220ada17e3558ea0be461c6a801c975ddfc540c"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotSupport/BotSupport.deps.json",
@@ -402,11 +402,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotSupport/BotSupport.dll",
-      "sha256": "479cd147a35fb536e6a5011e08e7908373c05a696c83282429167e4dcbf7fdd3"
+      "sha256": "b2db39eb9fec940d7dbb7d5dd3bf353d3dbdf3ff4bb43ced9285ecd876bb1213"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotSupport/BotSupport.pdb",
-      "sha256": "6c3b32717518765a2786832206db3ad743ec6624ff07e8468cc62f0f0d81838e"
+      "sha256": "3005b392aa000592b22ff8aa3a80c3188b235a2449809f01b17d58fd1f83090e"
     },
     {
       "path": "addons/counterstrikesharp/plugins/InventorySimulator/InventorySimulator.deps.json",
@@ -430,11 +430,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/NadeSystem/NadeSystem.dll",
-      "sha256": "664ccbab8360911dfd351f0fa6b42c1585ddf645168d9e6c8e51c1be07c17f8b"
+      "sha256": "2af89769a79822d96d257504343590b33959b37b5ed28c820ec822f7fe06fae2"
     },
     {
       "path": "addons/counterstrikesharp/plugins/NadeSystem/NadeSystem.pdb",
-      "sha256": "a081ff627a502cbb77f22d5d622491d936095bb56c816de2a0e1f72098abc6a0"
+      "sha256": "34f6397d0c5c6815039d285f225f5e341b670139c1184787f16a69cffaefc545"
     },
     {
       "path": "addons/counterstrikesharp/plugins/RoundDamageRecap/RoundDamageRecap.deps.json",
@@ -2109,7 +2109,7 @@
     },
     {
       "path": "scripts/ai/custom_improver/retake_config.kv3",
-      "sha256": "3ad13700755bebb2338e0d6181b57be4f51ecac153d686a6c46769a7675574a8"
+      "sha256": "51b14273a373cd60e6976769ab79382c0b2f24f7ea23fae5bff5804b51418382"
     }
   ],
   "user_config_snapshot": {
@@ -2119,7 +2119,7 @@
     "recorded_on": "2026-11-11",
     "note": "Managed by Panel/user; do not overwrite from the base lock."
   },
-  "custom_revision": "ally-relative-20261113",
+  "custom_revision": "postplant-transfer-cross-team-fire-20261114",
   "counterstrikesharp_native_hotfix": {
     "source": "https://github.com/roflmuffin/CounterStrikeSharp/pull/1490",
     "commit": "86e57d69ee33d0480a6ebd221b579860a26eeb78",
