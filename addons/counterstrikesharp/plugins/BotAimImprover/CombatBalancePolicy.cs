@@ -17,13 +17,13 @@ public static class CombatBalancePolicy
         &&humanTeams==(1<<team); // Spectators and humans on both teams get no asymmetric handicap.
     public static bool IsHumanEnemy(int team,int humanTeams)=>team is 2 or 3
         &&humanTeams==(1<<(team==2?3:2));
-    public const float MediumEnemyReactionSeconds=.170f;
+    public static float EnemyReactionSeconds(string difficulty)=>difficulty switch{"Low"=>.250f,"High"=>.140f,_=>.190f};
     public static HumanAimProfile EnemyProfile(HumanAimProfile p,float strength,string? difficulty=null)
     {
         var profile=p.ScaleCombat(NormalizeEnemyStrength(strength));
-        // User tuning applies to ordinary Medium enemies after global scaling.
+        // User tuning applies to ordinary enemies after global scaling.
         // Elite scaling is applied by the caller afterwards; allies stay intact.
-        return difficulty=="Medium"?profile with{Reaction=MediumEnemyReactionSeconds}:profile;
+        return difficulty==null?profile:profile with{Reaction=EnemyReactionSeconds(difficulty)};
     }
     public static float HeadIntentChance(string difficulty,AimWeaponClass weapon,string? item)
     {

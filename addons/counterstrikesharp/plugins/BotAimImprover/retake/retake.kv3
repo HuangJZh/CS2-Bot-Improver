@@ -52,6 +52,12 @@
 					child = {
 						type = "selector"
 						children = [
+							{
+								type = "subtree"
+								file = "scripts/ai/modules/bt_attack.kv3"
+								name = "RetakeAttack"
+							},
+// An established attack takes priority over damage-only reacquisition.
                             {
                                 type = "decorator_sensor"
                                 entity_type_filter = "DAMAGE"
@@ -68,11 +74,6 @@
                                     }
                                 }
                             },
-							{
-								type = "subtree"
-								file = "scripts/ai/modules/bt_attack.kv3"
-								name = "RetakeAttack"
-							},
 							{
 								type = "condition_is_equal"
 								source = "TeamName"

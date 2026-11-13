@@ -1,6 +1,6 @@
 {
   "schema": "cs2-bot-custom-base-lock-v1",
-  "custom_version": "8.54",
+  "custom_version": "8.55",
   "date": "2026-11-13",
   "cs2_buildid": "26598758",
   "stable_restore_tag": "custom-8.49-stable",
@@ -16,7 +16,7 @@
     "BotController": "a46b15a865c135a95f44688bd964da478f83a51a",
     "BotHider": "8be8e95919abb4ab05bb82b8cbdf516b4e347aa5",
     "BotVision": "df8f0707c7590cd55d9ffb8f6824ec9f3c959f5f",
-    "BotAimImprover": "custom 2.1.8-human.8.54; actual Valve Retakes subtrees postplant, human combat bridge retained",
+    "BotAimImprover": "custom 2.1.8-human.8.55; ordinary enemy reactions Low 250 / Medium 190 / High 140ms; preserve combat on retake handoff",
     "BotState": "custom 1.10.6-human.3; yield movement and fake defuse to owned Retakes tree",
     "NadeSystem": "preserved custom source; upstream 7605f272 unchanged",
     "BotSupport": "custom 1.0.10-sniper-limit; team sniper quota also applies to donations",
@@ -37,8 +37,13 @@
     "gameplay_tuning": "Existing custom settings; enemy combat strength now 0.80, ally 0.75, other tuning preserved.",
     "data": "difficulty VPKs, human-aim.json, navigation, nade snapshots, bot-only cosmetic config",
     "EnemyStrength": 0.8,
-    "MediumEnemyReactionMs": 170,
-    "RetakeAI": true
+    "MediumEnemyReactionMs": 190,
+    "RetakeAI": true,
+    "EnemyReactionMs": {
+      "Low": 250,
+      "Medium": 190,
+      "High": 140
+    }
   },
   "runtime_files": [
     {
@@ -339,11 +344,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.dll",
-      "sha256": "4060c770605281b59d0f0fa853400fe8c8ca2ae693be1989b352f8f120701b53"
+      "sha256": "20aea79b2d57a68e36cced30cacb13664ae9025a74e447b1a21d07034d926dd5"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.pdb",
-      "sha256": "07f6e1850e421eebab01ce4ce27e081abfd67bac36473f14e02ce92c10131bf9"
+      "sha256": "1ebdd1aa1156a07fea6622f37dcaa05cdc08840bc04bdf6075671a5a2ce1816e"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotBuy/BotBuy.deps.json",
@@ -2094,7 +2099,7 @@
     },
     {
       "path": "scripts/ai/custom_improver/retake.kv3",
-      "sha256": "bbf787d83fb541f775de4421b985ef8acc95d33212f02c051b99ba90534e528d"
+      "sha256": "1c24c41689dceb62ce303131095d54c34d5fc55e23a56d5dc017596b8894b454"
     },
     {
       "path": "scripts/ai/custom_improver/retake_config.kv3",
@@ -2108,7 +2113,7 @@
     "recorded_on": "2026-11-11",
     "note": "Managed by Panel/user; do not overwrite from the base lock."
   },
-  "custom_revision": "valve-retake-tree-20261113",
+  "custom_revision": "retake-response-and-reaction-20261113",
   "counterstrikesharp_native_hotfix": {
     "source": "https://github.com/roflmuffin/CounterStrikeSharp/pull/1490",
     "commit": "86e57d69ee33d0480a6ebd221b579860a26eeb78",

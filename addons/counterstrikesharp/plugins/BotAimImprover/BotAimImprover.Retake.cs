@@ -21,6 +21,7 @@ public partial class BotAimImprover
     private string? _retakePreviousTree;
     private readonly Dictionary<int,uint> _retakePawns=new();
     private readonly Dictionary<int,(uint Pawn,uint Target,float Next,bool Visible)> _retakeSight=new();
+    private static readonly int[] RetakeAttentionParts=[0,17,3,8,9,4];
     private bool RetakeOwnsGoals=>_retakePreviousTree!=null;
     private bool IsRetakeBot(CCSPlayerController p)=>_retakePawns.TryGetValue(p.Slot,out var pawn)&&pawn==p.PlayerPawn.Raw;
 
@@ -72,7 +73,9 @@ public partial class BotAimImprover
         string previous=_retakeTreeVar.StringValue;
         if(!string.IsNullOrEmpty(previous))return; // Respect native Retakes, Rush and other tree owners.
         _retakePreviousTree=previous;
-        ResetHuman();ResetTeamSupport();
+        // A mode handoff is not a new enemy contact. Keep reaction progress,
+        // observations, burst history and elite assignment already in flight.
+        ResetAllSilentMovement();ResetCoverPeeks();ResetTeamSupport();ResetTeamNavigation();
         _retakeTreeVar.SetValue(RetakeAiContract.Tree);
         try
         {
@@ -89,6 +92,9 @@ public partial class BotAimImprover
         // This no-argument native initializer was verified in the pinned server:
         // it resets AI state and creates the tree at +0x5d8; it does not respawn the pawn.
         _retakePawns[p.Slot]=p.PlayerPawn.Raw;
+        if(_humanStates.TryGetValue(p.Slot,out var state)&&state.Pawn==p.PlayerPawn.Raw)
+            _retakeSight[p.Slot]=(p.PlayerPawn.Raw,state.Enemy,0,false);
+        _pendingLargeTurns.Remove(bot.Handle);_turnAssistActive.Remove(bot.Handle);_nativeTurnAt.Remove(bot.Handle);
         _reloadRetakeBrain!.Invoke(bot.Handle);
         if(Marshal.ReadIntPtr(bot.Handle+0x5d8)==nint.Zero)throw new InvalidOperationException("Native behavior tree did not load");
     }
@@ -123,7 +129,7 @@ public partial class BotAimImprover
                     if(candidate is not {IsValid:true,PawnIsAlive:true}||candidate.TeamNum==p.TeamNum||candidate.TeamNum is not (2 or 3))continue;
                     if((candidate.PlayerPawn.Raw==sight.Target)!=(pass==0)||candidate.PlayerPawn.Value is not {IsValid:true} enemy
                         ||!TryReadTargetGeometry(enemy,out var geometry))continue;
-                    foreach(int part in _attentionParts)
+                    foreach(int part in RetakeAttentionParts)
                     {
                         if(!TryComputePartPos(geometry,part,out var x,out var y,out var z))continue;
                         var point=new Vec(x,y,z);var d=AimMath.Delta(AimMath.Angles(from,point),view);
@@ -134,7 +140,16 @@ public partial class BotAimImprover
                     if(target!=uint.MaxValue)break;
                 }
             }
-            sight=(p.PlayerPawn.Raw,target,now+MathF.Max(.025f,CombatProfile(p,now).SampleInterval),target!=uint.MaxValue);
+            bool visible=target!=uint.MaxValue;
+            // Retain identity through a brief occlusion, but never mark it visible
+            // or feed live hidden coordinates into the model. This matches the
+            // legacy enemy handle's continuity and avoids new reaction plans.
+            bool previousAlive=false;
+            foreach(var c in EntityPlayers())
+                if(c.IsValid&&c.PawnIsAlive&&c.TeamNum!=p.TeamNum&&c.TeamNum is 2 or 3&&c.PlayerPawn.Raw==sight.Target)
+                {previousAlive=true;break;}
+            target=RetakeAiContract.RememberTarget(target,sight.Target,previousAlive);
+            sight=(p.PlayerPawn.Raw,target,now+CombatProfile(p,now).SampleInterval,visible);
             _retakeSight[p.Slot]=sight;
         }
         bot.Enemy.Raw=sight.Target;bot.IsEnemyVisible=sight.Visible&&pawn.BlindUntilTime<=now;

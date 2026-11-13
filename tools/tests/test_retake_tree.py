@@ -78,6 +78,12 @@ class RetakeTreeTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             parse_kv3('{ children = [ {} {} ] }')
 
+    def test_damage_reacquisition_cannot_preempt_established_attack(self):
+        tree = parse_kv3((DATA / 'retake.kv3').read_text())
+        selector = next(n for n in walk(tree) if n.get('type') == 'selector')
+        self.assertEqual(selector['children'][0]['file'], 'scripts/ai/modules/bt_attack.kv3')
+        self.assertEqual(selector['children'][1]['entity_type_filter'], 'DAMAGE')
+
 
 if __name__ == '__main__':
     unittest.main()

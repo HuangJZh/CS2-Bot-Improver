@@ -599,13 +599,13 @@ Check(!CombatBalancePolicy.IsHumanEnemy(3,8)&&!CombatBalancePolicy.IsHumanEnemy(
 Check(!CombatBalancePolicy.IsHumanEnemy(2,0)&&!CombatBalancePolicy.IsHumanEnemy(3,12),"spectators and humans on both sides stay neutral");
 Check(CombatBalancePolicy.NormalizeEnemyStrength(float.NaN)==.8f&&CombatBalancePolicy.NormalizeEnemyStrength(0)>.0f,"invalid enemy scale cannot cause invalid division");
 var mediumEnemy=CombatBalancePolicy.EnemyProfile(HumanAimProfile.For("Medium"),.8f,"Medium");
-Check(MathF.Abs(mediumEnemy.Reaction-.170f)<.000001f,"ordinary Medium enemies use 170ms after all strength scaling");
+Check(MathF.Abs(mediumEnemy.Reaction-.190f)<.000001f,"ordinary Medium enemies use 190ms after all strength scaling");
 Check(mediumEnemy with{Reaction=HumanAimProfile.For("Medium").Reaction/.8f}==CombatBalancePolicy.EnemyProfile(HumanAimProfile.For("Medium"),.8f),
- "170ms override leaves all other enemy combat parameters unchanged");
-Check(MathF.Abs(CombatBalancePolicy.AllyProfile(mediumEnemy,1.2f).Reaction-.170f/1.2f)<.000001f
- &&MathF.Abs(CombatBalancePolicy.AllyProfile(mediumEnemy,1.3f).Reaction-.170f/1.3f)<.000001f,"Medium elite reaction remains relatively faster");
+ "190ms override leaves all other enemy combat parameters unchanged");
+Check(MathF.Abs(CombatBalancePolicy.AllyProfile(mediumEnemy,1.2f).Reaction-.190f/1.2f)<.000001f
+ &&MathF.Abs(CombatBalancePolicy.AllyProfile(mediumEnemy,1.3f).Reaction-.190f/1.3f)<.000001f,"Medium elite reaction remains relatively faster");
 foreach(var level in new[]{"Low","High"})
- Check(CombatBalancePolicy.EnemyProfile(HumanAimProfile.For(level),.8f,level)==CombatBalancePolicy.EnemyProfile(HumanAimProfile.For(level),.8f),level+" reaction unchanged by Medium override");
+ Check(MathF.Abs(CombatBalancePolicy.EnemyProfile(HumanAimProfile.For(level),.8f,level).Reaction-(level=="Low"?.250f:.140f))<.000001f,level+" ordinary enemy reaction uses the explicit target");
 Check(MathF.Abs(CombatBalancePolicy.AllyProfile(HumanAimProfile.For("Medium"),.75f).Reaction-.120f/1.10f/.75f)<.000001f,
  "Medium ally reaction unchanged by enemy-only override");
 Check(BotCombatPolicy.RetakeAiContract.Eligible(true,0,1,true,true),"competitive postplant admits Valve Retakes tree");
@@ -615,4 +615,7 @@ Check(!BotCombatPolicy.RetakeAiContract.Eligible(true,0,1,true,false),"frozen an
 Check(!BotCombatPolicy.RetakeAiContract.Eligible(false,0,1,true,true),"disabled Retakes feature cannot attach");
 Check(!BotCombatPolicy.RetakeAiContract.Eligible(true,0,5,true,true),"native Retakes mode is not overwritten");
 Check(!BotCombatPolicy.RetakeAiContract.Eligible(true,1,2,true,true),"deathmatch and other modes retain their own trees");
+Check(BotCombatPolicy.RetakeAiContract.RememberTarget(uint.MaxValue,42,true)==42,"temporary retake occlusion keeps target identity");
+Check(BotCombatPolicy.RetakeAiContract.RememberTarget(uint.MaxValue,42,false)==uint.MaxValue,"dead or replaced target cannot survive in retake memory");
+Check(BotCombatPolicy.RetakeAiContract.RememberTarget(99,42,true)==99,"a new visible opponent can replace the remembered target");
 Console.WriteLine($"{count} checks passed");
