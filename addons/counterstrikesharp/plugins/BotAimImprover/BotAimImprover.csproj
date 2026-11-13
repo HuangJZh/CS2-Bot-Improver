@@ -23,4 +23,4 @@
     <None Include="preaim-nodes.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="navigation/*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
-</Project>
+<ItemGroup><Compile Include="../../policies/RetakeAiContract.cs" Link="RetakeAiContract.cs" /></ItemGroup><ItemGroup><None Include="retake/*.kv3" CopyToOutputDirectory="PreserveNewest" /></ItemGroup></Project>

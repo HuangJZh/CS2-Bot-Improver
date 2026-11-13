@@ -48,6 +48,7 @@ public partial class BotAimImprover
     }
     private HookResult OnNativeUpdatePost(DynamicHook hook)
     {
+        if(RetakeOwnsGoals){var pointer=hook.GetParam<nint>(0);PrepareHumanAim(pointer);ApplyRetakeAim(pointer);}
         RefreshNativeFireGuard(hook);
         ReapplyOwnedSoundGaze(hook);
         return ExitNativePhase(hook);

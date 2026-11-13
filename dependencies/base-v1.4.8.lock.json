@@ -1,6 +1,6 @@
 {
   "schema": "cs2-bot-custom-base-lock-v1",
-  "custom_version": "8.53",
+  "custom_version": "8.54",
   "date": "2026-11-13",
   "cs2_buildid": "26598758",
   "stable_restore_tag": "custom-8.49-stable",
@@ -16,8 +16,8 @@
     "BotController": "a46b15a865c135a95f44688bd964da478f83a51a",
     "BotHider": "8be8e95919abb4ab05bb82b8cbdf516b4e347aa5",
     "BotVision": "df8f0707c7590cd55d9ffb8f6824ec9f3c959f5f",
-    "BotAimImprover": "custom source 2.1.8-human.8.53; ordinary Medium enemy reaction 170ms; elite 131-142ms; allies and Low/High unchanged",
-    "BotState": "custom 1.10.6-human.2; reuse flash scratch list, unchanged avoidance decisions",
+    "BotAimImprover": "custom 2.1.8-human.8.54; actual Valve Retakes subtrees postplant, human combat bridge retained",
+    "BotState": "custom 1.10.6-human.3; yield movement and fake defuse to owned Retakes tree",
     "NadeSystem": "preserved custom source; upstream 7605f272 unchanged",
     "BotSupport": "custom 1.0.10-sniper-limit; team sniper quota also applies to donations",
     "BotRandomizer": "preserved installed bot-only customization; binary pinned by SHA256",
@@ -37,7 +37,8 @@
     "gameplay_tuning": "Existing custom settings; enemy combat strength now 0.80, ally 0.75, other tuning preserved.",
     "data": "difficulty VPKs, human-aim.json, navigation, nade snapshots, bot-only cosmetic config",
     "EnemyStrength": 0.8,
-    "MediumEnemyReactionMs": 170
+    "MediumEnemyReactionMs": 170,
+    "RetakeAI": true
   },
   "runtime_files": [
     {
@@ -338,11 +339,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.dll",
-      "sha256": "e2ed8821d146335b696f1908b529e8d0aeb68cd081239a3700db1e01aa62e00c"
+      "sha256": "4060c770605281b59d0f0fa853400fe8c8ca2ae693be1989b352f8f120701b53"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.pdb",
-      "sha256": "85c3e796a1942fa2d3552429c343496932a39eb73bfa5514ae4bceafa84ccdcf"
+      "sha256": "07f6e1850e421eebab01ce4ce27e081abfd67bac36473f14e02ce92c10131bf9"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotBuy/BotBuy.deps.json",
@@ -378,11 +379,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotState/BotState.dll",
-      "sha256": "b1fb7100a250b4545620164c5d18eaff8e97f2796f1b5aafebcf03bdbadafee9"
+      "sha256": "7ed7fb20a030ea9b6502f147784b1052a7f31471f6a8d0cbd4cf039b6433d461"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotState/BotState.pdb",
-      "sha256": "fd7cc85c40d366131beb7326c5d6adc74a792d4c5bde0a7dfb87163da589cc89"
+      "sha256": "a0d06cfc8dd187a90a16d3adf7298f478f9ff79e89a67dfef9c861baffd878bd"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotSupport/BotSupport.deps.json",
@@ -2089,7 +2090,15 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/human-aim.json",
-      "sha256": "75337b76ece3623a02b5bf4115bb38fffe124fb766a5549bf30c1e376e4d848a"
+      "sha256": "ff73d28bda842e61151fc01931c8b9fcda46105734f80bb2956fbd0ba65b1e9b"
+    },
+    {
+      "path": "scripts/ai/custom_improver/retake.kv3",
+      "sha256": "bbf787d83fb541f775de4421b985ef8acc95d33212f02c051b99ba90534e528d"
+    },
+    {
+      "path": "scripts/ai/custom_improver/retake_config.kv3",
+      "sha256": "3ad13700755bebb2338e0d6181b57be4f51ecac153d686a6c46769a7675574a8"
     }
   ],
   "user_config_snapshot": {
@@ -2099,7 +2108,7 @@
     "recorded_on": "2026-11-11",
     "note": "Managed by Panel/user; do not overwrite from the base lock."
   },
-  "custom_revision": "medium-enemy-reaction-170-20261113",
+  "custom_revision": "valve-retake-tree-20261113",
   "counterstrikesharp_native_hotfix": {
     "source": "https://github.com/roflmuffin/CounterStrikeSharp/pull/1490",
     "commit": "86e57d69ee33d0480a6ebd221b579860a26eeb78",
@@ -2107,5 +2116,17 @@
     "build_run": "https://github.com/HuangJZh/CS2-Bot-Improver/actions/runs/43207178824",
     "sha256": "397aeda78abd68a98245ff6dd70bff2af891bd30d4ee44c84a790b4a1e038a0a",
     "status": "Locally built upstream draft fix; managed API and plugin binaries preserved."
+  },
+  "retake_ai_binding": {
+    "server_sha256": "84d596644ad574ac70f427777c89f9006a8023f493c46f4c215f40bceef13cbb",
+    "platform": "windows",
+    "mode": "classic casual/competitive after planted C4 only",
+    "valve_subtree_sha256": {
+      "bt_defuse_planted_bomb.kv3": "7f2b8028b247df47f89ff05d13e1edcb32bc45e7f3458359648802a9eb2c2c35",
+      "bt_hide_near_planted_bomb.kv3": "ec27d1f731c6a27b24e07b83f684f91155a5ec880904802b420f260bc85add11",
+      "bt_hold_near_planted_bomb.kv3": "4fae1f2c34543912adb0b489cf68309db4b16dace6fa95c8d6880dc2b323ac16",
+      "bt_watch_approach_points.kv3": "2e627679fcc911e5f6883819fcd8702119a325e0a37a7d8315d8c4e846249801"
+    },
+    "source_assets": "Existing installed game VPK, not redistributed"
   }
 }

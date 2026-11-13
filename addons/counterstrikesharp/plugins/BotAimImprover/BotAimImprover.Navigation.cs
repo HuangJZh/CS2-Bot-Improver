@@ -132,6 +132,7 @@ public partial class BotAimImprover
     }
     private void TickTeamNavigation()
     {
+        if(RetakeOwnsGoals)return;
         if(!_humanSettings.TeamNavigation||!HumanActive||_navigationFailed||_navigationRoundEnded||_navigationMoveTo==null)return;
         float now=Server.CurrentTime;if(now<_navigationTick)return;_navigationTick=now+.2f;
         try

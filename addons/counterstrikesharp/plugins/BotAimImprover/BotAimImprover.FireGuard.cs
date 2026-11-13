@@ -154,6 +154,8 @@ public partial class BotAimImprover
     {
         if(TestGateActive)return new(false,true,"test-override");
         if(_humanSettings.NativeCombat)return EvaluateNativeCombatGate(player,pawn,bot);
+        if(IsRetakeBot(player)&&(!_humanStates.TryGetValue(player.Slot,out var retakeState)||retakeState.Pawn!=player.PlayerPawn.Raw
+            ||!retakeState.LastSight||!retakeState.Model.HasObservation||!bot.IsEnemyVisible))return new(false,true,"retake-await-visual-plan");
         // Inhibit only: these coarse native-enemy coordinates never steer aim or
         // enter the perceptual model. Keep this check ahead of every fail-open path,
         // timeout and burst latch, including a newly assigned or retained enemy.

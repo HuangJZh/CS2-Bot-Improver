@@ -27,6 +27,7 @@ public partial class BotAimImprover
         public bool TeamNavigation {get;set;}=true;
         public bool RoundLearning {get;set;}=true;
         public bool TeamSupport {get;set;}=true;
+        public bool RetakeAI {get;set;}=true;
     }
     private sealed class HumanState
     {
@@ -80,6 +81,7 @@ public partial class BotAimImprover
         InitializeTeamNavigation();
         InitializeRoundLearning();
         InitializeTeamSupport();
+        InitializeRetakeAi();
         RegisterListener<Listeners.OnMapStart>(_=>Server.NextFrame(ApplyTeammatePassthrough));
         RegisterEventHandler<EventRoundStart>((e,i)=>{ApplyTeammatePassthrough();return HookResult.Continue;});
         ApplyTeammatePassthrough();
@@ -122,6 +124,7 @@ public partial class BotAimImprover
         }
         RegisterListener<Listeners.OnTick>(() =>
         {
+            if(RetakeOwnsGoals&&(!HumanActive||_humanSettings.NativeCombat||!_humanSettings.RetakeAI))EndRetakeAi(true);
             CleanCombatHistories();
             // ReleaseHuman removes entries but never adds to this dictionary.
             foreach(var (slot,state) in _humanStates)
@@ -334,8 +337,9 @@ public partial class BotAimImprover
             var bot=new CCSBot(pointer);
             if(pawn.IsDefusing||(_plantingUntil.TryGetValue(controller.Slot,out var plantingUntil)&&now<plantingUntil))
             {CancelSoundAttention(controller);ResetSilentMovement(controller.Slot);ReleaseHuman(controller.Slot);ReleaseFireGuard(controller.Slot);return HookResult.Continue;}
-            TickSilentMovement(controller,pawn,bot,now);
-            bool visualPriority=HasReliableVisibleThreat(controller,now);
+            bool retake=IsRetakeBot(controller);
+            if(!retake)TickSilentMovement(controller,pawn,bot,now);
+            bool visualPriority=retake?UpdateRetakeSight(controller,pawn,bot,eye,now):HasReliableVisibleThreat(controller,now);
             if(visualPriority)CancelSoundAttention(controller);
             if(bot.Enemy.Value is not {IsValid:true} enemy || enemy.LifeState!=0 || enemy.TeamNum==controller.TeamNum)
             {
@@ -352,7 +356,7 @@ public partial class BotAimImprover
                     RefreshFireGuard(controller);
                     return HookResult.Continue;
                 }
-                if(!visualPriority)
+                if(!visualPriority&&!retake)
                 {
                     if(TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
                     if(TryApplySupportPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
@@ -436,7 +440,7 @@ public partial class BotAimImprover
             // A retained native enemy is not a live visual threat. Let a ready
             // sound cue interrupt old visual memory before any early return.
             if(visible){ApplyVisibleAlertCredit(controller,state,now);CancelSoundAttention(controller);}
-            else if(TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
+            else if(!retake&&TryApplySoundPreaim(controller,bot,pointer,pawn,eyeVec,now))return HookResult.Continue;
             // Preserve native search/navigation once visual memory is gone. While a
             // recent observation is still usable, keep the memory-based plan alive so
             // the model holds/predicts the last seen angle instead of snapping back to

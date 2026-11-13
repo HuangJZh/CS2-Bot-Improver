@@ -42,7 +42,7 @@ public partial class BotState
         // Prevent bots from holding their knives when there're enemies alive
         _gunReequipTimer = AddTimer(
             1.0f,
-            ()=>{if(!_nativeCombat)ReequipGunForActiveBots();},
+            ()=>{if(!_nativeCombat&&!RetakeOwnsGoals)ReequipGunForActiveBots();},
             CounterStrikeSharp.API.Modules.Timers.TimerFlags.REPEAT);
         StartRushAntennaPublisher();
     }

@@ -57,6 +57,7 @@ public partial class BotAimImprover
     }
     private void RequestTeamSupport(CCSPlayerController source)
     {
+        if(RetakeOwnsGoals)return;
         float now=Server.CurrentTime;
         if(!HumanActive||!_humanSettings.TeamSupport||!_humanSettings.TeamNavigation||source.TeamNum is not (2 or 3)
             ||source.PlayerPawn.Value is not {IsValid:true} sp||sp.AbsOrigin==null

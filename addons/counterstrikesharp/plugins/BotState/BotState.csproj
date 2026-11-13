@@ -20,4 +20,4 @@
   </ItemGroup>
 
 <ItemGroup><Compile Include="../../policies/CombatBackend.cs" Link="CombatBackend.cs" /></ItemGroup>
-</Project>
+<ItemGroup><Compile Include="../../policies/RetakeAiContract.cs" Link="RetakeAiContract.cs" /></ItemGroup></Project>

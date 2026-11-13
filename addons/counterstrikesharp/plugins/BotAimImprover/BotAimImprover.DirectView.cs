@@ -20,6 +20,7 @@ public partial class BotAimImprover
     }
     private HookResult OnHumanLookPost(DynamicHook hook)
     {
+        if(RetakeOwnsGoals){ApplyRetakeAim(hook.GetParam<nint>(0));return HookResult.Continue;}
         if(HumanActive&&!_humanSettings.DirectViewControl)ApplyPendingLargeTurn(hook.GetParam<nint>(0));
         if(!HumanActive || !_humanSettings.DirectViewControl || _setEyeAngles==null)return HookResult.Continue;
         CCSPlayerController? controller=null;

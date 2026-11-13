@@ -608,4 +608,11 @@ foreach(var level in new[]{"Low","High"})
  Check(CombatBalancePolicy.EnemyProfile(HumanAimProfile.For(level),.8f,level)==CombatBalancePolicy.EnemyProfile(HumanAimProfile.For(level),.8f),level+" reaction unchanged by Medium override");
 Check(MathF.Abs(CombatBalancePolicy.AllyProfile(HumanAimProfile.For("Medium"),.75f).Reaction-.120f/1.10f/.75f)<.000001f,
  "Medium ally reaction unchanged by enemy-only override");
+Check(BotCombatPolicy.RetakeAiContract.Eligible(true,0,1,true,true),"competitive postplant admits Valve Retakes tree");
+Check(BotCombatPolicy.RetakeAiContract.Eligible(true,0,0,true,true),"casual postplant admits Valve Retakes tree");
+Check(!BotCombatPolicy.RetakeAiContract.Eligible(true,0,1,false,true),"preplant remains normal full-match behavior");
+Check(!BotCombatPolicy.RetakeAiContract.Eligible(true,0,1,true,false),"frozen and inactive rounds cannot attach Retakes tree");
+Check(!BotCombatPolicy.RetakeAiContract.Eligible(false,0,1,true,true),"disabled Retakes feature cannot attach");
+Check(!BotCombatPolicy.RetakeAiContract.Eligible(true,0,5,true,true),"native Retakes mode is not overwritten");
+Check(!BotCombatPolicy.RetakeAiContract.Eligible(true,1,2,true,true),"deathmatch and other modes retain their own trees");
 Console.WriteLine($"{count} checks passed");

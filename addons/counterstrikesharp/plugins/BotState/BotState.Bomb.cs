@@ -87,6 +87,7 @@ public partial class BotState
     // Starts the reveal cycle and rolls the existing fake-defuse probability.
     private HookResult OnBombBeginDefuse(EventBombBegindefuse @event, GameEventInfo info)
     {
+        if(RetakeOwnsGoals)return HookResult.Continue; // Do not interrupt Valve's exclusive defuser lock.
         ResetLookAroundForBot(@event.Userid);
 
         var player = @event.Userid;

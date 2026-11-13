@@ -1,0 +1,122 @@
+<!-- kv3 encoding:text:version{e21c7f3c-8a33-41c5-9977-a76d3a32aa0d} format:generic:version{7412167c-06e9-4698-aff2-e63eb59037e7} -->
+// Custom wiring: execute Valve Retakes subtrees from the installed game.
+{
+	config = "scripts/ai/custom_improver/retake_config.kv3"
+	root = {
+		type = "decorator_bot_service"
+		memory_to_expire = [
+			{
+				key = "ShortTermAttackMemory"
+				time = 0.7
+				distance = 0
+			},
+			{
+				key = "LongTermMemory"
+				time = 10
+				distance = 500
+			},
+			{
+				key = "ShortTermInvestigateMemory"
+				time = 3
+				distance = 200
+			}
+		]
+		child = {
+			type = "parallel"
+			children = [
+				{
+					type = "decorator_repeat"
+					child = {
+						type = "parallel"
+						children = [
+							{
+								type = "subtree"
+								file = "scripts/ai/modules/bt_memorize_enemies_vision.kv3"
+								name = "RetakeVision"
+							},
+							{
+								type = "subtree"
+								file = "scripts/ai/modules/bt_memorize_noises.kv3"
+								name = "RetakeHearing"
+							},
+							{
+								type = "subtree"
+								file = "scripts/ai/modules/bt_memorize_nearest_investigation.kv3"
+								name = "RetakeInvestigationMemory"
+							}
+						]
+					}
+				},
+				{
+					type = "decorator_repeat"
+					child = {
+						type = "selector"
+						children = [
+                            {
+                                type = "decorator_sensor"
+                                entity_type_filter = "DAMAGE"
+                                output = "RetakeDamage"
+                                priority = 0
+                                child = {
+                                    type = "condition_is_empty"
+                                    input = "RetakeDamage"
+                                    negated = 1
+                                    child = {
+                                        type = "action_aim"
+                                        input = "RetakeDamage"
+                                        acquire_only = 1
+                                    }
+                                }
+                            },
+							{
+								type = "subtree"
+								file = "scripts/ai/modules/bt_attack.kv3"
+								name = "RetakeAttack"
+							},
+							{
+								type = "condition_is_equal"
+								source = "TeamName"
+								destination = "'CT'"
+								child = {
+									type = "subtree"
+									file = "scripts/ai/retakes/modules/bt_defuse_planted_bomb.kv3"
+									name = "ValveDefusePlantedBomb"
+								}
+							},
+							{
+								type = "condition_is_equal"
+								source = "TeamName"
+								destination = "'T'"
+								child = {
+									type = "subtree"
+									file = "scripts/ai/retakes/modules/bt_hide_near_planted_bomb.kv3"
+									name = "ValveHideNearBomb"
+								}
+							},
+							{
+								type = "condition_is_equal"
+								source = "TeamName"
+								destination = "'CT'"
+								child = {
+									type = "subtree"
+									file = "scripts/ai/retakes/modules/bt_hold_near_planted_bomb.kv3"
+									name = "ValveHoldNearBomb"
+								}
+							},
+							{
+								type = "subtree"
+								file = "scripts/ai/modules/bt_investigate_closest_memorized_event.kv3"
+								name = "RetakeInvestigate"
+							},
+							{
+								type = "subtree"
+								file = "scripts/ai/retakes/modules/bt_watch_approach_points.kv3"
+								name = "ValveWatchApproaches"
+							}
+						]
+					}
+				}
+			]
+		}
+	}
+}

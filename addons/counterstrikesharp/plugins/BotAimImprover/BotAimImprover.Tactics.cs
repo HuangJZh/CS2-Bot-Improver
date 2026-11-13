@@ -62,6 +62,7 @@ public partial class BotAimImprover
     }
     private void MaintainTacticalMovement()
     {
+        if(RetakeOwnsGoals)return;
         foreach(var slot in _silentStates.Keys.Concat(_coverPeeks.Keys).Distinct().ToArray())
         {
             var p=EntityPlayerAtSlot(slot);
