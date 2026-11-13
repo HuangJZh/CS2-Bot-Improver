@@ -606,8 +606,8 @@ Check(MathF.Abs(CombatBalancePolicy.AllyProfile(mediumEnemy,1.2f).Reaction-.190f
  &&MathF.Abs(CombatBalancePolicy.AllyProfile(mediumEnemy,1.3f).Reaction-.190f/1.3f)<.000001f,"Medium elite reaction remains relatively faster");
 foreach(var level in new[]{"Low","High"})
  Check(MathF.Abs(CombatBalancePolicy.EnemyProfile(HumanAimProfile.For(level),.8f,level).Reaction-(level=="Low"?.250f:.140f))<.000001f,level+" ordinary enemy reaction uses the explicit target");
-Check(MathF.Abs(CombatBalancePolicy.AllyProfile(HumanAimProfile.For("Medium"),.75f).Reaction-.120f/1.10f/.75f)<.000001f,
- "Medium ally reaction unchanged by enemy-only override");
+Check(MathF.Abs(CombatBalancePolicy.AllyProfile(mediumEnemy,.75f).Reaction-.190f/.75f)<.000001f,
+ "Medium ally reaction follows the new ordinary enemy baseline");
 Check(BotCombatPolicy.RetakeAiContract.Eligible(true,0,1,true,true),"competitive postplant admits Valve Retakes tree");
 Check(BotCombatPolicy.RetakeAiContract.Eligible(true,0,0,true,true),"casual postplant admits Valve Retakes tree");
 Check(!BotCombatPolicy.RetakeAiContract.Eligible(true,0,1,false,true),"preplant remains normal full-match behavior");
@@ -618,4 +618,13 @@ Check(!BotCombatPolicy.RetakeAiContract.Eligible(true,1,2,true,true),"deathmatch
 Check(BotCombatPolicy.RetakeAiContract.RememberTarget(uint.MaxValue,42,true)==42,"temporary retake occlusion keeps target identity");
 Check(BotCombatPolicy.RetakeAiContract.RememberTarget(uint.MaxValue,42,false)==uint.MaxValue,"dead or replaced target cannot survive in retake memory");
 Check(BotCombatPolicy.RetakeAiContract.RememberTarget(99,42,true)==99,"a new visible opponent can replace the remembered target");
+foreach(var level in new[]{"Low","Medium","High"})
+{
+ var enemy=CombatBalancePolicy.EnemyProfile(HumanAimProfile.For(level),.8f,level);
+ var ally=CombatBalancePolicy.AllyProfile(enemy,.75f);
+ float expected=level switch{"Low"=>1f/3,"High"=>.140f/.75f,_=>.190f/.75f};
+ Check(MathF.Abs(ally.Reaction-expected)<.000001f,level+" ally reaction keeps a 25-percent strength disadvantage");
+ Check(MathF.Abs(ally.MaxSpeed/enemy.MaxSpeed-.75f)<.000001f,level+" ally motor speed is 75 percent of ordinary enemies");
+ Check(MathF.Abs(ally.MotorError/enemy.MotorError-1/.75f)<.000001f,level+" ally precision follows the same relative handicap");
+}
 Console.WriteLine($"{count} checks passed");

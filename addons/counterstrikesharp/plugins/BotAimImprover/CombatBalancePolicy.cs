@@ -22,7 +22,7 @@ public static class CombatBalancePolicy
     {
         var profile=p.ScaleCombat(NormalizeEnemyStrength(strength));
         // User tuning applies to ordinary enemies after global scaling.
-        // Elite scaling is applied by the caller afterwards; allies stay intact.
+        // Elite and teammate relative scaling is applied by the caller afterwards.
         return difficulty==null?profile:profile with{Reaction=EnemyReactionSeconds(difficulty)};
     }
     public static float HeadIntentChance(string difficulty,AimWeaponClass weapon,string? item)

@@ -1,6 +1,6 @@
 {
   "schema": "cs2-bot-custom-base-lock-v1",
-  "custom_version": "8.55",
+  "custom_version": "8.56",
   "date": "2026-11-13",
   "cs2_buildid": "26598758",
   "stable_restore_tag": "custom-8.49-stable",
@@ -16,7 +16,7 @@
     "BotController": "a46b15a865c135a95f44688bd964da478f83a51a",
     "BotHider": "8be8e95919abb4ab05bb82b8cbdf516b4e347aa5",
     "BotVision": "df8f0707c7590cd55d9ffb8f6824ec9f3c959f5f",
-    "BotAimImprover": "custom 2.1.8-human.8.55; ordinary enemy reactions Low 250 / Medium 190 / High 140ms; preserve combat on retake handoff",
+    "BotAimImprover": "custom 2.1.8-human.8.56; allies scaled to 75 percent of current ordinary enemy profile",
     "BotState": "custom 1.10.6-human.3; yield movement and fake defuse to owned Retakes tree",
     "NadeSystem": "preserved custom source; upstream 7605f272 unchanged",
     "BotSupport": "custom 1.0.10-sniper-limit; team sniper quota also applies to donations",
@@ -43,6 +43,12 @@
       "Low": 250,
       "Medium": 190,
       "High": 140
+    },
+    "HumanAllyStrengthReference": "Current ordinary enemy profile after EnemyStrength and explicit reaction targets",
+    "AllyReactionMs": {
+      "Low": 333.333,
+      "Medium": 253.333,
+      "High": 186.667
     }
   },
   "runtime_files": [
@@ -344,11 +350,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.dll",
-      "sha256": "20aea79b2d57a68e36cced30cacb13664ae9025a74e447b1a21d07034d926dd5"
+      "sha256": "d557a07af43c7420fa6b86331679e2fb29ba1b735d7a6709cc7f8b7944941d45"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.pdb",
-      "sha256": "1ebdd1aa1156a07fea6622f37dcaa05cdc08840bc04bdf6075671a5a2ce1816e"
+      "sha256": "f2d32932b82c599acce99cd93285e016ef8580b314d019387b42f4ce6d47b168"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotBuy/BotBuy.deps.json",
@@ -2113,7 +2119,7 @@
     "recorded_on": "2026-11-11",
     "note": "Managed by Panel/user; do not overwrite from the base lock."
   },
-  "custom_revision": "retake-response-and-reaction-20261113",
+  "custom_revision": "ally-relative-20261113",
   "counterstrikesharp_native_hotfix": {
     "source": "https://github.com/roflmuffin/CounterStrikeSharp/pull/1490",
     "commit": "86e57d69ee33d0480a6ebd221b579860a26eeb78",

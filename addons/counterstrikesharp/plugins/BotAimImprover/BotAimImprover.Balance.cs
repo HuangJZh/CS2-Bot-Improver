@@ -20,9 +20,11 @@ public partial class BotAimImprover
         {
             _balanceDifficulty=_humanDifficulty;_balanceStrength=_humanSettings.HumanAllyStrength;
             _baseCombatProfile=HumanAimProfile.For(_humanDifficulty);
-            _allyCombatProfile=CombatBalancePolicy.AllyProfile(_baseCombatProfile,_balanceStrength);
             _enemyStrength=_humanSettings.EnemyStrength;
             _enemyCombatProfile=CombatBalancePolicy.EnemyProfile(_baseCombatProfile,_enemyStrength,_humanDifficulty);
+            // The handicap is relative to today's ordinary enemies, including
+            // explicit per-difficulty reaction targets, not the older baseline.
+            _allyCombatProfile=CombatBalancePolicy.AllyProfile(_enemyCombatProfile,_balanceStrength);
             _eliteProfiles.Clear();
         }
         if(now>=_humanTeamsScanAt)
