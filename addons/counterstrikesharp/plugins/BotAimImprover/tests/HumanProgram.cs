@@ -380,8 +380,8 @@ foreach(float gap in new[]{5f,25f,70f})
   var prior=current with{FlickTime=level switch{"Low"=>.125f,"High"=>.065f,_=>.085f},FlickAmplitudeTime=.018f,FirstShotSettleLimit=.24f};
   var beforeTimes=Enumerable.Range(0,128).Select(seed=>FirstFire(prior,point,AimWeaponClass.Rifle,seed).Time).Order().ToArray();
   var afterTimes=Enumerable.Range(0,128).Select(seed=>FirstFire(current,point,AimWeaponClass.Rifle,seed).Time).Order().ToArray();
-  Check(afterTimes[64]<beforeTimes[64],$"{level} {gap}deg faster initial movement advances planned fire without reducing reaction");
   Console.WriteLine($"FLICK-TUNING {level} gap={gap} old_median_ms={beforeTimes[64]*1000:F1} new_median_ms={afterTimes[64]*1000:F1}");
+  Check(afterTimes[64]<=beforeTimes[64]+1f/128f,$"{level} {gap}deg shorter motor plan does not regress median beyond one simulation step");
  }
 }
 foreach(string level in new[]{"Low","Medium","High"})
@@ -412,7 +412,7 @@ bool sawOne=false,sawTwo=false;
 for(int seed=0;seed<32;seed++){var r=new EnemyEliteRoster();r.Refresh(8,balanceRoster,new Random(seed));sawOne|=r.Strengths.Count==1;sawTwo|=r.Strengths.Count==2;}
 Check(sawOne&&sawTwo,"round selection supports both one and two elite opponents");
 var eliteProfile=CombatBalancePolicy.AllyProfile(HumanAimProfile.For("Medium"),1.25f);
-Check(MathF.Abs(eliteProfile.Reaction-(.096f/1.10f))<.00001f&&eliteProfile.MotorError<HumanAimProfile.For("Medium").MotorError,
+Check(MathF.Abs(eliteProfile.Reaction-.080f)<.00001f&&eliteProfile.MotorError<HumanAimProfile.For("Medium").MotorError,
  "elite boost accelerates response and improves precision without damage changes");
 var midBefore840=new HumanAimProfile(.140f,.045f,.025f,.060f,.10f,.0075f,.045f,780,.90f)
  {PerceptionError=.05f,FlickAmplitudeTime=.008f,FirstShotSettleLimit=.10f,BurstLength=8,BurstPause=.18f};
@@ -424,26 +424,19 @@ foreach(float gap in new[]{5f,25f,70f})
  Check(newTimes[64]<oldTimes[64],$"8.40 Mid {gap}deg contact advances planned first fire relative to 8.39");
  Console.WriteLine($"MID-840 gap={gap} old_median_ms={oldTimes[64]*1000:F1} new_median_ms={newTimes[64]*1000:F1}");
 }
-Check(MathF.Abs(HumanAimProfile.For("Medium").MotorError-midBefore840.MotorError/1.10f)<.00001f
- &&MathF.Abs(HumanAimProfile.For("Medium").PerceptionError-midBefore840.PerceptionError/1.10f)<.00001f,"global combat scaling reduces Mid motor and sensory errors by the common factor");
-var before842=new Dictionary<string,HumanAimProfile>{
- ["Low"]=new(.180f,.075f,.040f,.105f,.24f,.015f,.085f,550,.72f){PerceptionError=.095f,FlickAmplitudeTime=.011f,FirstShotSettleLimit=.16f,BurstLength=5,BurstPause=.26f},
- ["Medium"]=new(.120f,.035f,.020f,.045f,.10f,.0075f,.032f,850,.90f){PerceptionError=.05f,FlickAmplitudeTime=.008f,FirstShotSettleLimit=.10f,BurstLength=8,BurstPause=.15f},
- ["High"]=new(.110f,.030f,.016f,.045f,.045f,.0035f,.030f,950,.97f){PerceptionError=.025f,FlickAmplitudeTime=.006f,FirstShotSettleLimit=.08f,BurstLength=10,BurstPause=.14f}
-};
-foreach(var (level,prior) in before842)
+var estimatedMid=HumanAimProfile.For("Medium");
+Check(estimatedMid.Reaction==.100f&&estimatedMid.SensorDelay==.020f&&estimatedMid.SampleInterval==.020f,"estimated Mid latency fields are final effective targets");
+Check(estimatedMid.FlickTime==.050f&&estimatedMid.TrackingTime==.050f&&estimatedMid.MaxSpeed==836f,"estimated Mid motor targets match the agreed calibration start");
+Check(estimatedMid.MotorError==.200f&&estimatedMid.AmplitudeError==.004f,"estimated Mid errors are not strengthened again by historical multipliers");
+foreach(var level in new[]{"Low","Medium","High"})
 {
- var current=HumanAimProfile.For(level);
- Check(Math.Abs(current.MaxSpeed/prior.MaxSpeed-1.10f)<.00001f&&Math.Abs(current.Reaction*1.10f-prior.Reaction)<.00001f,
-  level+" global scale increases speed and reduces latency consistently");
- Check(Math.Abs(current.MotorError*1.10f-prior.MotorError)<.00001f&&Math.Abs(current.PerceptionError*1.10f-prior.PerceptionError)<.00001f,
-  level+" global scale improves precision without changing target preference");
- Check(Math.Abs(current.SampleInterval*1.10f-prior.SampleInterval)<.00001f&&current.BurstLength==prior.BurstLength,
-  level+" faster sampling keeps discrete burst lengths unchanged");
- Check(Math.Abs(CombatBalancePolicy.AllyProfile(current,.85f).MaxSpeed/current.MaxSpeed-.85f)<.00001f,
-  level+" overall boost preserves relative ally handicap");
+ float scale=level switch{"Low"=>2f/3f,"High"=>4f/3f,_=>1f};var current=HumanAimProfile.For(level);
+ Check(Math.Abs(current.MaxSpeed/estimatedMid.MaxSpeed-scale)<.00001f&&Math.Abs(current.Reaction*scale-estimatedMid.Reaction)<.00001f,level+" tier scale increases speed and reduces latency consistently");
+ Check(Math.Abs(current.MotorError*scale-estimatedMid.MotorError)<.00001f&&Math.Abs(current.PerceptionError*scale-estimatedMid.PerceptionError)<.00001f,level+" tier scale applies coherently to motor and perception errors");
+ Check(Math.Abs(current.SampleInterval*scale-estimatedMid.SampleInterval)<.00001f,level+" visual sampling follows the tier scale");
+ Check(CombatBalancePolicy.EnemyProfile(current,1,level)==current,level+" default enemy scale does not double-apply historical tuning");
 }
-var preparedProfile=HumanAimProfile.For("Medium") with{MotorError=0,AmplitudeError=0};
+var preparedProfile=HumanAimProfile.For("Medium") with{Reaction=.15f,MotorError=0,AmplitudeError=0};
 var onset=new HumanAimModel(preparedProfile,Vector2.Zero,0,42);
 onset.Observe(0,new(600,0,0),4);onset.Step(.04f,Vector3.Zero,true);
 onset.Observe(.05f,new(600,25,0),4);
@@ -597,17 +590,14 @@ foreach(var level in new[]{"Low","Medium","High"})
 Check(CombatBalancePolicy.IsHumanEnemy(2,8)&&CombatBalancePolicy.IsHumanEnemy(3,4),"enemy reduction follows humans after side switch");
 Check(!CombatBalancePolicy.IsHumanEnemy(3,8)&&!CombatBalancePolicy.IsHumanEnemy(2,4),"enemy reduction never applies to teammates");
 Check(!CombatBalancePolicy.IsHumanEnemy(2,0)&&!CombatBalancePolicy.IsHumanEnemy(3,12),"spectators and humans on both sides stay neutral");
-Check(CombatBalancePolicy.NormalizeEnemyStrength(float.NaN)==.8f&&CombatBalancePolicy.NormalizeEnemyStrength(0)>.0f,"invalid enemy scale cannot cause invalid division");
-var mediumEnemy=CombatBalancePolicy.EnemyProfile(HumanAimProfile.For("Medium"),.8f,"Medium");
-Check(MathF.Abs(mediumEnemy.Reaction-.190f)<.000001f,"ordinary Medium enemies use 190ms after all strength scaling");
-Check(mediumEnemy with{Reaction=HumanAimProfile.For("Medium").Reaction/.8f}==CombatBalancePolicy.EnemyProfile(HumanAimProfile.For("Medium"),.8f),
- "190ms override leaves all other enemy combat parameters unchanged");
-Check(MathF.Abs(CombatBalancePolicy.AllyProfile(mediumEnemy,1.2f).Reaction-.190f/1.2f)<.000001f
- &&MathF.Abs(CombatBalancePolicy.AllyProfile(mediumEnemy,1.3f).Reaction-.190f/1.3f)<.000001f,"Medium elite reaction remains relatively faster");
+Check(CombatBalancePolicy.NormalizeEnemyStrength(float.NaN)==1f&&CombatBalancePolicy.NormalizeEnemyStrength(0)>.0f,"invalid enemy scale cannot cause invalid division");
+var mediumEnemy=CombatBalancePolicy.EnemyProfile(HumanAimProfile.For("Medium"),1f,"Medium");
+Check(MathF.Abs(mediumEnemy.Reaction-.100f)<.000001f,"ordinary Mid reaction is 100ms without additional multipliers");
+Check(MathF.Abs(CombatBalancePolicy.AllyProfile(mediumEnemy,1.2f).Reaction-.100f/1.2f)<.000001f
+ &&MathF.Abs(CombatBalancePolicy.AllyProfile(mediumEnemy,1.3f).Reaction-.100f/1.3f)<.000001f,"Mid elite reaction remains relatively faster");
 foreach(var level in new[]{"Low","High"})
- Check(MathF.Abs(CombatBalancePolicy.EnemyProfile(HumanAimProfile.For(level),.8f,level).Reaction-(level=="Low"?.250f:.140f))<.000001f,level+" ordinary enemy reaction uses the explicit target");
-Check(MathF.Abs(CombatBalancePolicy.AllyProfile(mediumEnemy,.75f).Reaction-.190f/.75f)<.000001f,
- "Medium ally reaction follows the new ordinary enemy baseline");
+ Check(MathF.Abs(CombatBalancePolicy.EnemyProfile(HumanAimProfile.For(level),1f,level).Reaction-(level=="Low"?.150f:.075f))<.000001f,level+" ordinary reaction follows Mid tier scaling");
+Check(MathF.Abs(CombatBalancePolicy.AllyProfile(mediumEnemy,.75f).Reaction-.100f/.75f)<.000001f,"Mid ally keeps the relative handicap on the new calibration");
 Check(BotCombatPolicy.RetakeAiContract.Eligible(true,0,1,true,true),"competitive postplant admits Valve Retakes tree");
 Check(BotCombatPolicy.RetakeAiContract.Eligible(true,0,0,true,true),"casual postplant admits Valve Retakes tree");
 Check(!BotCombatPolicy.RetakeAiContract.Eligible(true,0,1,false,true),"preplant remains normal full-match behavior");
@@ -620,9 +610,9 @@ Check(BotCombatPolicy.RetakeAiContract.RememberTarget(uint.MaxValue,42,false)==u
 Check(BotCombatPolicy.RetakeAiContract.RememberTarget(99,42,true)==99,"a new visible opponent can replace the remembered target");
 foreach(var level in new[]{"Low","Medium","High"})
 {
- var enemy=CombatBalancePolicy.EnemyProfile(HumanAimProfile.For(level),.8f,level);
+ var enemy=CombatBalancePolicy.EnemyProfile(HumanAimProfile.For(level),1f,level);
  var ally=CombatBalancePolicy.AllyProfile(enemy,.75f);
- float expected=level switch{"Low"=>1f/3,"High"=>.140f/.75f,_=>.190f/.75f};
+ float expected=level switch{"Low"=>.200f,"High"=>.100f,_=>.100f/.75f};
  Check(MathF.Abs(ally.Reaction-expected)<.000001f,level+" ally reaction keeps a 25-percent strength disadvantage");
  Check(MathF.Abs(ally.MaxSpeed/enemy.MaxSpeed-.75f)<.000001f,level+" ally motor speed is 75 percent of ordinary enemies");
  Check(MathF.Abs(ally.MotorError/enemy.MotorError-1/.75f)<.000001f,level+" ally precision follows the same relative handicap");

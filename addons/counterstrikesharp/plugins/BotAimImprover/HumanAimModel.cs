@@ -12,7 +12,6 @@ public sealed record HumanAimProfile(float Reaction, float SensorDelay, float Sa
     // are tuning hypotheses, not fitted rank or professional-player measurements.
     public int BurstLength {get;init;}=6;
     public float BurstPause {get;init;}=.28f;
-    public const float OverallStrength=1.10f;
     public HumanAimProfile ScaleCombat(float strength)=>this with
     {
         Reaction=Reaction/strength,SensorDelay=SensorDelay/strength,
@@ -31,15 +30,17 @@ public sealed record HumanAimProfile(float Reaction, float SensorDelay, float Sa
     {"Low"=>LowPreset,"High"=>HighPreset,_=>MediumPreset};
     private static HumanAimProfile BuildPreset(string level)
     {
-        var baseline=Baseline(level);
-        return baseline.ScaleCombat(OverallStrength) with{SampleInterval=baseline.SampleInterval/OverallStrength};
+        // Final effective calibration targets, not measured Aim Rush internals.
+        // Do not reapply the historical 1.10 boost or 0.80 enemy scale here.
+        var medium=new HumanAimProfile(.100f,.020f,.020f,.050f,.200f,.004f,.050f,836f,.97f)
+        {PerceptionError=.030f,FlickAmplitudeTime=.007f,FirstShotSettleLimit=.090f,BurstLength=8,BurstPause=.170f};
+        float strength=level switch{"Low"=>2f/3f,"High"=>4f/3f,_=>1f};
+        return medium.ScaleCombat(strength) with
+        {
+            SampleInterval=medium.SampleInterval/strength,
+            BurstLength=level switch{"Low"=>5,"High"=>10,_=>8}
+        };
     }
-    private static HumanAimProfile Baseline(string level) => level switch
-    {
-        "Low" => new(.180f,.075f,.040f,.105f,.24f,.015f,.085f,550,.72f){PerceptionError=.095f,FlickAmplitudeTime=.011f,FirstShotSettleLimit=.16f,BurstLength=5,BurstPause=.26f},
-        "High" => new(.110f,.030f,.016f,.045f,.045f,.0035f,.030f,950,.97f){PerceptionError=.025f,FlickAmplitudeTime=.006f,FirstShotSettleLimit=.08f,BurstLength=10,BurstPause=.14f},
-        _ => new(.120f,.035f,.020f,.045f,.10f,.0075f,.032f,850,.90f){PerceptionError=.05f,FlickAmplitudeTime=.008f,FirstShotSettleLimit=.10f,BurstLength=8,BurstPause=.15f}
-    };
 }
 public readonly record struct AimObservation(float Time, Vector3 Position,float Radius=8,float Uncertainty=0,string Part="point");
 public readonly record struct AimOutput(Vector2 Angles, bool AllowFire, string Phase, float ObservationAge);

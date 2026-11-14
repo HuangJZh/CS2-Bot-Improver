@@ -1,6 +1,6 @@
 {
   "schema": "cs2-bot-custom-base-lock-v1",
-  "custom_version": "8.57",
+  "custom_version": "8.58",
   "date": "2026-11-14",
   "cs2_buildid": "26598758",
   "stable_restore_tag": "custom-8.49-stable",
@@ -16,7 +16,7 @@
     "BotController": "a46b15a865c135a95f44688bd964da478f83a51a",
     "BotHider": "8be8e95919abb4ab05bb82b8cbdf516b4e347aa5",
     "BotVision": "df8f0707c7590cd55d9ffb8f6824ec9f3c959f5f",
-    "BotAimImprover": "custom 2.1.8-human.8.57; retake cooldown/input recovery and bounded partial-cover sight",
+    "BotAimImprover": "custom 2.1.8-human.8.58; Mid final 100ms reaction / 20ms sensor / 50ms flick / 50ms tracking / 0.20deg motor error; Low x2/3, High x4/3",
     "BotState": "custom 1.10.6-human.4; full entity roster for elimination, no winning knife locks during retake",
     "NadeSystem": "custom inventory.5-cross-team-fire; shared fire category, acquisition verification and actual held fire subtype",
     "BotSupport": "custom 1.0.11-held-primary-transfer; no-affordable-purchase fallback transfers most valuable real teammate primary",
@@ -34,21 +34,21 @@
     "HumanAllyStrength": 0.75,
     "EnemyElites": true,
     "mp_solid_teammates": 0,
-    "gameplay_tuning": "Existing custom settings; enemy combat strength now 0.80, ally 0.75, other tuning preserved.",
+    "gameplay_tuning": "Aim Rush estimate calibration; old 1.10 and 0.80 factors rebased, allies 0.75 and elites preserved.",
     "data": "difficulty VPKs, human-aim.json, navigation, nade snapshots, bot-only cosmetic config",
-    "EnemyStrength": 0.8,
-    "MediumEnemyReactionMs": 190,
+    "EnemyStrength": 1.0,
+    "MediumEnemyReactionMs": 100,
     "RetakeAI": true,
     "EnemyReactionMs": {
-      "Low": 250,
-      "Medium": 190,
-      "High": 140
+      "Low": 150,
+      "Medium": 100,
+      "High": 75
     },
     "HumanAllyStrengthReference": "Current ordinary enemy profile after EnemyStrength and explicit reaction targets",
     "AllyReactionMs": {
-      "Low": 333.333,
-      "Medium": 253.333,
-      "High": 186.667
+      "Low": 200,
+      "Medium": 133.333,
+      "High": 100
     }
   },
   "runtime_files": [
@@ -350,11 +350,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.dll",
-      "sha256": "4896d655a31f302e67d46394e5952290f03c8525a9a711f2b72290def5d1f390"
+      "sha256": "86bda46e56eeb1d99ecc7d26eaf3ae72574a910c9845fab5350173d7f977d8ea"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.pdb",
-      "sha256": "b15321dd725e7d88c829c8619728495d1a09b86b6e81bd08a232f728687cbc24"
+      "sha256": "910b8840e7d395bd67542cd6f9b0a3a615543263de0aacecf8b543789974bda9"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotBuy/BotBuy.deps.json",
@@ -2101,7 +2101,7 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/human-aim.json",
-      "sha256": "ff73d28bda842e61151fc01931c8b9fcda46105734f80bb2956fbd0ba65b1e9b"
+      "sha256": "4fde84dc8b83c8ebd9e5c9514bab1070db3fedc109f15d3775bba1b102329818"
     },
     {
       "path": "scripts/ai/custom_improver/retake.kv3",
@@ -2119,7 +2119,7 @@
     "recorded_on": "2026-11-11",
     "note": "Managed by Panel/user; do not overwrite from the base lock."
   },
-  "custom_revision": "postplant-transfer-cross-team-fire-20261114",
+  "custom_revision": "aimrush-estimate-calibration-20261114",
   "counterstrikesharp_native_hotfix": {
     "source": "https://github.com/roflmuffin/CounterStrikeSharp/pull/1490",
     "commit": "86e57d69ee33d0480a6ebd221b579860a26eeb78",
