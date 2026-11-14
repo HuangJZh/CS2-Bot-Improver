@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "bot_version": "8.58",
+  "project": "https://github.com/HuangJZh/CS2-Bot-Improver",
+  "input_sha256": "dd29fe27b4b662d0341b14677427dbd978195620b8f1a7cb4372162c5136a087",
+  "output_sha256": "8eb089882203d0c62ae1431ff8e7eba52470d9a7dbd2f4f311a02a98552a8fb2",
+  "frontend_sha256": "570fce8d74cdb829e44dc05aa3f72e1aa5a45ee35dcbb1540daf9cf640b51de8",
+  "automatic_updates": false,
+  "native_code_unchanged": true,
+  "backend": "pinned upstream 1.4.8 binary; unpublished Rust source"
+}

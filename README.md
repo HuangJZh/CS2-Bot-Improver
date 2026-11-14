@@ -1,9 +1,7 @@
 <div align="center">
 
-# CS2-Bot-Improver
+# CS2 Bot Improver — HuangJZh Independent Edition
 
-[![Latest release](https://img.shields.io/github/v/release/ed0ard/CS2-Bot-Improver?display_name=tag&sort=semver)](https://github.com/ed0ard/CS2-Bot-Improver/releases/latest)
-[![Release downloads](https://img.shields.io/github/downloads/ed0ard/CS2-Bot-Improver/total)](https://github.com/ed0ard/CS2-Bot-Improver/releases)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 ![Platforms: Windows and Linux](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-5c6bc0)
 
@@ -12,6 +10,8 @@
 [Features](#features) · [Installation](#installation) · [Commands](#commands) · [Panel Guide](#panel-guide-windows-only) · [FAQ](#faq)
 
 </div>
+
+**Independent panel 1.0.0 · Gameplay modules Custom 8.58.** Maintained in [HuangJZh/CS2-Bot-Improver](https://github.com/HuangJZh/CS2-Bot-Improver). Upstream update checks and the update button are removed; base components are reviewed and updated manually. See [version and installation notes](docs/INDEPENDENT-VERSION-20261115.md). Original credits and licences are retained.
 
 CS2-Bot-Improver enhances Counter-Strike 2 bots for offline matches and private games with friends. It improves their aim, movement, nade throwing, personalities, strategies, and can be installed on either a client or a dedicated server.
 
@@ -39,7 +39,7 @@ CS2-Bot-Improver enhances Counter-Strike 2 bots for offline matches and private 
 
 ## Installation
 
-Download the package for your operating system from the **[latest release](https://github.com/ed0ard/CS2-Bot-Improver/releases/latest)**.
+Use the validated custom installation recorded in [the independent edition notes](docs/INDEPENDENT-VERSION-20261115.md). The original platform instructions below are retained for reference; upstream release packages do not contain our custom AI.
 
 ### Windows
 

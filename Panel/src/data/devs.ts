@@ -1,8 +1,9 @@
 // Project link and the contributor credits shown in the Devs menu.
-export const PROJECT_URL = "https://github.com/ed0ard/CS2-Bot-Improver";
+export const PROJECT_URL = "https://github.com/HuangJZh/CS2-Bot-Improver";
 
 // Contributors, in the order shown.
 export const DEVS: string[] = [
+  "HuangJZh",
   "XBribo",
   "ed0ard",
   "unicbm",

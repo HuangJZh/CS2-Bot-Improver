@@ -2,13 +2,14 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { GearIcon, MinusIcon, CloseIcon } from "./icons";
 import { useT } from "../i18n";
 import "./TitleBar.css";
+import { PANEL_TITLE } from "../data/version";
 
 type Props = {
   title?: string;
   onSettings: () => void;
 };
 
-export default function TitleBar({ title = "CS2 Bot Improver v1.4.3", onSettings }: Props) {
+export default function TitleBar({ title = PANEL_TITLE, onSettings }: Props) {
   const appWindow = getCurrentWindow();
   const t = useT();
 

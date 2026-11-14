@@ -1,9 +1,7 @@
 <div align="center">
 
-# CS2-Bot-Improver
+# CS2 Bot Improver — HuangJZh 独立版
 
-[![最新版本](https://img.shields.io/github/v/release/ed0ard/CS2-Bot-Improver?display_name=tag&sort=semver)](https://github.com/ed0ard/CS2-Bot-Improver/releases/latest)
-[![累计下载](https://img.shields.io/github/downloads/ed0ard/CS2-Bot-Improver/total)](https://github.com/ed0ard/CS2-Bot-Improver/releases)
 [![许可证：AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](../LICENSE)
 ![支持平台：Windows 与 Linux](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-5c6bc0)
 
@@ -12,6 +10,8 @@
 [功能](#功能) · [安装](#安装) · [命令](#命令) · [Panel使用指南](#panel-使用指南仅限-windows) · [常见问题](#常见问题)
 
 </div>
+
+**面板独立版 1.0.0 · 战斗模块 Custom 8.58。** 由 [HuangJZh 个人仓库](https://github.com/HuangJZh/CS2-Bot-Improver) 独立维护，面板不再检查或提示上游更新。基础组件由我们手动审查、验证后更新。详见[独立版本说明](INDEPENDENT-VERSION-20261115.md)。保留原作者署名及许可证。
 
 CS2-Bot-Improver 面向喜欢与人机博弈，或想和朋友一起挑战人机的CS2玩家。主要增强了人机的瞄准、移动、道具、个性与战术表现，可安装到游戏客户端或专用服务器，为离线人机对局和好友私人对局带来更好的体验。
 
@@ -32,7 +32,7 @@ CS2-Bot-Improver 面向喜欢与人机博弈，或想和朋友一起挑战人机
 
 ## 安装
 
-请前往 **[最新版本](https://github.com/ed0ard/CS2-Bot-Improver/releases/latest)** 页面，下载与你的操作系统相对应的安装包。
+请使用[独立版本说明](INDEPENDENT-VERSION-20261115.md)记录的定制安装。以下原版平台安装步骤仅作参考；上游发行包不包含我们的定制 AI。
 
 ### Windows
 
