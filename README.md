@@ -1,266 +1,102 @@
-<div align="center">
+# CS2 Bot Improver — HuangJZh 独立版
 
-# CS2 Bot Improver — HuangJZh Independent Edition
+基于 [ed0ard/CS2-Bot-Improver](https://github.com/ed0ard/CS2-Bot-Improver) 修改的人机系统，用于 CS2 本地人机与私人对局。独立维护瞄准射击、队友协作、经济、道具和路线分配逻辑。
 
-[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
-![Platforms: Windows and Linux](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-5c6bc0)
+**面板 1.0.0 · 战斗模块 Custom 8.58 · 基础组件来源 v1.4.8**
 
-**English** · [简体中文](docs/README.zh-CN.md) · [Русский](docs/README.ru.md)
+**简体中文** · [English](docs/README.en.md)
 
-[Features](#features) · [Installation](#installation) · [Commands](#commands) · [Panel Guide](#panel-guide-windows-only) · [FAQ](#faq)
+[当前功能](#当前功能) · [开始使用](#开始使用) · [常用命令](#常用命令) · [更新与维护](#更新与维护) · [致谢](#致谢)
 
-</div>
+## 当前版本
 
-**Independent panel 1.0.0 · Gameplay modules Custom 8.58.** Maintained in [HuangJZh/CS2-Bot-Improver](https://github.com/HuangJZh/CS2-Bot-Improver). Upstream update checks and the update button are removed; base components are reviewed and updated manually. See [version and installation notes](docs/INDEPENDENT-VERSION-20261115.md). Original credits and licences are retained.
+维护分支为个人仓库的 [`custom/independent`](https://github.com/HuangJZh/CS2-Bot-Improver/tree/custom/independent)。面板已移除上游版本检查、更新按钮及发布页跳转，项目入口指向本仓库。面板与战斗模块分别编号。
 
-CS2-Bot-Improver enhances Counter-Strike 2 bots for offline matches and private games with friends. It improves their aim, movement, nade throwing, personalities, strategies, and can be installed on either a client or a dedicated server.
+当前验证环境为 **Windows 本地游戏主机**。部分基础依赖支持 Linux，但定制回防 AI 接入及当前原生兼容补丁只在 Windows 验证，不将本分支标为已完成跨平台验证的发行版。
 
-<details>
-<summary>Signature status</summary>
+## 当前功能
 
-[![Signature status](https://raw.githubusercontent.com/XBribo/cs2-bot-signatures/main/.github/docs/BotImprover.svg)](https://github.com/XBribo/cs2-bot-signatures)
-
-</details>
-
-## **Your stars⭐ are my motivation to keep updating**
-
-## Features
-
-| Field | Improvements |
+| 模块 | 当前行为 |
 | --- | --- |
-| **Aim and combat** | More accurate, human-like aim and FOV; spraying, flicking, smoke spamming, and anti-flash |
-| **Grenades** | Situational Smoke, Flashbang, HE grenade, and Molotov throwing |
-| **Movement** | Better movement and fixes for most bot-stuck situations |
-| **Strategy** | Smarter, more organized bots with improved awareness and decision-making |
-| **Economy** | Expanded weapon purchases and overhauled economy management |
-| **Personalities** | Pro and random player names, with pro characteristics based on [HLTV](https://www.hltv.org/) stats |
-| **Customization** | Per-bot knives, gloves, weapon skins, stickers, charms, agents, music kits, avatars, and profiles |
-| **Game experience** | Bot names without prefixes, bot-friendly rules, and extra console commands for fun |
+| 瞄准与射击 | Low / Medium / High 三档；感知延迟、一次定位、跟枪、首发朝向检查与连发节奏；支持 MIXED、HEAD、BODY。 |
+| 声音与视角 | 协调目视交战与声音调查，减少不同模块争抢视角。 |
+| 敌我强度 | 真人同队人机相对强度系数为 0.75；敌方可有 1–2 名参数增强约 20–30% 的精英。系数不代表对应比例的胜率变化。 |
+| 购买与经济 | 保留已有武器，优先主武器，其次发枪，最后道具；常规购买排除 AUG、SG553，有钱时优先 AK、M4、AWP。 |
+| 起狙人数 | 购买名额为 T 一把、CT 最多两把，计入已有及真人持有的狙击枪；不强制丢弃存活带回的枪。 |
+| 轮盘发枪 | 一名附近合适队友响应，优先资金最多者；在买得起的 AWP、AK、M4 中随机选，钱少时依次考虑步枪、冲锋枪；无人能买时尝试转交附近队友最贵的现有主武器。 |
+| 道具库存 | 购买后才能投掷，投出即消耗，不无限补充；T 火与 CT 火统一占用燃烧道具类别，避免跨阵营拾取后重复购买。 |
+| 寻路与战术 | 使用游戏导航区域进行分路分配，保留原生移动与局部行为；包含基于回合历史的轻量路线反馈。 |
+| 下包后行为 | 在支持的经典模式中，下包后可接入 Valve 回防模式行为树模块，同时保留定制战斗控制。 |
+| 饰品与资料 | 保留机器人饰品和资料；单独的本地虚拟库存功能限定于已支持的本地主机环境。 |
 
-## Installation
+### 三档难度
 
-Use the validated custom installation recorded in [the independent edition notes](docs/INDEPENDENT-VERSION-20261115.md). The original platform instructions below are retained for reference; upstream release packages do not contain our custom AI.
+当前普通敌人的基础反应字段约为 **Low 150 毫秒 / Medium 100 毫秒 / High 75 毫秒**。这是模型配置，**不等于敌人出现到实际开枪的总耗时**；感知、拉枪角度、定位过程、武器就绪、可见性和个体强度都会影响出弹时间。
 
-### Windows
+这组参数以模拟 Aim Rush 的估算为起点，不代表已测得与其完全一致，也不对应经过验证的真人段位或职业水平。详见[当前瞄准校准记录](docs/AIMRUSH-ESTIMATE-PRESETS-20261114.md)。
 
-1. Download and extract **CS2BotImprover.zip**.
-> [!NOTE]
-> Running a dedicated server that is not only for bot matches?  
-On Windows, please download **CS2BotImprover_rules_unchanged.zip** to preserve the standard game rules.
-2. Move **Panel v1.4.7.exe** somewhere convenient.
+## 开始使用
 
-   <img width="128" height="128" alt="CS2 Bot Improver Panel application icon" src="https://github.com/user-attachments/assets/7271dc7d-2436-484b-8359-6531f4abd710" />
+### 已有稳定安装
 
-3. Open your CS2 installation folder and navigate to `game/csgo`.
+1. 使用桌面原快捷方式打开 `Panel.exe`，标题应显示 **独立版 1.0.0**。
+2. 确认目录和文件状态为绿色。
+3. 选择**机器人模式**，设置难度、瞄准和道具预设，然后启动 CS2。
+4. 出现黄色提示时，重启 CS2 使对应修改生效。恢复正常游戏配置时，切换为**联机模式**。
 
-   <img width="405" height="256" alt="The game/csgo directory inside a CS2 installation" src="https://github.com/user-attachments/assets/ae2be90e-6742-4f1f-8e0c-096b728d5dbd" />
+当前独立版面板包仅用于替换**已有定制安装**的面板，并非完整插件安装包。替换前备份并关闭旧面板，再覆盖 `Panel.exe`；原快捷方式与设置继续有效。
 
-4. Copy all remaining files from the extracted package folder into `game/csgo`.
+### 全新安装与兼容性
 
-   <img width="540" height="181" alt="Copying the Windows package files into game/csgo" src="https://github.com/user-attachments/assets/6a8645fc-78e7-4f3a-92d3-5d1b6d913918" />
+仅克隆源码无法直接运行：还需要原生依赖、子模块、游戏资源与验证过的二进制组合。本仓库当前尚未提供面向全新安装的完整独立发行包，不应直接用上游整包覆盖现有定制安装。
 
-5. Open `Panel v1.4.7.exe`, select **Bot Mode**, then click **Launch CS2**.
+当前锁定清单记录 CS2 build **26598758** 及对应的 CounterStrikeSharp 原生兼容补丁。游戏更新可能改变签名或使回防接入失效，更新时应验证整套依赖组合。
 
-   <img width="339" height="129" alt="Selecting Bot Mode and launching CS2 from the Panel" src="https://github.com/user-attachments/assets/dc806991-c940-43cf-a614-f49012fae4a7" />
+安装位置、面板构建和回退方法见[独立版本说明](docs/INDEPENDENT-VERSION-20261115.md)，组件来源与文件哈希见[依赖锁定清单](dependencies/base-v1.4.8.lock.json)。
 
-### Linux
+## 常用命令
 
-1. Download and extract **CS2BotImprover_for_Linux.zip**.
-2. Move `Commands.txt` somewhere convenient.
-3. Open your CS2 installation folder and navigate to `game/csgo`.
+在游戏控制台输入；本地主机诊断指令不属于所有玩家都可执行的普通指令。
 
-   <img width="405" height="256" alt="The game/csgo directory inside a CS2 installation" src="https://github.com/user-attachments/assets/ae2be90e-6742-4f1f-8e0c-096b728d5dbd" />
-
-4. Copy all remaining files from the extracted package folder into `game/csgo`.
-
-   <img width="535" height="180" alt="Copying the Linux package files into game/csgo" src="https://github.com/user-attachments/assets/9bda7b1d-43d3-49cf-a283-27b124b894e0" />
-
-5. Add `-insecure` to your CS2 launch options.
-
-   <img width="130" height="153" alt="Opening CS2 properties in Steam" src="https://github.com/user-attachments/assets/4c775e36-3fc3-4a19-9cb1-4f0c9327838c" /><br>
-   <img width="625" height="423" alt="Adding -insecure to the CS2 launch options" src="https://github.com/user-attachments/assets/ac0b0c57-ee67-4e33-96fb-146d14714fc8" />
-
-## Commands
-
-### Aim
-
-| Command | Description |
+| 命令 | 用途 |
 | --- | --- |
-| `bot_aim mixed` | Select aiming spots dynamically based on situations. **(Default)** |
-| `bot_aim head` | Prioritize aiming at the head. |
-| `bot_aim body` | Prioritize aiming at the torso. |
-| `bot_aim` | Show the current aim mode. |
+| `bot_aim mixed` / `head` / `body` | 切换混合、头部或躯干瞄准；默认 mixed。 |
+| `bot_aim` | 查看当前瞄准模式。 |
+| `bot_nades off` / `less` / `normal` / `more` / `max` | 调整道具策略；所有启用档位仍受真实库存约束。 |
+| `bot_nades` | 查看当前道具模式。 |
+| `css_bot_request auto` | 请求队友发枪；轮盘“需要一把武器”也接入同一逻辑。 |
+| `bot_human_aim status` | 查看定制瞄准模型状态。 |
+| `bot_team_nav status` | 查看队伍导航状态。 |
+| `bot_route_learning status` | 查看轻量路线学习状态。 |
+| `bot_retake_ai status` | 查看回防 AI 接入状态。 |
+| `bot_aim_capture start 60` | 开始约 60 秒的本地瞄准诊断记录。 |
+| `bot_aim_capture stop` | 停止诊断记录。 |
+| `br_reroll` | 下次复活时重新随机机器人饰品。 |
 
-### Nades
+职业队命令保留在 [Commands.txt](Commands.txt)，也可通过面板的**指令**页面搜索复制。面板还可设置难度、瞄准、道具、机器人物品和游戏规则；部分修改需要重启游戏。
 
-| Command | Description |
+## 更新与维护
+
+本分支**不自动跟随上游更新**。CS2 或基础组件更新后，由维护者审查差异、保留定制功能、验证兼容性并准备恢复点后再安装。修改保存在个人仓库。
+
+| 文档 | 内容 |
 | --- | --- |
-| `bot_nades off` | Disable bot nade usage. |
-| `bot_nades less` | Use the same decision logic as normal mode with lower count limits. |
-| `bot_nades normal` | Use count limits close to those of human players. **(Default)** |
-| `bot_nades more` | Use the same decision logic as normal mode with higher count limits. |
-| `bot_nades max` | Bots have minimal limitations and think less before throwing nades. |
-| `bot_nades` | Show the current nade mode. |
+| [独立版本说明](docs/INDEPENDENT-VERSION-20261115.md) | 面板修改、可复现构建、安装与回退。 |
+| [基础组件更新流程](docs/BASE-SOFTWARE-UPDATES.md) | 依赖审查与升级步骤。 |
+| [当前瞄准校准](docs/AIMRUSH-ESTIMATE-PRESETS-20261114.md) | 三档参数与估算边界。 |
+| [队伍导航](docs/TEAM-NAVIGATION-8.38.md) | 路线分配设计和限制。 |
+| [地图扩展记录](docs/NAVIGATION-MAPS-EXPANSION-20261102.md) | 十张爆破图导航数据及验证范围。 |
+| [依赖锁定清单](dependencies/base-v1.4.8.lock.json) | 固定组件、来源和安装文件哈希。 |
 
-### Skins
+### 源码与构建范围
 
-| Command | Description |
-| --- | --- |
-| `br_reroll` | Reroll every bot's skins on their next spawn. |
+战斗模块包含定制 C# 源码和对应检查。部分运行组件仍以固定二进制或子模块形式保留，仅检出仓库不等于完整复现已安装环境。
 
-### Buying
+上游没有公开已发布面板的 Rust 后台源码，因此独立版 1.0.0 使用固定 1.4.8 二进制的可复现界面覆盖，原生机器码及既有配置兼容性保持不变。界面不再调用后台残留的版本查询处理函数；这不是完整的面板源码重编译。
 
-Enter a weapon name in the game console to give every bot this weapon from the next round.  
-Enter `bot_buy` to restore normal purchase behavior.
+`Panel/` 保存公开 React 界面和打包标题栏适配代码；`tools/build_independent_panel.py` 在校验原始程序与界面哈希后生成独立面板。构建步骤及固定依赖见独立版本说明。
 
-<details>
-<summary><strong>Show supported weapon names</strong></summary>
-
-```text
-elite     p250      fn57      deagle    cz75a     r8
-bizon     p90       mp5sd     mp9       mp7       mac10     ump45
-mag7      sawedoff  nova      xm1014
-famas     galilar   m4a1      m4a1s     ak47      aug       sg556
-ssg08     awp       scar20    g3sg1
-negev     m249
-```
-
-</details>
-
-### Pro teams
-
-Copy a block of team commands from [Commands.txt](Commands.txt) and paste it into the game console. You can also add your own teams using the same format.
-
-For example, the following block in `Commands.txt` adds Team Vitality to the CT side:
-
-<img width="301" height="237" alt="Team Vitality commands in Commands.txt" src="https://github.com/user-attachments/assets/a895f3a6-58f8-47dc-b6f5-b60c1b32fecd" />
-
-### Knives
-
-Point at the ground and press `\` on your keyboard to generate all kinds of knives there.
-
-### Flying Scoutsman
-
-After a match begins, use the command `scouts_on` or `scouts_off` to enable or disable Flying Scoutsman mode.
-
-## Panel Guide (Windows Only)
-
-### Status lights
-
-| Indicator | Meaning |
-| --- | --- |
-| 🟢 Green | No issues detected. Click the green light near Directory to open it. |
-| 🟡 Yellow | Restart CS2 to apply changes. |
-| 🔴 Red | Files missing. Click the red light to view the list of missing files. |
-
-<img width="481" height="82" alt="Green, yellow, and red Panel status indicators" src="https://github.com/user-attachments/assets/26a947e2-4e0e-423f-bce8-f220d88509a2" />
-
-### Matchmaking & Bot Mode Toggle
-
-Select your desired mode, then click **Launch CS2**.
-
-<img width="472" height="179" alt="Online Mode and Bot Mode selector in the Panel" src="https://github.com/user-attachments/assets/3f9254fa-4cbe-4854-8fd1-0f35228fff77" />
-
-### Settings
-
-Click the <img width="31" height="32" alt="Settings" src="https://github.com/user-attachments/assets/7f94176b-79f1-4e22-9495-4589c4dea9eb" /> icon in the top-right corner to open **Settings**.
-
-### Rules
-
-Open **Settings** and click **Rules** to adjust game rules.
-
-Click **Reset All** to restore default rules.
-
-<img width="360" height="385" alt="Rules" src="https://github.com/user-attachments/assets/ce7ce3b9-4f35-4921-b455-a42c816c30bd" />
-
-### Command browser
-
-Click **Commands**, **left-click** a block to copy it automatically, **right-click** blocks to copy them consecutively, or type keywords to search.
-
-<img width="350" height="420" alt="Searchable command browser in the Panel" src="https://github.com/user-attachments/assets/957cfafb-900d-4450-b985-13d3e8efc375" />
-
-## FAQ
-
-<details>
-<summary><strong>How to play bot matches with friends?</strong></summary>
-
-1. Start a bot match, enter any required commands, and then run `status` in the console.
-
-   <img width="597" height="141" alt="The steamid value shown by the status command" src="https://github.com/user-attachments/assets/792c4b4f-1d56-4a39-9186-b301cbff1846" />
-
-2. Copy the text after `steamid:`, add `connect ` before it (don't forget the space between them) 
-3. Send the full command to your friends and have them paste it into their consoles.
-
-</details>
-
-<details>
-<summary><strong>How to manually change the difficulty level?</strong></summary>
-
-1. Navigate to `game/csgo/overrides` in your CS2 installation folder.
-2. Open `Low` for easy difficulty, `Medium` for mixed difficulty based on HLTV stats (**default**), or `High` for extreme difficulty.
-3. Copy the selected `botprofile.vpk` into `game/csgo/overrides` before launching the game.
-
-</details>
-
-<details>
-<summary><strong>How to manually switch back to normal online matchmaking mode?</strong></summary>
-
-1. Navigate to `game/csgo/backup/Online` in your CS2 installation folder.
-2. Copy `gameinfo.gi` into `game/csgo` (Replace the file in the destination).
-3. Remove `-insecure` from your launch options.
-
-To play with bots again, copy `gameinfo.gi` from `game/csgo/backup/WithBots` into `game/csgo`, and restore the launch option.
-
-</details>
-
-<details>
-<summary><strong>How to manually disable bot weapon skins, agents, music kits, knives, and gloves?</strong></summary>
-
-1. Navigate to `game/csgo/addons/counterstrikesharp/plugins` in your CS2 installation folder.
-2. Rename `BotRandomizer` folder to `BotRandomizer_disabled`.
-3. Open `addons/counterstrikesharp/configs/core.json` and set `FollowCS2ServerGuidelines` to `true`.
-
-</details>
-
-<details>
-<summary><strong>How to manually disable bot Steam profiles?</strong></summary>
-
-Navigate to `game/csgo/addons` in your CS2 installation folder and rename `BotHider` folder to `BotHider_disabled`.
-
-</details>
-
-<details>
-<summary><strong>How to use the plugin normally on Workshop maps?</strong></summary>
-
-Add `-disable_workshop_command_filtering` to your launch options.
-
-</details>
-
-<details>
-<summary><strong>Panel not working properly?</strong></summary>
-   
-1. Install **WebView2 Runtime** if you are on Windows 10.
-2. Try right-clicking and selecting `Run as administrator`.
-
-</details>
-
-<details>
-<summary><strong>How to surf normally?</strong></summary>
-
-Run `sv_standable_normal 0.7` in the game console.
-
-</details>
-
-### What are the supported-use and responsibility boundaries?
-
-> [!WARNING]
-> This project is intended for offline bot matches, self-hosted private games with friends, and private dedicated servers used for bot play. `BotRandomizer` applies cosmetics **only to bots**; it does not grant, falsify, or alter the Steam inventory, skins, or profile of a human player. **This boundary is designed to follow [Valve's CS2 community-server and GSLT rules](https://help.steampowered.com/en/faqs/view/07AF-502E-A104-BD4B).**
->
-> The project is not intended or supported for Valve official matchmaking, [FACEIT](https://support.faceit.com/hc/en-us/articles/360015788779-What-is-deemed-to-be-a-cheat), or other third-party public community servers.
->
-> The [AGPL-3.0 license](LICENSE) does not grant access to third-party services or authorize violations of their rules. To the maximum extent permitted by applicable law, anyone who uses or deploys the project outside the scope described above, modifies it to evade security controls, or otherwise violates third-party terms assumes all resulting risks and responsibilities, including GSLT or server sanctions, FACEIT or community-server bans, VAC or game bans. The maintainers and contributors disclaim liability for those consequences.
-
-## Credits
+## 致谢
 
 - [Metamod:Source](https://github.com/alliedmodders/metamod-source)
 - [CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp)
@@ -278,6 +114,6 @@ Run `sv_standable_normal 0.7` in the game console.
 - [RoundDamageRecap](https://github.com/YuGeYu/LBTV-CS2-Bot-Enhancer/tree/main/addons/counterstrikesharp/plugins/RoundDamageRecap) by [YuGeYu](https://github.com/YuGeYu)
 - [Apple-Style-GUI](https://github.com/ed0ard/Apple-Style-GUI)
 
-## License
+## 许可证
 
 [GNU Affero General Public License v3.0](LICENSE), except `Panel/`, which is [PolyForm Strict 1.0.0](Panel/LICENSE)
