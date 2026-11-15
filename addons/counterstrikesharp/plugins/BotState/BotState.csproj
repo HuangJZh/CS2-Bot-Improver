@@ -19,5 +19,5 @@
     </Reference>
   </ItemGroup>
 
-<ItemGroup><Compile Include="../../policies/CombatBackend.cs" Link="CombatBackend.cs" /></ItemGroup>
+<ItemGroup><Compile Include="../../policies/CombatBackend.cs" Link="CombatBackend.cs" /><Compile Include="../../policies/JumpTraversalPolicy.cs" Link="JumpTraversalPolicy.cs" /><Compile Include="../../policies/NativeMoveGoalReader.cs" Link="NativeMoveGoalReader.cs" /></ItemGroup>
 <ItemGroup><Compile Include="../../policies/RetakeAiContract.cs" Link="RetakeAiContract.cs" /></ItemGroup></Project>

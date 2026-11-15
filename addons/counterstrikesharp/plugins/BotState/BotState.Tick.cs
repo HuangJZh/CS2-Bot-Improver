@@ -48,7 +48,7 @@ public partial class BotState
             if(!_nativeCombat)UpdateBotBehavior(bot, now);
             bool curIsAttacking = _nativeCombat?bot.IsAttacking:UpdateBotCombat(player, pawn, bot, idx);
             if(_nativeCombat&&(curIsAttacking||bot.IsEnemyVisible))continue;
-            if (!UpdateBotMovement(pawn, bot, idx, curIsAttacking, inDoorCooldown))
+            if (!UpdateBotMovement(player,pawn, bot, idx, curIsAttacking, inDoorCooldown))
                 continue;
 
             RecoverStuckBot(player, pawn, bot, idx, now, curIsAttacking);

@@ -1,6 +1,6 @@
 # CS2 Bot Improver — HuangJZh Independent Edition
 
-Panel 1.0.0 / Custom 8.59
+Panel 1.0.0 / Custom 8.60
 
 Актуальное руководство: [简体中文](../README.md) · [English](README.en.md).
 

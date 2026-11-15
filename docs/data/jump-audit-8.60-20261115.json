@@ -1,0 +1,846 @@
+{
+  "date": "2026-11-15",
+  "baseline_version": "8.59",
+  "candidate_version": "8.60",
+  "baseline_source_commit": "717df88",
+  "cases_manifest_sha256": "45d29a6e6d2df2922d14ad74644982888f1eaac38a217fa45e45b81248501e36",
+  "trials": 18,
+  "cases": 9,
+  "round_live_verified": true,
+  "maps": {
+    "de_dust2": {
+      "trials": 6,
+      "baseline_pass": 2,
+      "candidate_pass": 6,
+      "baseline_smooth": 2,
+      "candidate_smooth": 6
+    },
+    "de_inferno": {
+      "trials": 6,
+      "baseline_pass": 0,
+      "candidate_pass": 6,
+      "baseline_smooth": 0,
+      "candidate_smooth": 6
+    },
+    "de_mirage": {
+      "trials": 6,
+      "baseline_pass": 2,
+      "candidate_pass": 6,
+      "baseline_smooth": 2,
+      "candidate_smooth": 6
+    }
+  },
+  "records": [
+    {
+      "map": "de_dust2",
+      "case": "de_dust2-397-337",
+      "variant": 0,
+      "from_area": 397,
+      "to_area": 337,
+      "start": [
+        -405.25012,
+        1055.9999,
+        -69.5
+      ],
+      "landing": [
+        -362.50012,
+        927.9998,
+        -33.333332
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_dust2",
+        "Name": "de_dust2-397-337",
+        "variant": 0,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.1875,
+        "jumps": 0,
+        "max_z": -40.076263,
+        "start_z": -72.40519,
+        "goal_z": -40.11037,
+        "distance": 111.6622
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_dust2",
+        "Name": "de_dust2-397-337",
+        "variant": 0,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.140625,
+        "jumps": 0,
+        "max_z": -40.042553,
+        "start_z": -72.40519,
+        "goal_z": -40.11037,
+        "distance": 117.991554
+      }
+    },
+    {
+      "map": "de_dust2",
+      "case": "de_dust2-397-337",
+      "variant": 1,
+      "from_area": 397,
+      "to_area": 337,
+      "start": [
+        -405.25012,
+        1055.9999,
+        -69.5
+      ],
+      "landing": [
+        -362.50012,
+        927.9998,
+        -33.333332
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_dust2",
+        "Name": "de_dust2-397-337",
+        "variant": 1,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.28125,
+        "jumps": 0,
+        "max_z": -39.92977,
+        "start_z": -72.40519,
+        "goal_z": -40.11037,
+        "distance": 117.22473
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_dust2",
+        "Name": "de_dust2-397-337",
+        "variant": 1,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.203125,
+        "jumps": 0,
+        "max_z": -40.002144,
+        "start_z": -72.40519,
+        "goal_z": -40.11037,
+        "distance": 118.29825
+      }
+    },
+    {
+      "map": "de_dust2",
+      "case": "de_dust2-1849-1873",
+      "variant": 0,
+      "from_area": 1849,
+      "to_area": 1873,
+      "start": [
+        1133,
+        2515.8748,
+        98.499985
+      ],
+      "landing": [
+        1062.5,
+        2550.4998,
+        155.99998
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_dust2",
+        "Name": "de_dust2-1849-1873",
+        "variant": 0,
+        "success": false,
+        "reason": "timeout",
+        "seconds": 8.015625,
+        "jumps": 4,
+        "max_z": 160.70312,
+        "start_z": 94.57362,
+        "goal_z": 151.91684,
+        "distance": 193.76674
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_dust2",
+        "Name": "de_dust2-1849-1873",
+        "variant": 0,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.25,
+        "jumps": 1,
+        "max_z": 160.32812,
+        "start_z": 94.57362,
+        "goal_z": 151.91684,
+        "distance": 82.46252
+      }
+    },
+    {
+      "map": "de_dust2",
+      "case": "de_dust2-1849-1873",
+      "variant": 1,
+      "from_area": 1849,
+      "to_area": 1873,
+      "start": [
+        1133,
+        2515.8748,
+        98.499985
+      ],
+      "landing": [
+        1062.5,
+        2550.4998,
+        155.99998
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_dust2",
+        "Name": "de_dust2-1849-1873",
+        "variant": 1,
+        "success": false,
+        "reason": "timeout",
+        "seconds": 8.015625,
+        "jumps": 5,
+        "max_z": 160.85938,
+        "start_z": 94.57362,
+        "goal_z": 151.91684,
+        "distance": 220.03746
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_dust2",
+        "Name": "de_dust2-1849-1873",
+        "variant": 1,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.25,
+        "jumps": 1,
+        "max_z": 160.20312,
+        "start_z": 94.57362,
+        "goal_z": 151.91684,
+        "distance": 84.662964
+      }
+    },
+    {
+      "map": "de_dust2",
+      "case": "de_dust2-1893-1956",
+      "variant": 0,
+      "from_area": 1893,
+      "to_area": 1956,
+      "start": [
+        -1245.9999,
+        2534.9998,
+        55.999992
+      ],
+      "landing": [
+        -1258.4999,
+        2609.9998,
+        113.333336
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_dust2",
+        "Name": "de_dust2-1893-1956",
+        "variant": 0,
+        "success": false,
+        "reason": "timeout",
+        "seconds": 8.015625,
+        "jumps": 6,
+        "max_z": 121.984375,
+        "start_z": 49.71944,
+        "goal_z": 101.82219,
+        "distance": 501.8615
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_dust2",
+        "Name": "de_dust2-1893-1956",
+        "variant": 0,
+        "success": true,
+        "reason": "landed",
+        "seconds": 0.796875,
+        "jumps": 1,
+        "max_z": 120.671875,
+        "start_z": 49.71944,
+        "goal_z": 101.82219,
+        "distance": 79.10654
+      }
+    },
+    {
+      "map": "de_dust2",
+      "case": "de_dust2-1893-1956",
+      "variant": 1,
+      "from_area": 1893,
+      "to_area": 1956,
+      "start": [
+        -1245.9999,
+        2534.9998,
+        55.999992
+      ],
+      "landing": [
+        -1258.4999,
+        2609.9998,
+        113.333336
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_dust2",
+        "Name": "de_dust2-1893-1956",
+        "variant": 1,
+        "success": false,
+        "reason": "timeout",
+        "seconds": 8.015625,
+        "jumps": 4,
+        "max_z": 126.578125,
+        "start_z": 49.71944,
+        "goal_z": 101.82219,
+        "distance": 187.16644
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_dust2",
+        "Name": "de_dust2-1893-1956",
+        "variant": 1,
+        "success": true,
+        "reason": "landed",
+        "seconds": 0.96875,
+        "jumps": 1,
+        "max_z": 120.421875,
+        "start_z": 49.71944,
+        "goal_z": 101.82219,
+        "distance": 79.011795
+      }
+    },
+    {
+      "map": "de_mirage",
+      "case": "de_mirage-2282-2299",
+      "variant": 0,
+      "from_area": 2282,
+      "to_area": 2299,
+      "start": [
+        -2321.1252,
+        632.00494,
+        -80
+      ],
+      "landing": [
+        -2334.6252,
+        671.37994,
+        -36.000004
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_mirage",
+        "Name": "de_mirage-2282-2299",
+        "variant": 0,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.5,
+        "jumps": 1,
+        "max_z": -14.140625,
+        "start_z": -86.345245,
+        "goal_z": -43.439125,
+        "distance": 38.371284
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_mirage",
+        "Name": "de_mirage-2282-2299",
+        "variant": 0,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.515625,
+        "jumps": 1,
+        "max_z": -21.140625,
+        "start_z": -86.345245,
+        "goal_z": -43.439125,
+        "distance": 74.51345
+      }
+    },
+    {
+      "map": "de_mirage",
+      "case": "de_mirage-2282-2299",
+      "variant": 1,
+      "from_area": 2282,
+      "to_area": 2299,
+      "start": [
+        -2321.1252,
+        632.00494,
+        -80
+      ],
+      "landing": [
+        -2334.6252,
+        671.37994,
+        -36.000004
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_mirage",
+        "Name": "de_mirage-2282-2299",
+        "variant": 1,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.453125,
+        "jumps": 1,
+        "max_z": -21.140625,
+        "start_z": -86.345245,
+        "goal_z": -43.439125,
+        "distance": 36.590378
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_mirage",
+        "Name": "de_mirage-2282-2299",
+        "variant": 1,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.5,
+        "jumps": 1,
+        "max_z": -21.140625,
+        "start_z": -86.345245,
+        "goal_z": -43.439125,
+        "distance": 59.02191
+      }
+    },
+    {
+      "map": "de_mirage",
+      "case": "de_mirage-1956-1978",
+      "variant": 0,
+      "from_area": 1956,
+      "to_area": 1978,
+      "start": [
+        -558,
+        -2058.4954,
+        -106
+      ],
+      "landing": [
+        -602.125,
+        -2098.37,
+        -49.99998
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_mirage",
+        "Name": "de_mirage-1956-1978",
+        "variant": 0,
+        "success": false,
+        "reason": "timeout",
+        "seconds": 8.015625,
+        "jumps": 3,
+        "max_z": -38.140625,
+        "start_z": -103.35,
+        "goal_z": -60.764465,
+        "distance": 398.8394
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_mirage",
+        "Name": "de_mirage-1956-1978",
+        "variant": 0,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.453125,
+        "jumps": 1,
+        "max_z": -38.171875,
+        "start_z": -103.35,
+        "goal_z": -60.764465,
+        "distance": 79.614296
+      }
+    },
+    {
+      "map": "de_mirage",
+      "case": "de_mirage-1956-1978",
+      "variant": 1,
+      "from_area": 1956,
+      "to_area": 1978,
+      "start": [
+        -558,
+        -2058.4954,
+        -106
+      ],
+      "landing": [
+        -602.125,
+        -2098.37,
+        -49.99998
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_mirage",
+        "Name": "de_mirage-1956-1978",
+        "variant": 1,
+        "success": false,
+        "reason": "timeout",
+        "seconds": 8.015625,
+        "jumps": 3,
+        "max_z": -38.140625,
+        "start_z": -103.35,
+        "goal_z": -60.764465,
+        "distance": 857.31354
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_mirage",
+        "Name": "de_mirage-1956-1978",
+        "variant": 1,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.34375,
+        "jumps": 1,
+        "max_z": -38.140625,
+        "start_z": -103.35,
+        "goal_z": -60.764465,
+        "distance": 84.026764
+      }
+    },
+    {
+      "map": "de_mirage",
+      "case": "de_mirage-319-379",
+      "variant": 0,
+      "from_area": 319,
+      "to_area": 379,
+      "start": [
+        421.99997,
+        606.50494,
+        -208
+      ],
+      "landing": [
+        427.24997,
+        660.50494,
+        -162
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_mirage",
+        "Name": "de_mirage-319-379",
+        "variant": 0,
+        "success": false,
+        "reason": "timeout",
+        "seconds": 8.015625,
+        "jumps": 5,
+        "max_z": -146.14062,
+        "start_z": -211.76637,
+        "goal_z": -166.17537,
+        "distance": 255.28001
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_mirage",
+        "Name": "de_mirage-319-379",
+        "variant": 0,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.5,
+        "jumps": 1,
+        "max_z": -146.14062,
+        "start_z": -211.76637,
+        "goal_z": -166.17537,
+        "distance": 85.604164
+      }
+    },
+    {
+      "map": "de_mirage",
+      "case": "de_mirage-319-379",
+      "variant": 1,
+      "from_area": 319,
+      "to_area": 379,
+      "start": [
+        421.99997,
+        606.50494,
+        -208
+      ],
+      "landing": [
+        427.24997,
+        660.50494,
+        -162
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_mirage",
+        "Name": "de_mirage-319-379",
+        "variant": 1,
+        "success": false,
+        "reason": "timeout",
+        "seconds": 8.015625,
+        "jumps": 5,
+        "max_z": -146.14062,
+        "start_z": -211.76637,
+        "goal_z": -166.17537,
+        "distance": 251.78029
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_mirage",
+        "Name": "de_mirage-319-379",
+        "variant": 1,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.5625,
+        "jumps": 1,
+        "max_z": -146.14062,
+        "start_z": -211.76637,
+        "goal_z": -166.17537,
+        "distance": 84.739044
+      }
+    },
+    {
+      "map": "de_inferno",
+      "case": "de_inferno-2085-2075",
+      "variant": 0,
+      "from_area": 2085,
+      "to_area": 2075,
+      "start": [
+        567.875,
+        2749.75,
+        159.99994
+      ],
+      "landing": [
+        502.62497,
+        2772.625,
+        195.99992
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_inferno",
+        "Name": "de_inferno-2085-2075",
+        "variant": 0,
+        "success": false,
+        "reason": "timeout",
+        "seconds": 8.015625,
+        "jumps": 5,
+        "max_z": 230.85938,
+        "start_z": 161.49998,
+        "goal_z": 192.97324,
+        "distance": 269.48364
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_inferno",
+        "Name": "de_inferno-2085-2075",
+        "variant": 0,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.53125,
+        "jumps": 1,
+        "max_z": 226.35938,
+        "start_z": 161.49998,
+        "goal_z": 192.97324,
+        "distance": 92.59529
+      }
+    },
+    {
+      "map": "de_inferno",
+      "case": "de_inferno-2085-2075",
+      "variant": 1,
+      "from_area": 2085,
+      "to_area": 2075,
+      "start": [
+        567.875,
+        2749.75,
+        159.99994
+      ],
+      "landing": [
+        502.62497,
+        2772.625,
+        195.99992
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_inferno",
+        "Name": "de_inferno-2085-2075",
+        "variant": 1,
+        "success": false,
+        "reason": "timeout",
+        "seconds": 8.015625,
+        "jumps": 5,
+        "max_z": 230.85938,
+        "start_z": 161.49998,
+        "goal_z": 192.97324,
+        "distance": 274.20282
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_inferno",
+        "Name": "de_inferno-2085-2075",
+        "variant": 1,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.15625,
+        "jumps": 1,
+        "max_z": 226.35938,
+        "start_z": 161.49998,
+        "goal_z": 192.97324,
+        "distance": 91.63576
+      }
+    },
+    {
+      "map": "de_inferno",
+      "case": "de_inferno-1337-1335",
+      "variant": 0,
+      "from_area": 1337,
+      "to_area": 1335,
+      "start": [
+        1852.3749,
+        339.6247,
+        162.49992
+      ],
+      "landing": [
+        1838.75,
+        225.6247,
+        223.99994
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_inferno",
+        "Name": "de_inferno-1337-1335",
+        "variant": 0,
+        "success": false,
+        "reason": "timeout",
+        "seconds": 8.015625,
+        "jumps": 5,
+        "max_z": 225.85938,
+        "start_z": 160.99997,
+        "goal_z": 220.00003,
+        "distance": 258.31833
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_inferno",
+        "Name": "de_inferno-1337-1335",
+        "variant": 0,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.421875,
+        "jumps": 1,
+        "max_z": 225.85938,
+        "start_z": 160.99997,
+        "goal_z": 220.00003,
+        "distance": 106.79437
+      }
+    },
+    {
+      "map": "de_inferno",
+      "case": "de_inferno-1337-1335",
+      "variant": 1,
+      "from_area": 1337,
+      "to_area": 1335,
+      "start": [
+        1852.3749,
+        339.6247,
+        162.49992
+      ],
+      "landing": [
+        1838.75,
+        225.6247,
+        223.99994
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_inferno",
+        "Name": "de_inferno-1337-1335",
+        "variant": 1,
+        "success": false,
+        "reason": "timeout",
+        "seconds": 8.015625,
+        "jumps": 5,
+        "max_z": 225.85938,
+        "start_z": 160.99997,
+        "goal_z": 220.00003,
+        "distance": 238.85904
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_inferno",
+        "Name": "de_inferno-1337-1335",
+        "variant": 1,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.375,
+        "jumps": 1,
+        "max_z": 225.85938,
+        "start_z": 160.99997,
+        "goal_z": 220.00003,
+        "distance": 103.13171
+      }
+    },
+    {
+      "map": "de_inferno",
+      "case": "de_inferno-220-275",
+      "variant": 0,
+      "from_area": 220,
+      "to_area": 275,
+      "start": [
+        177.99992,
+        465.49976,
+        85.99993
+      ],
+      "landing": [
+        230.74994,
+        474.24976,
+        125.99992
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_inferno",
+        "Name": "de_inferno-220-275",
+        "variant": 0,
+        "success": false,
+        "reason": "timeout",
+        "seconds": 8.015625,
+        "jumps": 5,
+        "max_z": 147.29688,
+        "start_z": 79.80705,
+        "goal_z": 121.92854,
+        "distance": 246.2819
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_inferno",
+        "Name": "de_inferno-220-275",
+        "variant": 0,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.953125,
+        "jumps": 1,
+        "max_z": 146.85938,
+        "start_z": 79.80705,
+        "goal_z": 121.92854,
+        "distance": 90.39816
+      }
+    },
+    {
+      "map": "de_inferno",
+      "case": "de_inferno-220-275",
+      "variant": 1,
+      "from_area": 220,
+      "to_area": 275,
+      "start": [
+        177.99992,
+        465.49976,
+        85.99993
+      ],
+      "landing": [
+        230.74994,
+        474.24976,
+        125.99992
+      ],
+      "baseline": {
+        "kind": "result",
+        "map": "de_inferno",
+        "Name": "de_inferno-220-275",
+        "variant": 1,
+        "success": false,
+        "reason": "timeout",
+        "seconds": 8.015625,
+        "jumps": 4,
+        "max_z": 146.85938,
+        "start_z": 79.80705,
+        "goal_z": 121.92854,
+        "distance": 212.72949
+      },
+      "candidate": {
+        "kind": "result",
+        "map": "de_inferno",
+        "Name": "de_inferno-220-275",
+        "variant": 1,
+        "success": true,
+        "reason": "landed",
+        "seconds": 1.84375,
+        "jumps": 1,
+        "max_z": 146.85938,
+        "start_z": 79.80705,
+        "goal_z": 121.92854,
+        "distance": 98.05718
+      }
+    }
+  ],
+  "limits": "Fixed native destination, standing starts, two initial-angle variants, 8-second deadline; not a natural-match success-rate estimate."
+}

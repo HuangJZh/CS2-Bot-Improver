@@ -351,6 +351,12 @@ public partial class BotAimImprover
             if(visualPriority)CancelSoundAttention(controller);
             if(bot.Enemy.Value is not {IsValid:true} enemy || enemy.LifeState!=0 || enemy.TeamNum==controller.TeamNum)
             {
+                if(NearNativeJump(pawn,bot)||(pawn.Flags&1)==0)
+                {
+                    CancelSoundSteering(controller);ResetSilentMovement(controller.Slot);CancelCoverPeek(controller.Slot,"native-jump");
+                    _preaimTargets.Remove(controller.Slot);ReleaseHuman(controller.Slot);_modelSpots.Remove(pointer);
+                    RefreshFireGuard(controller);return HookResult.Continue;
+                }
                 // The native enemy handle can flicker between peeks. Keep the memory
                 // based plan for a short grace period instead of resetting every
                 // model (reset means a fresh sensor delay and reaction before the

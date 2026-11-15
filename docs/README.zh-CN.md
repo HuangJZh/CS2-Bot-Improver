@@ -2,7 +2,7 @@
 
 基于 [ed0ard/CS2-Bot-Improver](https://github.com/ed0ard/CS2-Bot-Improver) 修改的人机系统，用于 CS2 本地人机与私人对局。独立维护瞄准射击、队友协作、经济、道具和路线分配逻辑。
 
-**面板 1.0.0 · 战斗模块 Custom 8.59 · 基础组件来源 v1.4.8**
+**面板 1.0.0 · 战斗模块 Custom 8.60 · 基础组件来源 v1.4.8**
 
 [仓库首页](../README.md) · [English](README.en.md)
 
@@ -14,7 +14,7 @@
 
 当前验证环境为 **Windows 本地游戏主机**。部分基础依赖支持 Linux，但定制回防 AI 接入及当前原生兼容补丁只在 Windows 验证，不将本分支标为已完成跨平台验证的发行版。
 
-本次玩法更新见 [Custom 8.59：开局赶路、转身开火与跳跃修正](OPENING-TURN-JUMP-8.59-20261115.md)。
+本次玩法更新见 [Custom 8.60：三张常见地图的高差通行审查](JUMP-AUDIT-8.60-20261115.md)。
 
 ## 当前功能
 

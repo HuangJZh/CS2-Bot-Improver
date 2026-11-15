@@ -13,6 +13,7 @@ public partial class BotAimImprover
     // Native MoveTo binding adapted from ed0ard/CS2-Bot-Nav, AGPL-3.0,
     // commit 0d1d04f8eb748e3434462d2a799ca89ab299e583. See docs/NAVIGATION-SOURCES.md.
     private MemoryFunctionVoid<nint,nint,int>? _navigationMoveTo;
+    private readonly BotMovement.NativeMoveGoalReader _localMoveGoal=new();
     private TeamNavigationGraph? _navigationGraph;
     private string? _navigationMap;
     private float _navigationTick;
@@ -36,11 +37,8 @@ public partial class BotAimImprover
     {
         try
         {
-            string signature=OperatingSystem.IsWindows()
-                ? "F2 0F 10 02 F2 0F 11 81 E8 02 00 00 8B 42 08 48 8D 91 E0 02 00 00 89 81 F0 02 00 00 44 89 81 F4 02 00 00 E9 ? ? ? ?"
-                : "48 8B 06 48 89 87 E0 02 00 00 8B 46 08 48 8D B7 D8 02 00 00 89 97 EC 02 00 00 89 87 E8 02 00 00 E9 ? ? ? ?";
-            _navigationMoveTo=new(signature);
-            if(_navigationMoveTo.Handle==nint.Zero)throw new InvalidOperationException("MoveTo not found");
+            if(!_localMoveGoal.Initialize())throw new InvalidOperationException("MoveTo not found");
+            _navigationMoveTo=_localMoveGoal.MoveTo;
         }
         catch(Exception e){_navigationFailed=true;Logger.LogWarning(e,"Team navigation unavailable; keeping native routes");}
         RegisterEventHandler<EventRoundEnd>((e,i)=>{ResetTeamNavigation();_navigationRoundEnded=true;return HookResult.Continue;});

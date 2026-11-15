@@ -1,0 +1,25 @@
+using System.Numerics;
+using BotMovement;
+int count=0;
+void Check(bool condition,string name){if(!condition)throw new Exception(name);count++;Console.WriteLine("PASS "+name);}
+Check(JumpTraversalPolicy.NearRise(Vector3.Zero,new(80,0,48),true),"nearby native ledge requests traversal ownership");
+Check(!JumpTraversalPolicy.NearRise(Vector3.Zero,new(80,0,48),false),"a native path is required");
+Check(!JumpTraversalPolicy.NearRise(Vector3.Zero,new(80,0,0),true),"ordinary flat movement stays native");
+Check(!JumpTraversalPolicy.NearRise(Vector3.Zero,new(80,0,-48),true),"dropoffs cannot arm an upward jump assist");
+Check(!JumpTraversalPolicy.NearRise(Vector3.Zero,new(80,0,120),true),"unreachable high destinations do not create super jumps");
+Check(!JumpTraversalPolicy.NearRise(Vector3.Zero,new(500,0,48),true),"distant site goals cannot steer local jumps");
+Check(!JumpTraversalPolicy.NearRise(Vector3.Zero,new(float.NaN,0,48),true),"invalid native goals are ignored");
+var east=JumpTraversalPolicy.AirStep(Vector2.Zero,Vector2.Zero,new(80,0),1f/64);
+Check(east.X>0&&east.Y==0,"horizontal assist follows landing coordinates");
+var west=JumpTraversalPolicy.AirStep(Vector2.Zero,Vector2.Zero,new(-80,0),1f/64);
+Check(west.X<0&&west.Y==0,"opposite landing uses opposite world direction");
+Check(east.Length()<=900f/64+.001f,"acceleration has a per-tick bound");
+var fast=new Vector2(215,0);
+Check(JumpTraversalPolicy.AirStep(Vector2.Zero,fast,new(180,0),1f/64)==fast,"sufficient native running momentum is preserved");
+Check(JumpTraversalPolicy.AirStep(Vector2.Zero,fast,new(8,0),1f/64)==fast,"no last-instant reversal at the landing point");
+Check(JumpTraversalPolicy.AirStep(Vector2.Zero,fast,new(500,0),1f/64)==fast,"flight assistance has a local range bound");
+Check(JumpTraversalPolicy.AirStep(Vector2.Zero,fast,new(80,0),1)==fast,"a paused or stale frame cannot inject a velocity spike");
+Check(JumpTraversalPolicy.AirStep(Vector2.Zero,fast,new(80,0),0)==fast,"repeated same-frame calls do not accelerate twice");
+var side=new Vector2(0,80);var correction=JumpTraversalPolicy.AirStep(Vector2.Zero,side,new(80,0),1f/64);
+Check(Vector2.Distance(correction,side)<=900f/64+.001f&&correction.X>0,"wrong-way momentum is corrected gradually");
+Console.WriteLine($"{count} jump traversal checks passed");

@@ -14,6 +14,7 @@ public partial class BotState
     public override void Load(bool hotReload)
     {
         ReadCombatBackend();
+        if(!_jumpMoveGoal.Initialize())Console.WriteLine("[Smarter-Bot] Native local movement goal unavailable; jump assistance disabled");
         InstallDefuseBombHook();
         InstallBotBlindHook();
         InitializeFovPatches();
@@ -69,6 +70,7 @@ public partial class BotState
         RestoreAllFovPatches();
         ReleaseKnifeLocks();
         EndOpeningSprint();
+
         ClearReveals();
         _defuseRevealTimer?.Kill();
         _gunReequipTimer?.Kill();

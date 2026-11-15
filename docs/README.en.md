@@ -1,6 +1,6 @@
 # CS2 Bot Improver — HuangJZh Independent Edition
 
-**Panel 1.0.0 · Gameplay Custom 8.59 · Base provenance v1.4.8**
+**Panel 1.0.0 · Gameplay Custom 8.60 · Base provenance v1.4.8**
 
 [简体中文 — full guide](../README.md) · **English**
 
@@ -19,7 +19,7 @@ This personal fork of [ed0ard/CS2-Bot-Improver](https://github.com/ed0ard/CS2-Bo
 
 Ordinary-enemy base reaction fields are approximately **Low 150 ms / Medium 100 ms / High 75 ms**. These fields are not measured visibility-to-shot times. Perception, view angle, aim motion, weapon readiness and profile modifiers also affect firing. The calibration is an estimated Aim Rush comparison, not a measured player rank or proven equivalence.
 
-Latest gameplay change: [Custom 8.59](OPENING-TURN-JUMP-8.59-20261115.md) adds safe opening knife travel, a brief firing guard after large turns, and fixes interference with native jump traversal.
+Latest gameplay change: [Custom 8.60](JUMP-AUDIT-8.60-20261115.md) audits nine elevation transitions across Dust2, Mirage and Inferno, with bounded assistance toward the native movement destination and traversal ownership fixes. Opening knife travel and large-turn firing guards are retained.
 
 ## Using the current installation
 

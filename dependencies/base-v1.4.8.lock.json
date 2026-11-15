@@ -1,6 +1,6 @@
 {
   "schema": "cs2-bot-custom-base-lock-v1",
-  "custom_version": "8.59",
+  "custom_version": "8.60",
   "date": "2026-11-15",
   "cs2_buildid": "26598758",
   "stable_restore_tag": "custom-8.49-stable",
@@ -16,8 +16,8 @@
     "BotController": "a46b15a865c135a95f44688bd964da478f83a51a",
     "BotHider": "8be8e95919abb4ab05bb82b8cbdf516b4e347aa5",
     "BotVision": "df8f0707c7590cd55d9ffb8f6824ec9f3c959f5f",
-    "BotAimImprover": "custom 2.1.8-human.8.59; 80ms settle after large turns, native traversal handoff, no reaction/profile changes",
-    "BotState": "custom 1.10.6-human.5; safe four-second opening knife travel, preserve native jump timing and air steering",
+    "BotAimImprover": "custom 2.1.8-human.8.60; native movement-goal reader and traversal ownership; aim calibration unchanged",
+    "BotState": "custom 1.10.6-human.6; bounded native-jump horizontal assistance, fresh recovery heading, no jump input injection",
     "NadeSystem": "custom inventory.5-cross-team-fire; shared fire category, acquisition verification and actual held fire subtype",
     "BotSupport": "custom 1.0.11-held-primary-transfer; no-affordable-purchase fallback transfers most valuable real teammate primary",
     "BotRandomizer": "preserved installed bot-only customization; binary pinned by SHA256",
@@ -350,11 +350,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.dll",
-      "sha256": "06852a1e2a3b0a30e42edb7440c6582c023213fec01eafdf73886e7cc87eb0f7"
+      "sha256": "1a16e992ae87d36b3ba82df137af69f9138cf698fcff6d9d0b300ffe552dc93f"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotAimImprover/BotAimImprover.pdb",
-      "sha256": "6ce02d4ae0b013101c27034c25e547c3f64f1b8480fff190610d684438e718b5"
+      "sha256": "4f7314ab1799f868f326b9550edb639307af12bb8dcb30b9781c0a99ed9ee8de"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotBuy/BotBuy.deps.json",
@@ -390,11 +390,11 @@
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotState/BotState.dll",
-      "sha256": "22b4b9b90e8cb1bfa13ab3b603a552d44997474f95d86559af702a18a289f615"
+      "sha256": "82b96788d74880951d7c41ec5e2ce9fcaa0d78ed53fd1fd4666282b0ccdc7a57"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotState/BotState.pdb",
-      "sha256": "ca23bd137a83cbd1e88c30389e8ffdf5f4f51492c70742357b7b072604bd5252"
+      "sha256": "fa543e7bfda630a7d26c3cfe3509ee94e762199364fc183d31df5ebd66f9cf85"
     },
     {
       "path": "addons/counterstrikesharp/plugins/BotSupport/BotSupport.deps.json",
@@ -2119,7 +2119,7 @@
     "recorded_on": "2026-11-11",
     "note": "Managed by Panel/user; do not overwrite from the base lock."
   },
-  "custom_revision": "opening-turn-jump-20261115",
+  "custom_revision": "jump-audit-8.60-20261115",
   "counterstrikesharp_native_hotfix": {
     "source": "https://github.com/roflmuffin/CounterStrikeSharp/pull/1490",
     "commit": "86e57d69ee33d0480a6ebd221b579860a26eeb78",

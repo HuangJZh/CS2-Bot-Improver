@@ -47,6 +47,7 @@ public partial class BotAimImprover
     private TacticalMovementDecision MovementContext(CCSPlayerController p,CCSPlayerPawn pawn,CCSBot bot,float now)
     {
         ReadObjective(now);
+        if(NearNativeJump(pawn,bot))return new(false,false,"native-jump-approach");
         if(_roundLive&&!_bombPlanted&&now>=_roundStartedAt&&now-_roundStartedAt<4)
             return new(false,false,"opening-travel");
         if((pawn.Flags&1)==0||pawn.MoveType==MoveType_t.MOVETYPE_LADDER)
@@ -62,6 +63,9 @@ public partial class BotAimImprover
         _tacticalReasons[p.Slot]=decision.Reason;
         return decision;
     }
+    private bool NearNativeJump(CCSPlayerPawn pawn,CCSBot bot)
+        =>pawn.AbsOrigin is {} origin&&_localMoveGoal.TryRead(bot,out var goal)
+            &&BotMovement.JumpTraversalPolicy.NearRise(new(origin.X,origin.Y,origin.Z),goal,bot.PathIndex>0);
     private void MaintainTacticalMovement()
     {
         if(RetakeOwnsGoals)return;

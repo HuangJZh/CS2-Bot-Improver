@@ -8,7 +8,7 @@ namespace BotState;
 public partial class BotState
 {
 
-    private readonly Dictionary<int, (float X,float Y)> _travelDirection = new();
+    private readonly Dictionary<int, (float X,float Y,float At,float PX,float PY,uint Pawn)> _travelDirection = new();
     private readonly HashSet<int> _airCrouchOwned = new();
     private readonly Dictionary<int, float> _ladderExitTime = new();
     private readonly Dictionary<int, float> _doorEventCooldown = new();
@@ -44,7 +44,7 @@ public partial class BotState
     }
 
     // Updates ladder and air movement; door cooldown skips all later movement work.
-    private bool UpdateBotMovement(CCSPlayerPawn pawn, CCSBot bot, int idx, bool curIsAttacking, bool inDoorCooldown)
+    private bool UpdateBotMovement(CCSPlayerController player,CCSPlayerPawn pawn, CCSBot bot, int idx, bool curIsAttacking, bool inDoorCooldown)
     {
         // Ladder Stuck Issue Fix
         var moveServices = pawn.MovementServices as CCSPlayer_MovementServices;
@@ -68,15 +68,18 @@ public partial class BotState
         // Door Stuck Issue Fix
         if (inDoorCooldown)
         {
+            _jumpApproaches.Remove(idx);
             return false;
         }
-        // View direction is not travel direction. Native air steering owns XY
-        // velocity; the former view-relative boost pushed a turning bot off jumps.
+        AssistNativeJump(player,pawn,bot,idx,nearLadder,curIsAttacking);
+        // Ordinary air steering remains native. The limited jump assistance
+        // above uses a recent native landing goal, never the view direction.
         float speedSquared=pawn.AbsVelocity.X*pawn.AbsVelocity.X+pawn.AbsVelocity.Y*pawn.AbsVelocity.Y;
-        if(!inAir&&!nearLadder&&!bot.IsStuck&&speedSquared>40*40)
+        if(!inAir&&!nearLadder&&!bot.IsStuck&&speedSquared>40*40&&pawn.AbsOrigin is {} travelPosition)
         {
             float speed=MathF.Sqrt(speedSquared);
-            _travelDirection[idx]=(pawn.AbsVelocity.X/speed,pawn.AbsVelocity.Y/speed);
+            _travelDirection[idx]=(pawn.AbsVelocity.X/speed,pawn.AbsVelocity.Y/speed,Server.CurrentTime,
+                travelPosition.X,travelPosition.Y,pawn.EntityHandle.Raw);
         }
         if(inAir&&!curIsAttacking&&!pawn.IsDefusing&&pawn.AbsVelocity.Z>20&&!bot.IsCrouching)
         {bot.IsCrouching=true;_airCrouchOwned.Add(idx);}
@@ -143,7 +146,9 @@ public partial class BotState
                 float baseYaw=MathF.Atan2(heading.Y,heading.X);
                 float backYaw = baseYaw + MathF.PI + offsetRad;
 
-                if(heading.X*heading.X+heading.Y*heading.Y>.5f)
+                bool fresh=heading.Pawn==pawn.EntityHandle.Raw&&now-heading.At is >=0 and <5f
+                    &&MathF.Pow(curPos.X-heading.PX,2)+MathF.Pow(curPos.Y-heading.PY,2)<96*96;
+                if(fresh&&heading.X*heading.X+heading.Y*heading.Y>.5f)
                 {
                     pawn.AbsVelocity.X = MathF.Cos(backYaw) * 100f;
                     pawn.AbsVelocity.Y = MathF.Sin(backYaw) * 100f;
@@ -250,6 +255,7 @@ public partial class BotState
         // Player indices are reused, so do not carry movement state into the next round.
         _travelDirection.Clear();
         _airCrouchOwned.Clear();
+        _jumpApproaches.Clear();
         _ladderExitTime.Clear();
         _doorEventCooldown.Clear();
         _stuckStartTime.Clear();
