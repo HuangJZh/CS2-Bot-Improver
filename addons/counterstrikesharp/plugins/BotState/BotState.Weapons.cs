@@ -65,6 +65,7 @@ public partial class BotState
         if (!winningTeamAlive) return;
 
         _eliminationHandled = true;
+        EndOpeningSprint(); // Release opening ownership before winning-team locks.
 
         foreach (var bot in winningBots)
         {
@@ -242,6 +243,7 @@ public partial class BotState
 
             var pawn = player.PlayerPawn?.Value;
             if (pawn == null || !pawn.IsValid || pawn.IsDefusing) continue;
+            if(_openingKnives.ContainsKey(player.Slot)&&Server.CurrentTime<_openingSprintUntil)continue;
 
             // Only act when the bot is idly holding a knife; the sole purpose is
             // to stop a bot roaming with its knife while enemies live.

@@ -37,7 +37,8 @@ public partial class BotState
         RegisterListener<Listeners.OnEntitySpawned>(InvalidateFlashEntities);
         RegisterListener<Listeners.OnEntityDeleted>(InvalidateFlashEntities);
         RegisterListener<Listeners.OnMapStart>(_ => {ReadCombatBackend();ClearFlashEntities();});
-        RegisterListener<Listeners.OnMapEnd>(ClearFlashEntities);
+        RegisterListener<Listeners.OnMapEnd>(()=>{EndOpeningSprint();ClearFlashEntities();});
+        RegisterEventHandler<EventRoundEnd>((e,i)=>{EndOpeningSprint();return HookResult.Continue;});
         RegisterListener<Listeners.OnTick>(OnTick);
         // Prevent bots from holding their knives when there're enemies alive
         _gunReequipTimer = AddTimer(
@@ -67,6 +68,7 @@ public partial class BotState
         UninstallDefuseBombHook();
         RestoreAllFovPatches();
         ReleaseKnifeLocks();
+        EndOpeningSprint();
         ClearReveals();
         _defuseRevealTimer?.Kill();
         _gunReequipTimer?.Kill();
@@ -94,6 +96,7 @@ public partial class BotState
     [GameEventHandler]
     public HookResult OnRoundFreezeEnd(EventRoundFreezeEnd @event, GameEventInfo info)
     {
+        BeginOpeningSprint();
         if(_nativeCombat)return HookResult.Continue;
         foreach (var player in Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller"))
         {
@@ -106,6 +109,7 @@ public partial class BotState
     // Clears per-round state and releases elimination knife locks
     private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
     {
+        EndOpeningSprint();
         ReadCombatBackend();
         ClearFovObservers();
         ReleaseKnifeLocks();

@@ -25,6 +25,7 @@ public partial class BotState
         {
             var victim = @event.Userid;
             if (victim == null || !victim.IsValid || !victim.IsBot) return HookResult.Continue;
+            StopOpeningSprint(victim.Slot);
 
             // World damage has no attacker, and self damage is nobody hurting
             // anyone else.

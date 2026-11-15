@@ -51,6 +51,7 @@ public partial class BotState
     // Makes non-possessed Bots hurry once the bomb has been planted.
     private HookResult OnBombPlanted(EventBombPlanted @event, GameEventInfo info)
     {
+        EndOpeningSprint();
         foreach (var player in Utilities.FindAllEntitiesByDesignerName<CCSPlayerController>("cs_player_controller"))
         {
             if (!player.IsValid || !player.IsBot)

@@ -47,6 +47,8 @@ public partial class BotAimImprover
     private TacticalMovementDecision MovementContext(CCSPlayerController p,CCSPlayerPawn pawn,CCSBot bot,float now)
     {
         ReadObjective(now);
+        if(_roundLive&&!_bombPlanted&&now>=_roundStartedAt&&now-_roundStartedAt<4)
+            return new(false,false,"opening-travel");
         if((pawn.Flags&1)==0||pawn.MoveType==MoveType_t.MOVETYPE_LADDER)
             return new(false,false,"airborne-or-ladder");
         bool busy=pawn.IsDefusing||(_plantingUntil.TryGetValue(p.Slot,out var until)&&now<until);

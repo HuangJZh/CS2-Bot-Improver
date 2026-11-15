@@ -263,6 +263,7 @@ public partial class BotAimImprover
     }
     private void ResetHuman()
     {
+        _turnReadiness.Clear();
         ClearRetakeFireRecovery();
         _testGateUntil=float.NegativeInfinity;
         foreach(var slot in _humanStates.Keys.ToArray())ReleaseHuman(slot);
@@ -286,6 +287,10 @@ public partial class BotAimImprover
     // bounded turn rate and a tier-scaled angular error, instead of ignoring sound.
     private bool TryApplySoundPreaim(CCSPlayerController controller,CCSBot bot,nint pointer,CCSPlayerPawn pawn,Vec eyeVec,float now)
     {
+        // Keep the cue, but let native traversal own air/ladder steering until
+        // landing. A noncombat noise must not pull a jump off its approach.
+        if((pawn.Flags&1)==0||pawn.MoveType==MoveType_t.MOVETYPE_LADDER)
+        {CancelSoundSteering(controller);return false;}
         if(HasReliableVisibleThreat(controller,now)){CancelSoundAttention(controller);return false;}
         if(!_soundFocus.TryGetValue(controller.Slot,out var owner)||owner.Pawn!=controller.PlayerPawn.Raw)
             _soundFocus[controller.Slot]=owner=new(controller.PlayerPawn.Raw,new());
@@ -618,6 +623,8 @@ public partial class BotAimImprover
         if(!turn.Auditory)_pendingLargeTurns.Remove(pointer);
         else
         {
+            if((pawn.Flags&1)==0||pawn.MoveType==MoveType_t.MOVETYPE_LADDER)
+            {CancelSoundSteering(p);return;}
             if(HasReliableVisibleThreat(p,Server.CurrentTime)){CancelSoundAttention(p);return;}
             if(!_soundFocus.TryGetValue(p.Slot,out var focus)||focus.Pawn!=p.PlayerPawn.Raw||!focus.Focus.Holding(Server.CurrentTime))
             {CancelSoundSteering(p);return;}

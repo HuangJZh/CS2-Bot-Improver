@@ -11,6 +11,13 @@ public partial class BotState
     private static class BotControllerBridge
     {
         [MethodImpl(MethodImplOptions.NoInlining)]
+        public static bool IsWeaponControlled(object api,int slot)
+        {
+            var controller=(BotControllerApi.IBotControllerApi)api;
+            return controller.IsLocked(slot,BotControllerApi.LockKind.Weapon)
+                ||controller.IsLocked(slot,BotControllerApi.LockKind.All)||controller.IsReplaying(slot);
+        }
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static bool IsViewControlled(object api, int slot)
         {
             var controller = (BotControllerApi.IBotControllerApi)api;

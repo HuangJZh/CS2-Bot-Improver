@@ -11,8 +11,10 @@ public partial class BotState
     {
         ProcessFlashbangAvoidance();
         ExpireReveals(Server.CurrentTime);
+        MaintainOpeningSprint();
         if(RetakeOwnsGoals)
         {
+            if(_openingKnives.Count>0)EndOpeningSprint();
             if(_knifeLockedBotSlots.Count>0)ReleaseKnifeLocks();
             return; // Valve BT owns positioning, weapon selection and objective states.
         }
@@ -22,7 +24,7 @@ public partial class BotState
         for (int slot = 0; slot < maxPlayers; slot++)
         {
             var player = Utilities.GetPlayerFromSlot(slot);
-            if (player == null || !player.IsValid || !player.IsBot)
+            if (player == null || !player.IsValid || !player.IsBot || !player.PawnIsAlive)
                 continue;
 
             var pawn = player.PlayerPawn.Value;
@@ -34,10 +36,11 @@ public partial class BotState
                 continue;
             // In case the bot has been taken over
             bool isTakenOver = player.HasBeenControlledByPlayerThisRound;
-            if (isTakenOver) continue;
+            if (isTakenOver){ReleaseOpeningKnife(player.Slot);continue;}
 
             int idx = (int)player.Index;
             float now = Server.CurrentTime;
+            TickOpeningSprint(player,pawn,bot,now);
             if(!_nativeCombat)InterruptReload(player, pawn, bot, now);
             // Door Stuck Fix
             bool inDoorCooldown = _doorEventCooldown.TryGetValue(idx, out float doorCooldownEnd) && now < doorCooldownEnd;

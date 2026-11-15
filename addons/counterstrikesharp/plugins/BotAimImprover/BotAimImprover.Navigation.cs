@@ -26,6 +26,8 @@ public partial class BotAimImprover
         public required int Team;
         public float Started,LastProgress,BestDistance=float.PositiveInfinity,LogAt;
         public int Cursor;
+        public int LastMoveArea=-1;
+        public float LastMoveAt=float.NegativeInfinity;
     }
     private readonly Dictionary<int,NavigationPlan> _navigationPlans=new();
     private readonly Dictionary<string,int> _navigationCounters=new();
@@ -169,21 +171,25 @@ public partial class BotAimImprover
                 var nodes=plan.Path;
                 // Advance only on genuine approach to the next area, not on time.
                 int oldCursor=plan.Cursor;
-                if(_navigationGraph!.Locate(origin,100) is {} standing)
+                if(_navigationGraph!.Locate(origin,100) is {} standing
+                    &&!TeamNavigationPolicy.NativeTraversal(origin,_navigationGraph.Areas[standing].Point))
                     for(int i=plan.Cursor;i<Math.Min(nodes.Count,plan.Cursor+8);i++)if(nodes[i]==standing)plan.Cursor=i;
-                while(plan.Cursor<nodes.Count-1&&Vec.Distance(origin,_navigationGraph.Areas[nodes[plan.Cursor]].Point)<125)plan.Cursor++;
+                while(plan.Cursor<nodes.Count-1&&TeamNavigationPolicy.ReachedWaypoint(origin,_navigationGraph.Areas[nodes[plan.Cursor]].Point))plan.Cursor++;
                 if(oldCursor!=plan.Cursor){plan.BestDistance=float.PositiveInfinity;plan.LastProgress=now;}
                 float waypointDistance=Vec.Distance(origin,_navigationGraph!.Areas[nodes[plan.Cursor]].Point);
                 if(waypointDistance<plan.BestDistance-20){plan.BestDistance=waypointDistance;plan.LastProgress=now;}
                 if(now-plan.LastProgress>3){EndNavigation(slot,"no-progress-native-recovery");continue;}
-                int look=plan.Cursor;float length=0;
-                while(look<nodes.Count-1&&length<220)
-                {length+=Vec.Distance(_navigationGraph.Areas[nodes[look]].Point,_navigationGraph.Areas[nodes[look+1]].Point);look++;}
+                int look=TeamNavigationPolicy.LookAhead(_navigationGraph,nodes,plan.Cursor,origin);
                 var destination=_navigationGraph.Areas[nodes[look]].Point;
+                bool traversal=TeamNavigationPolicy.NativeTraversal(origin,destination);
+                // Let the native pathfinder finish its takeoff, facing and landing
+                // sequence rather than restarting MoveTo at the 5 Hz policy tick.
+                if(!TeamNavigationPolicy.RefreshMove(plan.LastMoveArea,nodes[look],now-plan.LastMoveAt,traversal))continue;
                 ResetSilentMovement(slot);
                 bool crowd=false; // Team collision is disabled; no spacing input.
                 _navigationTarget.X=destination.X;_navigationTarget.Y=destination.Y;_navigationTarget.Z=destination.Z;
                 _navigationMoveTo.Invoke(bot.Handle,_navigationTarget.Handle,1);NavCount("move-to");
+                plan.LastMoveArea=nodes[look];plan.LastMoveAt=now;
                 if(now>=plan.LogAt)
                 {
                     plan.LogAt=now+1;

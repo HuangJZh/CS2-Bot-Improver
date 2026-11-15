@@ -53,14 +53,16 @@ public partial class BotAimImprover
         WriteTelemetry(new{kind="native_aim_point",time=Server.CurrentTime,slot=p.Slot,pawn=p.PlayerPawn.Raw,
             enemy=bot.Enemy.Raw,mode=_aimMode.ToString(),point=contact.Point,x=point.X,y=point.Y,z=point.Z});
     }
-    private FireGateDecision EvaluateNativeCombatGate(CCSPlayerController p,CCSPlayerPawn pawn,CCSBot bot)
+    private FireGateDecision EvaluateNativeCombatGate(CCSPlayerController p,CCSPlayerPawn pawn,CCSBot bot,bool advanceTimers=true)
     {
         if(bot.Enemy.Value is not {IsValid:true,LifeState:0} enemy||enemy.TeamNum==p.TeamNum||!TryGetBotEyePosition(p,out var eye))
             return new(false,false,"native-no-target");
         if(enemy.AbsOrigin is {} origin)
         {
             var bearing=AimMath.Angles(new(eye.X,eye.Y,eye.Z),new(origin.X,origin.Y,origin.Z+enemy.ViewOffset.Z*.7f));
+            bool turnReady=LargeTurnReady(p,pawn,bot,bearing.Y,advanceTimers);
             if(FacingFirePolicy.OutsideCone(pawn.EyeAngles.Y,bearing.Y))return new(false,true,"target-outside-fire-cone");
+            if(!turnReady)return new(false,true,"large-turn-settle");
         }
         if(!bot.IsEnemyVisible||pawn.BlindUntilTime>Server.CurrentTime)return new(false,false,"native-search");
         if(_nativeContacts.TryGetValue(p.Slot,out var contact)&&contact.Pawn==p.PlayerPawn.Raw&&contact.Target==bot.Enemy.Raw

@@ -521,6 +521,18 @@ Check(!grossGate.FirstShot(3,false,90,.65f,true,.1f,90).Allow,
  "a burst continuation cannot bypass a large horizontal execution error");
 Check(grossGate.FirstShot(3.1f,true,.1f,.65f,true,.1f,.1f).Allow,
  "turn safety releases immediately after actual view alignment");
+var turnSettle=new LargeTurnReadiness();
+Check(!turnSettle.Ready(0,0,180),"large rear turn blocks firing");
+Check(!turnSettle.Ready(.2f,179,180),"instant endpoint alignment does not immediately authorize fire");
+Check(!turnSettle.Ready(.27f,179,180)&&turnSettle.Ready(.29f,179,180),"large turn needs 80 ms of stable facing before releasing fire");
+Check(turnSettle.Ready(.30f,179,180),"settled turn does not repeatedly delay a live spray");
+var unstableTurn=new LargeTurnReadiness();
+unstableTurn.Ready(0,0,90);unstableTurn.Ready(.1f,89,90);
+Check(!unstableTurn.Ready(.16f,70,90)&&!unstableTurn.Ready(.20f,89,90)&&!unstableTurn.Ready(.25f,89,90),"leaving the facing cone restarts the settling window");
+Check(unstableTurn.Ready(.29f,89,90),"reacquisition releases after a new stable interval");
+var previewTurn=new LargeTurnReadiness();
+Check(!previewTurn.Ready(0,0,90,false)&&previewTurn.Ready(1,0,2),"diagnostic evaluation cannot arm a persistent turn delay");
+Check(new LargeTurnReadiness().Ready(0,179,-179),"small wraparound correction has no large-turn delay");
 Check(FacingFirePolicy.OutsideCone(0,90)&&FacingFirePolicy.OutsideCone(0,180)
  &&!FacingFirePolicy.OutsideCone(179,-179)&&!FacingFirePolicy.OutsideCone(0,8),
  "native fallback fire cone blocks rear and side targets with correct yaw wrapping");

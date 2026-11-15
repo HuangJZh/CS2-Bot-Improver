@@ -9,6 +9,28 @@ public static class FacingFirePolicy
         =>float.IsFinite(actualYaw+targetYaw)&&MathF.Abs(AimMath.Wrap(targetYaw-actualYaw))>8;
 }
 
+// Inhibitory only: a large turn must finish, then remain in the facing cone
+// briefly. Small adjustments and existing sprays acquire no extra delay.
+public sealed class LargeTurnReadiness
+{
+    private bool _turning;
+    private float? _alignedSince;
+    public bool Ready(float now,float actualYaw,float bearingYaw,bool advance=true)
+    {
+        if(!float.IsFinite(now+actualYaw+bearingYaw))return false;
+        float gap=MathF.Abs(AimMath.Wrap(bearingYaw-actualYaw));
+        if(gap>=45)
+        {if(advance){_turning=true;_alignedSince=null;}return false;}
+        if(!_turning)return true;
+        if(gap>6)
+        {if(advance)_alignedSince=null;return false;}
+        if(advance)_alignedSince??=now;
+        if(now-(_alignedSince??now)<.08f)return false;
+        if(advance){_turning=false;_alignedSince=null;}
+        return true;
+    }
+}
+
 // Bounded negative feedback around the requested (already imperfect) motor aim.
 // It never reads enemy coordinates or writes the player's view directly.
 public sealed class AimExecutionController

@@ -47,4 +47,14 @@ foreach(var file in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory,"na
  }
  Check(reached>30,data.Map+" sampled native routes retain legal edges and bounded alternatives");
 }
+Check(!TeamNavigationPolicy.ReachedWaypoint(new(0,0,0),new(30,0,50)),"nearby raised box is not treated as reached before landing");
+Check(TeamNavigationPolicy.ReachedWaypoint(new(0,0,50),new(30,0,50)),"landing advances raised waypoint");
+Check(!TeamNavigationPolicy.ReachedWaypoint(new(0,0,100),new(20,0,0)),"lower landing is not skipped from above");
+var steps=new TeamNavigationGraph([Node(0,0,0,0,1),Node(1,80,0,48,2),Node(2,180,0,48,3),Node(3,300,0,48)]);
+Check(TeamNavigationPolicy.LookAhead(steps,new[]{0,1,2,3},0)==1,"lookahead retains the first raised landing instead of cutting past it");
+Check(TeamNavigationPolicy.LookAhead(steps,new[]{0,1,2,3},1,Vector3.Zero)==1,"a current raised target stays selected until feet reach its elevation");
+Check(TeamNavigationPolicy.LookAhead(steps,new[]{0,1,2,3},1)==3,"flat navigation keeps lookahead after landing");
+Check(!TeamNavigationPolicy.RefreshMove(1,1,.2f,true),"native jump approach is not restarted at the 5 Hz policy tick");
+Check(!TeamNavigationPolicy.RefreshMove(1,1,1.4f,true)&&TeamNavigationPolicy.RefreshMove(1,1,1.5f,true),"jump traversal has a finite retry interval");
+Check(TeamNavigationPolicy.RefreshMove(1,2,.1f,true),"new landing or route can still update immediately");
 Console.WriteLine($"{checks} navigation checks passed");

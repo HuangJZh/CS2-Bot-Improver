@@ -143,6 +143,25 @@ public readonly record struct NavigationContext(bool Combat,bool Busy,bool Groun
     bool RoundLive,bool NativeOwned,bool Urgent,float Elapsed,float Deadline);
 public static class TeamNavigationPolicy
 {
+    // A raised waypoint is not reached just because its XY is close. Do not
+    // advance past a box/ledge before the feet actually reach its elevation.
+    public static bool ReachedWaypoint(Vector3 origin,Vector3 waypoint)
+        =>Vector3.Distance(origin,waypoint)<125&&MathF.Abs(origin.Z-waypoint.Z)<=18;
+    public static bool NativeTraversal(Vector3 from,Vector3 to)=>MathF.Abs(to.Z-from.Z)>18;
+    public static int LookAhead(TeamNavigationGraph graph,IReadOnlyList<int> path,int cursor,Vector3? origin=null)
+    {
+        if(origin is {} feet&&NativeTraversal(feet,graph.Areas[path[cursor]].Point))return cursor;
+        int look=cursor;float length=0;
+        while(look<path.Count-1&&length<220)
+        {
+            var from=graph.Areas[path[look]].Point;var to=graph.Areas[path[look+1]].Point;
+            length+=Vector3.Distance(from,to);look++;
+            if(NativeTraversal(from,to))break;
+        }
+        return look;
+    }
+    public static bool RefreshMove(int previous,int next,float elapsed,bool traversal)
+        =>previous!=next||elapsed>=(traversal?1.5f:.75f);
     public static int ChooseSite(int team,int attackSite,Vector3 origin,IReadOnlyList<Vector3> sites,IReadOnlyList<int> assigned)
     {
         if(sites.Count==0||sites.Count!=assigned.Count)throw new ArgumentException("Missing site assignments");

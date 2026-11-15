@@ -11,6 +11,17 @@ public partial class BotAimImprover
     private sealed record FireGuard(uint Pawn,long Token);
     private sealed record PendingFireGuardRelease(int Slot,uint Pawn,long Token,float Until,int Attempts);
     private readonly Dictionary<int,FireGuard> _fireGuards=new();
+    private sealed record TurnReadiness(uint Pawn,uint Target,LargeTurnReadiness State);
+    private readonly Dictionary<int,TurnReadiness> _turnReadiness=new();
+    private bool LargeTurnReady(CCSPlayerController player,CCSPlayerPawn pawn,CCSBot bot,float bearing,bool advance)
+    {
+        if(!_turnReadiness.TryGetValue(player.Slot,out var entry)||entry.Pawn!=player.PlayerPawn.Raw||entry.Target!=bot.Enemy.Raw)
+        {
+            entry=new(player.PlayerPawn.Raw,bot.Enemy.Raw,new());
+            if(advance)_turnReadiness[player.Slot]=entry;
+        }
+        return entry.State.Ready(Server.CurrentTime,pawn.EyeAngles.Y,bearing,advance);
+    }
     private sealed record WeaponTurnClock(uint Pawn,uint Weapon,int BeforeTick,float BeforeFraction,float BeforeAttack,int UntilTick,float UntilAttack);
     private readonly Dictionary<int,WeaponTurnClock> _weaponTurnClocks=new();
     private readonly List<PendingFireGuardRelease> _pendingGuardReleases=new();
@@ -135,7 +146,7 @@ public partial class BotAimImprover
         // can prevent BT from ever making the request we are waiting to release.
         long installed=_fireGuards.TryGetValue(slot,out var bound)?bound.Token:0;
         bool needsClock=BotCombatPolicy.RetakeAiContract.NeedsWeaponClock(IsRetakeBot(player),installed);
-        if(needsClock&&(decision.Reason is "target-outside-fire-cone" or "turn-not-ready" or "native-reaction"))HoldWeaponTurnClock(player);
+        if(needsClock&&(decision.Reason is "target-outside-fire-cone" or "turn-not-ready" or "native-reaction" or "large-turn-settle"))HoldWeaponTurnClock(player);
         else ReleaseWeaponTurnClock(slot);
         if(_fireGuards.TryGetValue(slot,out var current) && current.Token>0)return;
         long token=_humanController!.StartUsercmdSuppression(slot,(ulong)PlayerButtons.Attack);
@@ -158,7 +169,7 @@ public partial class BotAimImprover
     private FireGateDecision EvaluateFireGate(CCSPlayerController player,CCSPlayerPawn pawn,CCSBot bot,bool advanceTimers)
     {
         if(TestGateActive)return new(false,true,"test-override");
-        if(_humanSettings.NativeCombat)return EvaluateNativeCombatGate(player,pawn,bot);
+        if(_humanSettings.NativeCombat)return EvaluateNativeCombatGate(player,pawn,bot,advanceTimers);
         if(IsRetakeBot(player)&&(!_humanStates.TryGetValue(player.Slot,out var retakeState)||retakeState.Pawn!=player.PlayerPawn.Raw
             ||!retakeState.LastSight||!retakeState.Model.HasObservation||!bot.IsEnemyVisible))return new(false,true,"retake-await-visual-plan");
         // Inhibit only: these coarse native-enemy coordinates never steer aim or
@@ -168,7 +179,9 @@ public partial class BotAimImprover
             &&nativeEnemy.AbsOrigin is {} origin&&TryGetBotEyePosition(player,out var eye))
         {
             var bearing=AimMath.Angles(new(eye.X,eye.Y,eye.Z),new(origin.X,origin.Y,origin.Z+nativeEnemy.ViewOffset.Z*.7f));
+            bool turnReady=LargeTurnReady(player,pawn,bot,bearing.Y,advanceTimers);
             if(FacingFirePolicy.OutsideCone(pawn.EyeAngles.Y,bearing.Y))return new(false,true,"target-outside-fire-cone");
+            if(!turnReady)return new(false,true,"large-turn-settle");
         }
         if(!_humanStates.TryGetValue(player.Slot,out var state))return new(false,false,"no-plan");
         if(state.Pawn!=player.PlayerPawn.Raw)return new(false,false,"pawn-changed");
